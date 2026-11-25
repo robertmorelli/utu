@@ -4,4 +4,4 @@ main {
     let total: F64 = &{ value: 1.0 };
     console.log(total);
 }
-using console from std:Console
+using console from std:console

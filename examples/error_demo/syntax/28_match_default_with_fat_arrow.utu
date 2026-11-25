@@ -8,4 +8,4 @@ fn describe(n: I32) Str {
 }
 
 main { console.log(describe(7)); }
-using console from std:Console
+using console from std:console

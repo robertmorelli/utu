@@ -4,4 +4,4 @@ main {
     let bytes: Array[U8] = [0, 128, 255, 256];
     console.log(bytes.len());
 }
-using console from std:Console
+using console from std:console

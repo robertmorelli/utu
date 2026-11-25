@@ -1106,10 +1106,10 @@ fn check_wutu_key(node: I32, args: I32, cx: Cx) I32 {
     return error_value()
 }
 
-/// Whether `callee` is `wutu.show` (std:Wutu's).
+/// Whether `callee` is `wutu.show` (std:wutu's).
 fn is_wutu_show(callee: I32) Bool => is_wutu_fn(callee, cks(Ckt.Show))
 
-/// Whether `callee` is std:Wutu's function `name` (`wutu.name`).
+/// Whether `callee` is std:wutu's function `name` (`wutu.name`).
 fn is_wutu_fn(callee: I32, name: Str) Bool {
     if not is_kind(callee, Node.Field_expr) { return false }
     let base = first_child(callee)
@@ -1129,7 +1129,7 @@ fn is_wutu_fn(callee: I32, name: Str) Bool {
 //! (compared by value, so nothing it reads can change unseen) and f is
 //! memo-safe: it, and every function it calls, reads no global or mem,
 //! calls no host function or `@es` binding of its own (std's and the
-//! template's helpers are trusted), and uses none of std:Wutu's effects
+//! template's helpers are trusted), and uses none of std:wutu's effects
 //! (route, refresh, timers, cleanups, storage).
 
 /// `wutu.memo_key(f(…), `…`)`: the key's template when f(…) may be reused, else "".
@@ -1204,7 +1204,7 @@ fn memo_unsafe(n: I32, why: I32) Bool {
 }
 
 /// Whether function `decl` is memo-safe (see above). A function in a file
-/// that is not the program's own (std's) is, but std:Wutu's effects.
+/// that is not the program's own (std's) is, but std:wutu's effects.
 fn memo_safe_fn(decl: I32) Bool {
     if not decl_is(decl, Decl.Fn) { return false }
     while (memo_state.len() <= decl) { memo_state.push(0) }
@@ -1220,7 +1220,7 @@ fn memo_safe_fn(decl: I32) Bool {
 }
 
 /// A std function: all are memo-safe but those that ask the host for
-/// something new each time (the clock, random seeds, streams) and std:Wutu's effects.
+/// something new each time (the clock, random seeds, streams) and std:wutu's effects.
 fn std_memo_safe(decl: I32) Bool {
     let module = module_of(decl)
     if module < 0 { return true }
@@ -1331,6 +1331,7 @@ fn int_value(node: I32) I64 {
     let t = node_first[node]
     let i = tok_start[t]
     let end_ = tok_end[t]
+    if src[i] == 39 { return I32.max(char_value(t), 0).i64() }
     let v: I64 = 0
     if end_ - i > 2 and src[i] == 48 and (src[i + 1] == 120 or src[i + 1] == 98) {
         let hex = src[i + 1] == 120
@@ -1354,6 +1355,12 @@ fn int_value(node: I32) I64 {
 /// adopt it, else @literal_default. `at` is the literal as written: with
 /// its minus, when `negate`.
 fn int_literal(node: I32, at: I32, expect: I32, negate: Bool) I32 {
+    let t0 = node_first[node]
+    if src[tok_start[t0]] == 39 {
+        let c = char_value(t0)
+        if c == -2 { report_bad_literal(at) }
+        else if c < 0 { report2(Diag.InvalidEscape, at, src.intern(tok_start[t0], tok_end[t0]), 4, -1) }
+    }
     let t = if expect >= 0 and is_numeric(expect) { expect } else { literal_default(node, negate) }
     if not literal_fits(node, t, negate) {
         report2(Diag.IntegerOutOfRange, at, -1, t, if negate { 1 } else { 0 })
@@ -1370,6 +1377,7 @@ fn past_64_bits(node: I32) Bool {
     let t = node_first[node]
     let i = tok_start[t]
     let end_ = tok_end[t]
+    if src[i] == 39 { return false }
     let max = cks(Ckt.N18446744073709551615)
     let per = 0
     if end_ - i > 2 and src[i] == 48 and (src[i + 1] == 120 or src[i + 1] == 98) {

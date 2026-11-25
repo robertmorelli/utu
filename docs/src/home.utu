@@ -3,13 +3,11 @@ using code from "./code.utu"
 using ui from "./ui.utu"
 mod home {
     fn greeting_sample() Str {
-        return \\using Browser from std:Browser
-        \\
-        \\wn greeting(name: Str) {
+        return \\wn greeting(name: Str) {
         \\    section.greeting {
         \\        display: grid
         \\        gap: 1rem
-        \\        h2 { "Hello, "; = name }
+        \\        h2 { "Hello, "; | name }
         \\        a {
         \\            href = "#/start"
         \\            :hover { opacity: 0.8 }
@@ -18,8 +16,10 @@ mod home {
         \\    }
         \\}
         \\
-        \\main {
-        \\    Browser.document.body.append(greeting("friend"))
+        \\html {
+        \\    body {
+        \\        |> greeting("friend")
+        \\    }
         \\}
     }
     fn npm_sample() Str {
@@ -39,14 +39,14 @@ mod home {
         \\        filter |n| { n > 4 }
         \\        fold (0) |total, n| { total + n })
         \\}
-        \\using console from std:Console
+        \\using console from std:console
     }
     fn page() Browser.HTMLElement {
         return @wutu/\
         article.home {
             section.hero {
                 div.pitch {
-                    = ui.logo()
+                    |> ui.logo()
                     h1 {
                         "A language that compiles to WasmGC."
                     }
@@ -69,7 +69,7 @@ mod home {
                     }
                 }
                 div.sample {
-                    = code.block(greeting_sample())
+                    |> code.block(greeting_sample())
                     p.caption {
                         "Wutu, utu's built-in DOM and CSS language. Markup, styles, and events in one typed expression. This page is written in it."
                     }
@@ -86,7 +86,7 @@ mod home {
                         }
                         " gives typed access to the whole DOM and JavaScript standard library, and any npm package with types imports directly. Only the boundary operations a program uses are emitted."
                     }
-                    = code.block(npm_sample())
+                    |> code.block(npm_sample())
                     a {
                         href = "#/javascript"
                         "JavaScript, the browser, and npm"
@@ -99,7 +99,7 @@ mod home {
                     p {
                         "A pipeline over a native array compiles to one Wasm loop with scalar locals. No iterator objects, no closures, no operator library, no intermediate collections."
                     }
-                    = code.block(pipeline_sample())
+                    |> code.block(pipeline_sample())
                     a {
                         href = "#/data"
                         "Typed JSON, iterators, and indexes"

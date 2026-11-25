@@ -87,7 +87,7 @@ async function buildWithSelfhost({ entry, outDir, stdlib, optimize, safe = true,
     throw new Error(format(errors, new Map(result.files.map(f => [f.key, f.text])), { color, relative, highlight: highlighter(utu, result.files) }));
   }
   const { wasm, spec } = result;
-  // A chunk runs in a page that has std:Wutu's runtime already: it does not ship it again.
+  // A chunk runs in a page that has std:wutu's runtime already: it does not ship it again.
   if (chunk) for (const bindings of Object.values(spec.es ?? {}))
     for (const [name, body] of Object.entries(bindings)) if (typeof body === 'string' && body.includes('function createWutuRuntime')) bindings[name] = '() => {}';
   await fs.mkdir(outDir, { recursive: true });
@@ -133,7 +133,6 @@ async function buildWithSelfhost({ entry, outDir, stdlib, optimize, safe = true,
       report.chunks[path.basename(dir)] = size(bytes);
     }
   }
-  await fs.writeFile(path.join(outDir, 'sizes.json'), JSON.stringify(report, null, 2) + '\n');
   return report;
 }
 

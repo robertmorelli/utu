@@ -9,4 +9,4 @@ fn bucket(n: I32) I32 {
 }
 
 main { console.log(bucket(1)); }
-using console from std:Console
+using console from std:console

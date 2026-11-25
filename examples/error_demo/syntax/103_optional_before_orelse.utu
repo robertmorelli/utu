@@ -10,4 +10,4 @@ main {
     second = head.next?.name orelse "default";
     console.log(second);
 }
-using console from std:Console
+using console from std:console

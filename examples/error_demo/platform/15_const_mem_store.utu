@@ -6,4 +6,4 @@ main {
     primes[0] = 1;
     console.log(primes[0]);
 }
-using console from std:Console
+using console from std:console

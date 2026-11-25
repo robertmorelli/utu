@@ -13,4 +13,4 @@ main {
     let s: S = a.mk();
     console.log(s.x);
 }
-using console from std:Console
+using console from std:console

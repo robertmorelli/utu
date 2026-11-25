@@ -4,4 +4,4 @@ main {
     let huge: I64 = 99999999999999999999;
     console.log(huge);
 }
-using console from std:Console
+using console from std:console

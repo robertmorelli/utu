@@ -15,4 +15,4 @@ main {
     let c: Counter = NoStep { n: 1 };
     console.log(c.step());
 }
-using console from std:Console
+using console from std:console

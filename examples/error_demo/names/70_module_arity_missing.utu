@@ -12,4 +12,4 @@ fn depth(s: Stack) I32 { return s.size; }
 main {
     console.log(depth(Stack[I32].new(0)));
 }
-using console from std:Console
+using console from std:console

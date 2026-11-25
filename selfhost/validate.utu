@@ -137,8 +137,8 @@ fn validate_program() Void {
 //!
 //! `#inline`, `#noinline`, `#cache`, and `#cache(N)` before a function
 //! (parse.utu lists them, @dir_node). Each is known, takes an argument only
-//! when it is #cache's (0, no bound, or a power of 2), and is given once; a
-//! function is not both #inline and #noinline.
+//! when it is `#cache`'s (0, no bound, or a power of 2), and is given once; a
+//! function is not both `#inline` and `#noinline`.
 
 /// What a directive's name says: 0 unknown, 1 `#inline`, 2 `#noinline`, 3 `#cache`, 4 `#luge`, 5 `#workgroup`.
 fn directive_kind(d: I32) I32 {
@@ -538,7 +538,7 @@ fn self_clash(params: I32) Void {
     }
 }
 
-/// The lets of a block, each name once; a function's body also not a parameter's.
+/// The lets of a block, each name once (but `_`); a function's body also not a parameter's.
 fn duplicate_lets(block: I32) Void {
     // (A block without a let names nothing twice.)
     let any = first_child(block)
@@ -559,7 +559,8 @@ fn duplicate_lets(block: I32) Void {
     while (c >= 0) {
         if is_kind(c, Node.Bind_expr) and is_kind(first_child(c), Node.Identifier) {
             let word = word_of(first_child(c))
-            if word_seen(word, stamp) {
+            // (`let _ = f()`: a value dropped; `_` may repeat.)
+            if word_seen(word, stamp) and node_text(first_child(c)) != "_" {
                 let param = param_named(params, word)
                 report2(Diag.DuplicateDeclaration, c, word, if param >= 0 { 8 } else { 3 }, -1)
                 if param >= 0 { diag_place(Extra.Related, first_child(param), sms(Sml.TheParameter)) }

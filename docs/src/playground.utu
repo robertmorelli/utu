@@ -46,7 +46,7 @@ mod playground {
         \\        label {
         \\            input { type = "checkbox"; bind:checked = todo.done }
         \\            " "
-        \\            = todo.text
+        \\            | todo.text
         \\        }
         \\    }
         \\}
@@ -91,7 +91,7 @@ mod playground {
         \\        }
         \\        p {
         \\            color: rgb(101 108 126)
-        \\            = `${state.left()} left`
+        \\            |> `${state.left()} left`
         \\        }
         \\    }
         \\    }
@@ -101,7 +101,7 @@ mod playground {
     /// browser's storage.
     fn saved() Saved {
         return @stored/\
-        Saved "utu-playground-v3" Saved { source: sample() }
+        Saved "utu-playground-v4" Saved { source: sample() }
         \/
     }
     fn start() State {
@@ -137,7 +137,7 @@ mod playground {
         }
         return @wutu/\
         article.page.playground {
-            = ui.header("Playground", "Edit Wutu and the site it builds runs beside it. The compiler is utu's own, compiled to WasmGC, running in your browser.")
+            |> ui.header("Playground", "Edit Wutu and the site it builds runs beside it. The compiler is utu's own, compiled to WasmGC, running in your browser.")
             div.bench {
                 display:grid
                 grid-template-columns:minmax(0, 1fr) minmax(0, 1fr)
@@ -162,7 +162,7 @@ mod playground {
                         overflow:hidden
                         white-space:pre
                         pointer-events:none
-                        = code.spans(state.saved.source)
+                        |> code.spans(state.saved.source)
                     }
                     textarea as field {
                         spellcheck = "false"
@@ -240,7 +240,7 @@ mod playground {
                             color: var(--orange)
                             font-weight: 600
                         }
-                        = state.status
+                        | state.status
                     }
                     iframe {
                         id = "play-preview"
@@ -258,7 +258,7 @@ mod playground {
                     margin-block-start:0
                     inline-size:min(100%, 76rem)
                     white-space:pre-wrap
-                    = state.detail
+                    | state.detail
                 }
             }
             p {

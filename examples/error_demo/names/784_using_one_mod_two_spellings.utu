@@ -6,4 +6,4 @@ using helpers from "./lib/../lib/489_helper_lib.utu";
 main {
     console.log(helpers.one());
 }
-using console from std:Console
+using console from std:console

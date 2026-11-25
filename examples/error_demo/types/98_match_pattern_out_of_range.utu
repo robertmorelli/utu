@@ -9,4 +9,4 @@ fn status(code: U32) I32 {
 }
 
 main { console.log(status(0)); }
-using console from std:Console
+using console from std:console

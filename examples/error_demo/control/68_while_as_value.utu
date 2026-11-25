@@ -5,4 +5,4 @@ main {
     let n: I32 = while (i < 10) { i += 1; };
     console.log(n);
 }
-using console from std:Console
+using console from std:console

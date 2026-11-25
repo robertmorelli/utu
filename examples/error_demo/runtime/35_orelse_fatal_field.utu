@@ -9,4 +9,4 @@ main {
     let n = tail.next orelse fatal;
     console.log(n.name);
 }
-using console from std:Console
+using console from std:console

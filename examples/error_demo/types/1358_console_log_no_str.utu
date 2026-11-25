@@ -1,6 +1,6 @@
 // What: console.log of a struct with no str(): its $T body does not fit the struct
 // Expect: No method Point.str, at console.log's x.str(), with this call marked "as log[Point] here"
-using console from std:Console;
+using console from std:console;
 
 struct Point:
     | x: I32

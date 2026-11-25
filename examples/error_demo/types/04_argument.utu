@@ -6,4 +6,4 @@ main {
     let width: F64 = 4.5;
     console.log(repeat_dash(width).len());
 }
-using console from std:Console
+using console from std:console

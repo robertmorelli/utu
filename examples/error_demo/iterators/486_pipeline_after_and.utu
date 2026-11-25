@@ -4,4 +4,4 @@ main {
     let ok = true;
     console.log(ok and (0 ..< 5) all |i| { i < 9; });
 }
-using console from std:Console
+using console from std:console

@@ -1,4 +1,4 @@
 
       main { let broken: I32 = ; }
     
-using console from std:Console
+using console from std:console

@@ -8,4 +8,4 @@ fn initial(name: ?Str) Str {
 }
 
 main { console.log(initial("Ada")); }
-using console from std:Console
+using console from std:console

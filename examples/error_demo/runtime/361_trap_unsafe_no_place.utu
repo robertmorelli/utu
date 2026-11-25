@@ -8,4 +8,4 @@ fn ratio(a: I32, b: I32) I32 {
 main {
     console.log(ratio(1, 0));
 }
-using console from std:Console
+using console from std:console

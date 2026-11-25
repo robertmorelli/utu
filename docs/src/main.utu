@@ -568,7 +568,7 @@ main {
                     block-size: 2.1rem
                     flex: none
                 }
-                = ui.logo()
+                |> ui.logo()
                 "utu"
                 span.sub {
                     font-weight:400
@@ -618,7 +618,7 @@ main {
                                 border-block-end-color: var(--orange)
                             }
                         }
-                        = link.label
+                        | link.label
                     }
                 }
             }
@@ -644,8 +644,8 @@ main {
         }
         div.content {
             min-inline-size:0
-            = arrive(site, wutu.route())
-            = page(wutu.route(), play)
+            |> arrive(site, wutu.route())
+            |> page(wutu.route(), play)
             footer {
                 padding:1.5rem clamp(1rem, 4vw, 3rem) 3rem
                 border-block-start:1px solid var(--line)

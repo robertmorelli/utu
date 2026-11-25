@@ -7,4 +7,4 @@ fn get(xs: Array[I32], i: I32) I32 {
 main {
     console.log(get([1, 2], 9));
 }
-using console from std:Console
+using console from std:console

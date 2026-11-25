@@ -7,4 +7,4 @@ fn count_down(n: I32) I32 {
 main {
     console.log(count_down(10));
 }
-using console from std:Console
+using console from std:console

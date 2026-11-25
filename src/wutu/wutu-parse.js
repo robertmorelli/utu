@@ -64,7 +64,7 @@ const TAG_ATTRIBUTES = Object.fromEntries(Object.entries({
   area: 'alt coords shape href target download rel',
   base: 'href target',
   link: 'href rel type media sizes crossorigin',
-  meta: 'name content charset http-equiv',
+  meta: 'name content charset http-equiv property media itemprop',
   a: 'href target rel download hreflang type',
   button: 'type disabled name value form popovertarget popovertargetaction',
   input: 'type name value placeholder required disabled readonly checked min max step minlength maxlength pattern multiple accept autocomplete autofocus size form',
@@ -616,6 +616,7 @@ class WutuParser {
       global.push(this.readCssBlock());
       this.skipTrivia();
     }
+    this.global = global;
     const children = [];
     while (!this.done) {
       if (this.text[this.p] === ';') { this.p++; this.skipTrivia(); continue; }
@@ -791,8 +792,17 @@ class WutuParser {
       this.skipTrivia();
       if (this.done) this.fail(`unterminated element '${tag}'`, start);
       if (this.text[this.p] === '}') { this.p++; break; }
+      // `html { @document { … } head { … } body { … } }`: the page's document CSS.
+      if (tag === 'html' && this.global && this.at('@document')) {
+        this.p += '@document'.length;
+        this.skipTrivia();
+        if (this.text[this.p] !== '{') this.fail('expected document CSS block');
+        this.global.push(this.readCssBlock());
+        continue;
+      }
       this.parseElementStatement(node);
     }
+    node.end = this.p;
     this.svg = outer;
     this.svgElement = outerElement;
     if (VOID_TAGS.has(tag) && node.children.length) this.fail(`${tag} cannot have children`, start);

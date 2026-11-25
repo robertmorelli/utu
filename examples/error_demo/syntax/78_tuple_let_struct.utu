@@ -8,4 +8,4 @@ main {
     let .{x, y} = Point { x: 1, y: 2 };
     console.log(x + y);
 }
-using console from std:Console
+using console from std:console

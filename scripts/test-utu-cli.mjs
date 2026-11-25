@@ -25,14 +25,14 @@ fn add(a: I32, b: I32) I32 { return a + b; }
 main { console.log(twice(add(1, 2))); }
 test "adds" { assert add(1, 2) == 3; }
 test "fails" { assert add(1, 2) == 4; }
-using console from std:Console
+using console from std:console
 `);
   await write('bad.utu', `fn add(a: I32, b: I32) I32 { return a + b; }
 main {
     let x: I32 = add(1, "two");
     console.log(x + missing);
 }
-using console from std:Console
+using console from std:console
 `);
 
   let r = utu('check', 'good.utu');
@@ -66,7 +66,7 @@ using console from std:Console
    │                     ━━━━━━━
    │                     ╰─ not defined
  5 │ }
- 6 │ using console from std:Console`);
+ 6 │ using console from std:console`);
   // On a terminal, colored as the compiler reads it: \`add\` a function, \`I32\` a type, the string a string.
   const colored = spawnSync(process.execPath, [cli, 'check', 'bad.utu'], { cwd: dir, encoding: 'utf8', env: { ...process.env, NO_COLOR: '', FORCE_COLOR: '1', COLORTERM: 'truecolor', UTU_THEME: 'dark' } }).stderr;
   assert.match(colored, /\x1b\[38;2;130;170;255madd/);
@@ -81,7 +81,7 @@ using console from std:Console
     assert.ok(!plain.includes('\x1b['), JSON.stringify(env));
   }
   // The mark is under the code, past wide characters.
-  await fs.writeFile(path.join(dir, 'wide.utu'), 'main {\n    let s: Str = "漢字"; console.log(nope);\n}\nusing console from std:Console\n');
+  await fs.writeFile(path.join(dir, 'wide.utu'), 'main {\n    let s: Str = "漢字"; console.log(nope);\n}\nusing console from std:console\n');
   assert.match(utu('check', 'wide.utu').stderr, /^ {3}│ {38}━{4}$/m);
   // A file that ends early says so, and which brace is left open.
   await fs.writeFile(path.join(dir, 'short.utu'), 'main {\n');
@@ -230,7 +230,7 @@ FAIL after tests: late
   // leave them out, and it reaches the capacity beyond.
   await write('past.utu', `using Buffer from std:Buffer;
 main { let b = Buffer[I32].new(); b.push(7); console.log(b[3]); }
-using console from std:Console
+using console from std:console
 `);
   for (const mode of [[], ['-O', 'fast']]) {
     r = utu('run', 'past.utu', ...mode);
@@ -252,24 +252,24 @@ using console from std:Console
   // A trap at its line, with the functions it was in, by a source map:
   // each kind of trap, in debug (exact), small and fast (best effort).
   const traps = {
-    assert: ['fn boom(x: I32) I32 {\n    assert x > 5;\n    return x * 2;\n}\nmain { console.log(boom(10) + boom(1)); }\nusing console from std:Console\n', 'Failed assert', '2:5', 'boom'],
-    fatal: ['fn check(x: I32) I32 {\n    if x < 0 { fatal; };\n    return x;\n}\nmain { console.log(check(-1)); }\nusing console from std:Console\n', 'Reached fatal', '2:16', 'check'],
-    divide: ['fn div(a: I32, b: I32) I32 {\n    return a / b;\n}\nmain { console.log(div(7, 0)); }\nusing console from std:Console\n', 'Integer division by zero', '2:12', 'div'],
-    bounds: ['fn at(xs: Array[I32], i: I32) I32 {\n    return xs[i];\n}\nmain { console.log(at([1, 2, 3], 5)); }\nusing console from std:Console\n', 'Index out of bounds', '2:12', 'at'],
+    assert: ['fn boom(x: I32) I32 {\n    assert x > 5;\n    return x * 2;\n}\nmain { console.log(boom(10) + boom(1)); }\nusing console from std:console\n', 'Failed assert', '2:5', 'boom'],
+    fatal: ['fn check(x: I32) I32 {\n    if x < 0 { fatal; };\n    return x;\n}\nmain { console.log(check(-1)); }\nusing console from std:console\n', 'Reached fatal', '2:16', 'check'],
+    divide: ['fn div(a: I32, b: I32) I32 {\n    return a / b;\n}\nmain { console.log(div(7, 0)); }\nusing console from std:console\n', 'Integer division by zero', '2:12', 'div'],
+    bounds: ['fn at(xs: Array[I32], i: I32) I32 {\n    return xs[i];\n}\nmain { console.log(at([1, 2, 3], 5)); }\nusing console from std:console\n', 'Index out of bounds', '2:12', 'at'],
     // A mem's or vec's index past its length (within its capacity), as an array's.
-    mem_bounds: ['mem b: U8;\nfn put(i: I32) Void {\n    b[i] = 77;\n}\nmain { b.push(9); put(1); put(4); console.log(b.len()); }\nusing console from std:Console\n', 'Index out of bounds', '3:5', 'put'],
-    vec_bounds: ['vec b: I32;\nfn at(i: I32) I32 {\n    return b[i] + 1;\n}\nmain { b.reserve(8); b.push(9); console.log(at(0) + at(3)); }\nusing console from std:Console\n', 'Index out of bounds', '3:12', 'at'],
+    mem_bounds: ['mem b: U8;\nfn put(i: I32) Void {\n    b[i] = 77;\n}\nmain { b.push(9); put(1); put(4); console.log(b.len()); }\nusing console from std:console\n', 'Index out of bounds', '3:5', 'put'],
+    vec_bounds: ['vec b: I32;\nfn at(i: I32) I32 {\n    return b[i] + 1;\n}\nmain { b.reserve(8); b.push(9); console.log(at(0) + at(3)); }\nusing console from std:console\n', 'Index out of bounds', '3:12', 'at'],
     // `orelse fatal` is fatal's trap, not a null's.
-    null: ['fn pick(x: ?Str) Str {\n    return x orelse fatal;\n}\nmain { console.log(pick(null)); }\nusing console from std:Console\n', 'Reached fatal', '2:21', 'pick'],
-    slice: ['fn cut(xs: Array[I32]) I32 {\n    return xs[2, 1].len();\n}\nmain { console.log(cut([1, 2, 3])); }\nusing console from std:Console\n', 'Slice ends before it starts', '2:12', 'cut'],
+    null: ['fn pick(x: ?Str) Str {\n    return x orelse fatal;\n}\nmain { console.log(pick(null)); }\nusing console from std:console\n', 'Reached fatal', '2:21', 'pick'],
+    slice: ['fn cut(xs: Array[I32]) I32 {\n    return xs[2, 1].len();\n}\nmain { console.log(cut([1, 2, 3])); }\nusing console from std:console\n', 'Slice ends before it starts', '2:12', 'cut'],
     // In the slice helper every use shares: at this use, not the first.
-    slice2: ['fn n(x: I32) I32 { return x; }\nfn ok(xs: Array[I32]) I32 { return xs[0, 1].len(); }\nfn cut(xs: Array[I32]) I32 {\n    return xs[2, n(1)].len();\n}\nmain { let xs = [1, 2, 3]; console.log(ok(xs) + cut(xs)); }\nusing console from std:Console\n', 'Slice ends before it starts', '4:12', 'cut'],
+    slice2: ['fn n(x: I32) I32 { return x; }\nfn ok(xs: Array[I32]) I32 { return xs[0, 1].len(); }\nfn cut(xs: Array[I32]) I32 {\n    return xs[2, n(1)].len();\n}\nmain { let xs = [1, 2, 3]; console.log(ok(xs) + cut(xs)); }\nusing console from std:console\n', 'Slice ends before it starts', '4:12', 'cut'],
     // (A safe build stops at Color(9), before the match could miss.)
     // A column counts characters, as check's do (an emoji is one, not two UTF-16 units).
-    emoji: ['fn at(xs: Array[I32], i: I32) I32 {\n    let s = "😀😀"; return xs[i];\n}\nmain { console.log(at([1, 2, 3], 5)); }\nusing console from std:Console\n', 'Index out of bounds', '2:26', 'at'],
+    emoji: ['fn at(xs: Array[I32], i: I32) I32 {\n    let s = "😀😀"; return xs[i];\n}\nmain { console.log(at([1, 2, 3], 5)); }\nusing console from std:console\n', 'Index out of bounds', '2:26', 'at'],
     // A lone \r ends a line, as \n and \r\n do.
-    cr: ['fn at(xs: Array[I32], i: I32) I32 {\r    return xs[i];\r}\rmain { console.log(at([1, 2, 3], 5)); }\r\nusing console from std:Console\n', 'Index out of bounds', '2:12', 'at'],
-    range: ['enum(U8) Color:\n    | Red\n    | Green\nfn name(c: Color) I32 {\n    return match c { Color.Red => 1, Color.Green => 2, };\n}\nmain { console.log(name(Color(9))); }\nusing console from std:Console\n', 'Color: no variant has this value', '7:25', 'main'],
+    cr: ['fn at(xs: Array[I32], i: I32) I32 {\r    return xs[i];\r}\rmain { console.log(at([1, 2, 3], 5)); }\r\nusing console from std:console\n', 'Index out of bounds', '2:12', 'at'],
+    range: ['enum(U8) Color:\n    | Red\n    | Green\nfn name(c: Color) I32 {\n    return match c { Color.Red => 1, Color.Green => 2, };\n}\nmain { console.log(name(Color(9))); }\nusing console from std:console\n', 'Color: no variant has this value', '7:25', 'main'],
   };
   for (const [name, [source, title, at, fn]] of Object.entries(traps)) {
     await write(`${name}.utu`, source);
@@ -285,7 +285,7 @@ using console from std:Console
   }
   assert.match(utu('run', 'assert.utu', '-O', 'fast').stderr, /in boom  assert\.utu:2:5  \(inlined into main\)/);
   // A trap in a global's initializer, as any other (it showed JavaScript's stack).
-  await write('global.utu', 'fn n(x: I32) I32 { return x; }\nlet xs: Array[I32] = [1, 2];\nlet g: I32 = xs[n(5)];\nmain { console.log(g); }\ntest "g" { assert g == 1; }\nusing console from std:Console\n');
+  await write('global.utu', 'fn n(x: I32) I32 { return x; }\nlet xs: Array[I32] = [1, 2];\nlet g: I32 = xs[n(5)];\nmain { console.log(g); }\ntest "g" { assert g == 1; }\nusing console from std:console\n');
   for (const command of ['run', 'test']) {
     r = utu(command, 'global.utu');
     assert.equal(r.status, 1, r.stdout);
@@ -297,10 +297,10 @@ using console from std:Console
   assert.equal(r.status, 1, r.stdout);
   assert.ok(r.stderr.startsWith(' TRAP  Integer division by zero\n       trap · later.utu:3:35\n'), r.stderr);
   // @json's place in the text counts characters, and a lone \r ends a line.
-  await write('json.utu', 'struct P:\n    | s: Str\n    | x: I32\nmain {\n    console.log(@json/\\ error P "{\\"s\\": \\"😀\\",\\r\\"x\\": q}" \\/);\n}\nusing console from std:Console\n');
+  await write('json.utu', 'struct P:\n    | s: Str\n    | x: I32\nmain {\n    console.log(@json/\\ error P "{\\"s\\": \\"😀\\",\\r\\"x\\": q}" \\/);\n}\nusing console from std:console\n');
   assert.match(utu('run', 'json.utu').stdout, /at line 2, column 6$/m);
   // An @es body that is not JavaScript: at its block, when checked.
-  await write('es.utu', 'let f: fun(I32) I32 = @es/\\ (a) => a +* 1 \\/;\nmain { console.log(f(1)); }\nusing console from std:Console\n');
+  await write('es.utu', 'let f: fun(I32) I32 = @es/\\ (a) => a +* 1 \\/;\nmain { console.log(f(1)); }\nusing console from std:console\n');
   r = utu('check', 'es.utu');
   assert.equal(r.status, 1, r.stdout);
   assert.match(r.stderr, /^ ERROR  @es body is not JavaScript: .+\n {8}es-syntax · es\.utu:1:23\n/);
@@ -315,7 +315,7 @@ using console from std:Console
   assert.equal(r.status, 0, r.stderr);
   const map = JSON.parse(await fs.readFile(path.join(dir, 'mapped', 'assert.wasm.map'), 'utf8'));
   assert.equal(map.version, 3);
-  assert.deepEqual(map.sources, ['../assert.utu', 'std:Console', 'std:I32']);
+  assert.deepEqual(map.sources, ['../assert.utu', 'std:console', 'std:I32']);
   assert.match(map.mappings, /^[A-Za-z0-9+/,]+$/);
   const mapped = await fs.readFile(path.join(dir, 'mapped', 'assert.wasm'));
   const custom = WebAssembly.Module.customSections(new WebAssembly.Module(mapped), 'sourceMappingURL');
@@ -331,14 +331,14 @@ using console from std:Console
 
   // A program nested past the main thread's stack builds in a worker with a deeper one (Node).
   await write('deep.utu', `main { console.log(${'('.repeat(100000)}1${')'.repeat(100000)}); }
-using console from std:Console
+using console from std:console
 `);
   r = utu('run', 'deep.utu');
   assert.equal(r.status, 0, r.stderr.slice(0, 300));
   assert.equal(r.stdout.trim(), '1');
 
   // Arguments after -- reach the program as process.argv.slice(2); -- is only run's.
-  await write('args.utu', 'let count: fun() I32 = @es/\\ () => process.argv.length - 2 \\/;\nlet arg: fun(I32) Str = @es/\\ (i) => process.argv[i + 2] \\/;\nmain { console.log(`${count()} ${arg(1)}`); }\nusing console from std:Console\n');
+  await write('args.utu', 'let count: fun() I32 = @es/\\ () => process.argv.length - 2 \\/;\nlet arg: fun(I32) Str = @es/\\ (i) => process.argv[i + 2] \\/;\nmain { console.log(`${count()} ${arg(1)}`); }\nusing console from std:console\n');
   r = utu('run', 'args.utu', '--', 'a', 'b c');
   assert.equal(r.status, 0, r.stderr);
   assert.equal(r.stdout.trim(), '2 b c');
@@ -346,11 +346,11 @@ using console from std:Console
 
   // console.log of an array prints its elements' str: nested, empty, of strings,
   // of U32; a trap is still main's.
-  await write('arrays.utu', 'main { console.log([[1, 2, 3], [], [4]]); }\nusing console from std:Console\n');
-  await write('empty.utu', 'main { let e: Array[I32] = []; console.log(e); }\nusing console from std:Console\n');
-  await write('strs.utu', 'main { console.log(["a", "b\\"c", ""]); }\nusing console from std:Console\n');
-  await write('u32s.utu', 'main { console.log([4000000000, 0]); }\nusing console from std:Console\n');
-  await write('arraytrap.utu', 'fn at(xs: Array[I32], i: I32) I32 { return xs[i]; }\nmain { console.log([at([1], 3)]); }\nusing console from std:Console\n');
+  await write('arrays.utu', 'main { console.log([[1, 2, 3], [], [4]]); }\nusing console from std:console\n');
+  await write('empty.utu', 'main { let e: Array[I32] = []; console.log(e); }\nusing console from std:console\n');
+  await write('strs.utu', 'main { console.log(["a", "b\\"c", ""]); }\nusing console from std:console\n');
+  await write('u32s.utu', 'main { console.log([4000000000, 0]); }\nusing console from std:console\n');
+  await write('arraytrap.utu', 'fn at(xs: Array[I32], i: I32) I32 { return xs[i]; }\nmain { console.log([at([1], 3)]); }\nusing console from std:console\n');
   for (const mode of ['debug', 'small', 'fast', 'smallUnsafe', 'fastUnsafe']) {
     assert.equal(utu('run', 'arrays.utu', '-O', mode).stdout, '[[1, 2, 3], [], [4]]\n', mode);
     assert.equal(utu('run', 'empty.utu', '-O', mode).stdout, '[]\n', mode);
@@ -374,7 +374,7 @@ using console from std:Console
   await write('api.js', 'export function twice(n) { return n * 2; }\n');
   r = spawnSync(process.execPath, [path.resolve('tools/dts/cli.mjs'), '--input', 'api.d.ts', '--module', './api.js', '--prefix', 'Api', '--out', 'bindings'], { encoding: 'utf8', cwd: dir });
   assert.equal(r.status, 0, r.stderr);
-  await write('abi.utu', 'using Api from "./bindings/Api.abi.json";\nmain { console.log(Api.twice(21.0)); }\nusing console from std:Console\n');
+  await write('abi.utu', 'using Api from "./bindings/Api.abi.json";\nmain { console.log(Api.twice(21.0)); }\nusing console from std:console\n');
   r = utu('check', 'abi.utu');
   assert.equal(r.status, 0, r.stderr);
   r = utu('run', 'abi.utu');
@@ -396,7 +396,7 @@ using console from std:Console
 
   // An npm package's browser build, which Node runs too (nanoid's Node build needs
   // Buffer, which a browser lacks); --target node, its Node build.
-  await write('nano.utu', 'using Nano from "npm:nanoid";\nmain { console.log(Nano.nanoid(8).len()); }\nusing console from std:Console\n');
+  await write('nano.utu', 'using Nano from "npm:nanoid";\nmain { console.log(Nano.nanoid(8).len()); }\nusing console from std:console\n');
   for (const [target, buffer] of [[[], false], [['--target', 'browser'], false], [['--target', 'node'], true]]) {
     const where = `nano-${target[1] ?? 'default'}`;
     r = utu('build', 'nano.utu', '-o', where, ...target);
@@ -432,7 +432,7 @@ using console from std:Console
   assert.equal(r.stdout.trim(), '2 --blame');
   // A file that cannot be read is a read error; a place that cannot be written, a write error, without esbuild's stack.
   if (process.getuid?.() !== 0) {
-    await write('unread.utu', 'main { console.log(1); }\nusing console from std:Console\n');
+    await write('unread.utu', 'main { console.log(1); }\nusing console from std:console\n');
     await fs.chmod(path.join(dir, 'unread.utu'), 0o000);
     r = utu('check', 'unread.utu');
     assert.equal(r.status, 1);
@@ -468,7 +468,7 @@ using console from std:Console
   }
 
   // The views: source, declarations, syntax, WAT and graphs, from the self-hosted compiler.
-  await write('views.utu', 'fn twice(x: I32) I32 { return x * 2; }\nmain { console.log(twice(3)); }\ntest "twice" { assert twice(2) == 4; }\nusing console from std:Console\n');
+  await write('views.utu', 'fn twice(x: I32) I32 { return x * 2; }\nmain { console.log(twice(3)); }\ntest "twice" { assert twice(2) == 4; }\nusing console from std:console\n');
   r = utu('display', 'views.utu');
   assert.equal(r.status, 0, r.stderr);
   assert.match(r.stdout, /^fn twice\(x: I32\) I32 \{ return x \* 2; \}$/m);
@@ -490,14 +490,14 @@ using console from std:Console
   assert.match(await fs.readFile(path.join(dir, 'views.html'), 'utf8'), /twice/);
 
   // The views: a mistake in the command is said, not thrown.
-  await write('lost.utu', 'using nothere from "./nothere.utu";\nmain { console.log(1); }\nusing console from std:Console\n');
+  await write('lost.utu', 'using nothere from "./nothere.utu";\nmain { console.log(1); }\nusing console from std:console\n');
   // A byte that is not UTF-8, in the file or in one it imports: the self-hosted compiler's error, at the byte.
   await fs.writeFile(path.join(dir, 'latin1.utu'), Buffer.concat([Buffer.from('main {\n    // caf'), Buffer.from([0xe9]), Buffer.from('\n    1;\n}\n')]));
-  await write('uses-latin1.utu', 'using l from "./latin1.utu";\nmain { console.log(1); }\nusing console from std:Console\n');
+  await write('uses-latin1.utu', 'using l from "./latin1.utu";\nmain { console.log(1); }\nusing console from std:console\n');
   // A module that does not exist: said, not a stack.
-  await write('unknown-module.utu', 'using geometri |Point|;\nmain { console.log(1); }\nusing console from std:Console\n');
+  await write('unknown-module.utu', 'using geometri |Point|;\nmain { console.log(1); }\nusing console from std:console\n');
   // A @comptime loop that never ends: stopped, as the self-hosted compiler stops it.
-  await write('forever.utu', 'fn f() Array[I32] { while (true) { }; return [1]; }\nconst mem t: I32 = @comptime/\\ f() \\/;\nmain { console.log(t.len()); }\nusing console from std:Console\n');
+  await write('forever.utu', 'fn f() Array[I32] { while (true) { }; return [1]; }\nconst mem t: I32 = @comptime/\\ f() \\/;\nmain { console.log(t.len()); }\nusing console from std:console\n');
   // How it was run (2), or the program (1).
   for (const [args, said, status = 1] of [
     [['display'], /No file/, 2],

@@ -3,4 +3,4 @@
 using helper from "./lib/489_helper_lib.utu";
 
 main { console.log(helper()); }
-using console from std:Console
+using console from std:console

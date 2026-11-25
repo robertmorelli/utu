@@ -12,4 +12,4 @@ fn kind(s: Shape) I32 {
 }
 
 main { console.log(kind(Dot {})); }
-using console from std:Console
+using console from std:console

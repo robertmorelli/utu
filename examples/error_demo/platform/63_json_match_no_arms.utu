@@ -10,4 +10,4 @@ fn status(text: Str) I32 {
 main {
     console.log(status("{}"));
 }
-using console from std:Console
+using console from std:console

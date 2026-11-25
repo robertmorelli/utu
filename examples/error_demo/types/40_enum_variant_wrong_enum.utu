@@ -11,4 +11,4 @@ enum(U8) Size:
 fn paint(c: Color) I32 { return c.i32(); }
 
 main { console.log(paint(Size.Small)); }
-using console from std:Console
+using console from std:console

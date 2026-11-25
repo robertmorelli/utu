@@ -15,4 +15,4 @@ main {
     for (walk(root, 0)) |n| { count += 1; };
     console.log(count);
 }
-using console from std:Console
+using console from std:console

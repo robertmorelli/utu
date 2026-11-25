@@ -5,4 +5,4 @@ mem table: U8 = @es/\ [1, 2, 3] \/;
 main {
     console.log(table.len());
 }
-using console from std:Console
+using console from std:console

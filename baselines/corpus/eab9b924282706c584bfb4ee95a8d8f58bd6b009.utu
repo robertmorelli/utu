@@ -10,4 +10,4 @@ main {
     let point: Point = Point { x: 3, y: 4 };
     console.log(score(point));
 }
-using console from std:Console
+using console from std:console

@@ -10,4 +10,4 @@ fn has_big_next(head: Node) Bool {
 }
 
 main { console.log(if has_big_next(Node { count: 1, next: null }) { 1; } else { 0; }); }
-using console from std:Console
+using console from std:console

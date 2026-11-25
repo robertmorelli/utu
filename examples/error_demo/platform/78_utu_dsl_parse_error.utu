@@ -5,4 +5,4 @@ main {
     let x: I32 = @utu/\ 1 + \/;
     console.log(x);
 }
-using console from std:Console
+using console from std:console

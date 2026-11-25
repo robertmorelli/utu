@@ -1,4 +1,4 @@
-//! Clocks: `using time from std:Time;`, then `time.now()`. Each function ships only when used.
+//! Clocks: `using time from std:time;`, then `time.now()`. Each function ships only when used.
 
 mod time {
     /// Milliseconds since an arbitrary start, with sub-millisecond precision

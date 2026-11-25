@@ -9,4 +9,4 @@ main {
     let second = head.next?.name;
     console.log(second);
 }
-using console from std:Console
+using console from std:console

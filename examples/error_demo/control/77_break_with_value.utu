@@ -10,4 +10,4 @@ fn first_even(xs: Array[I32]) I32 {
 main {
     console.log(first_even([1, 4]));
 }
-using console from std:Console
+using console from std:console

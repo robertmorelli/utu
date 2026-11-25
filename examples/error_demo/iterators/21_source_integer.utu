@@ -4,4 +4,4 @@ main {
     let n = 10;
     console.log(n map |i| { i * i; } sum);
 }
-using console from std:Console
+using console from std:console

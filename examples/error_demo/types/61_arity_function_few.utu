@@ -7,4 +7,4 @@ fn clamp(x: I32, low: I32, high: I32) I32 {
 }
 
 main { console.log(clamp(5, 0)); }
-using console from std:Console
+using console from std:console

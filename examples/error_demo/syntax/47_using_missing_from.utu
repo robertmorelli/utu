@@ -1,6 +1,6 @@
 // What: a using declaration that forgets the word `from`.
 // Expect: expected 'from' (or ';') after `using console`, got 'std'.
-using console std:Console;
+using console std:console;
 
 main {
     console.log("hi");

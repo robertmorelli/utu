@@ -3,4 +3,4 @@
 fn same(a: $T, b: $T) Bool { return a == b; }
 
 main { console.log(if same(1, 2) { 1; } else { 0; }); }
-using console from std:Console
+using console from std:console

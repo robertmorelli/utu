@@ -13,4 +13,4 @@ fn P[Line].perimeter |self| () F32 { return self.x; }
 main {
     console.log(1);
 }
-using console from std:Console
+using console from std:console

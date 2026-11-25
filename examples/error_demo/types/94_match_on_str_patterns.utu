@@ -8,4 +8,4 @@ fn code(cmd: Str) I32 {
 }
 
 main { console.log(code("start")); }
-using console from std:Console
+using console from std:console

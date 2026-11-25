@@ -9,4 +9,4 @@ fn count(xs: ?Array[Str]) I32 {
 main {
     console.log(count(["a"]));
 }
-using console from std:Console
+using console from std:console

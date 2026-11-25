@@ -8,4 +8,4 @@ main {
     };
     console.log(x);
 }
-using console from std:Console
+using console from std:console

@@ -10,4 +10,4 @@ main {
     let m = Money.of(5);
     console.log(m.doubled().cents);
 }
-using console from std:Console
+using console from std:console

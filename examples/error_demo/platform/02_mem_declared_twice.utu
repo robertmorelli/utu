@@ -7,4 +7,4 @@ main {
     pixels.push(255);
     console.log(pixels.len());
 }
-using console from std:Console
+using console from std:console

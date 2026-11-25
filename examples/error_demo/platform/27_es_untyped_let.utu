@@ -5,4 +5,4 @@ let now = @es/\ () => Date.now() \/;
 main {
     console.log(now());
 }
-using console from std:Console
+using console from std:console

@@ -86,4 +86,4 @@ test "two listeners on one event both fire" {
     assert cells[1] == 6;
     assert e.count("x") == 2;
 }
-using console from std:Console
+using console from std:console

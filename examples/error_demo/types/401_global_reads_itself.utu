@@ -3,4 +3,4 @@
 let count: I32 = count + 1;
 
 main { console.log(count); }
-using console from std:Console
+using console from std:console

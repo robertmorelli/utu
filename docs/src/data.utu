@@ -16,7 +16,7 @@ mod data {
         \\    })
         \\    // 3 pen, no note: unknown fields are skipped
         \\}
-        \\using console from std:Console
+        \\using console from std:console
     }
     fn encode_sample() Str {
         return \\struct Item:
@@ -37,7 +37,7 @@ mod data {
         \\    // {"version":2,"items":[{"name":"pen","count":3,"note":null},
         \\    //                       {"name":"cup","count":1,"note":"chipped"}]}
         \\}
-        \\using console from std:Console
+        \\using console from std:console
     }
     fn roundtrip_sample() Str {
         return \\struct Point:
@@ -50,10 +50,10 @@ mod data {
         \\    for (points) |p| { p.x *= 10 }
         \\    console.log(@json/\ encode Array[Point] points \/)   // [{"x":10,"y":2},{"x":40,"y":5}]
         \\}
-        \\using console from std:Console
+        \\using console from std:console
     }
     fn error_sample() Str {
-        return \\using console from std:Console
+        return \\using console from std:console
         \\
         \\struct Item:
         \\    | name: Str
@@ -87,7 +87,7 @@ mod data {
         \\    s.shape = Square { side: 3.0 }
         \\    console.log(@json/\ encode Sticker s \/)   // {"color":"Green","shape":{"kind":"Square","side":3}}
         \\}
-        \\using console from std:Console
+        \\using console from std:console
     }
     fn recursive_sample() Str {
         return \\struct Folder:
@@ -106,7 +106,7 @@ mod data {
         \\               \\  {"name": "src", "size": 10, "children": []}]}
         \\    console.log(total(@json/\ decode Folder text \/ orelse fatal))   // 9007199254741003
         \\}
-        \\using console from std:Console
+        \\using console from std:console
     }
     fn match_sample() Str {
         return \\fn handle(response: Str) Str {
@@ -125,7 +125,7 @@ mod data {
         \\    // {"status": "ok", "user": {"name": "Cy", "age": "old"}}
         \\    //     unexpected: user.age: expected an integer at line 1, column 48
         \\}
-        \\using console from std:Console
+        \\using console from std:console
     }
     fn match_subtree_sample() Str {
         return \\struct Line:
@@ -149,7 +149,7 @@ mod data {
         \\                \\ "coupon-code": "SPRING", "audit": {"by": "x", "at": 1}}
         \\    console.log(units(order))   // 6: "id" and "audit" are skipped without being decoded
         \\}
-        \\using console from std:Console
+        \\using console from std:console
     }
     fn segment_sample() Str {
         return \\using SegmentTree from std:SegmentTree
@@ -165,7 +165,7 @@ mod data {
         \\    let first = sums.first_prefix(reaches_ten, add) // 1: 2 + 10 reaches ten
         \\    console.log(before * 100 + after + first)                    // 816
         \\}
-        \\using console from std:Console
+        \\using console from std:console
     }
     fn segment_max_sample() Str {
         return \\using SegmentTree from std:SegmentTree
@@ -176,7 +176,7 @@ mod data {
         \\    let temps = SegmentTree[F64].new([12.5, 18.0, 9.5, 21.0, 15.0], F64.inf() * -1.0, max)
         \\    console.log(temps.query(0, 3, max) + temps.query(2, 5, max))   // 18 + 21 = 39
         \\}
-        \\using console from std:Console
+        \\using console from std:console
     }
     fn persistent_sample() Str {
         return \\using PersistentSegmentTree from std:PersistentSegmentTree
@@ -188,7 +188,7 @@ mod data {
         \\    let v2 = v1.set(1, 10, add)          // a new version; v1 is unchanged
         \\    console.log(v1.query(0, 3, add) * 100 + v2.query(0, 3, add))   // 10 and 17: 1017
         \\}
-        \\using console from std:Console
+        \\using console from std:console
     }
     fn spatial_sample() Str {
         return \\using Spatial from std:Spatial
@@ -206,12 +206,12 @@ mod data {
         \\    let closest = (index.nearest(3.1, 1.1) orelse fatal).value   // 30
         \\    console.log(low + box + near + closest)                       // 130
         \\}
-        \\using console from std:Console
+        \\using console from std:console
     }
     fn page() Browser.HTMLElement {
         return @wutu/\
         article.page {
-            = ui.header("Typed JSON and indexes", "Data handling that stays in Wasm: a JSON parser and printer generated per type, and native range and spatial indexes.")
+            |> ui.header("Typed JSON and indexes", "Data handling that stays in Wasm: a JSON parser and printer generated per type, and native range and spatial indexes.")
             h2 {
                 "Decode and encode"
             }
@@ -237,9 +237,9 @@ mod data {
                 }
                 " writes compact JSON in field order."
             }
-            = code.block(decode_sample())
-            = code.block(encode_sample())
-            = code.block(roundtrip_sample())
+            |> code.block(decode_sample())
+            |> code.block(encode_sample())
+            |> code.block(roundtrip_sample())
             h2 {
                 "Errors with positions"
             }
@@ -249,12 +249,12 @@ mod data {
                 }
                 " is empty when the text matches, and otherwise says what is wrong and where."
             }
-            = code.block(error_sample())
+            |> code.block(error_sample())
             h2 {
                 "Enums, recursion, and big integers"
             }
-            = code.block(enums_sample())
-            = code.block(recursive_sample())
+            |> code.block(enums_sample())
+            |> code.block(recursive_sample())
             table {
                 tbody {
                     tr {
@@ -336,12 +336,12 @@ mod data {
                 }
                 " arm that can bind the error."
             }
-            = code.block(match_sample())
-            = code.block(match_subtree_sample())
+            |> code.block(match_sample())
+            |> code.block(match_subtree_sample())
             p {
                 "A 4 MB save file of 40,000 entities decodes to native structs in 23 ms on V8. The generated code adds about 4 KB per module plus a few hundred bytes per type."
             }
-            = ui.further("docs/language/json.md", "Typed JSON")
+            |> ui.further("docs/language/json.md", "Typed JSON")
             h2 {
                 "Iterators"
             }
@@ -386,9 +386,9 @@ mod data {
                 }
                 "."
             }
-            = code.block(segment_sample())
-            = code.block(segment_max_sample())
-            = code.block(persistent_sample())
+            |> code.block(segment_sample())
+            |> code.block(segment_max_sample())
+            |> code.block(persistent_sample())
             h2 {
                 "Spatial indexes"
             }
@@ -414,8 +414,8 @@ mod data {
                 }
                 ". Results come in no particular order."
             }
-            = code.block(spatial_sample())
-            = ui.further("docs/language/queries.md", "Native range and spatial indexes")
+            |> code.block(spatial_sample())
+            |> ui.further("docs/language/queries.md", "Native range and spatial indexes")
             p {
                 "More modules ("
                 code {

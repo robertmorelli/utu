@@ -12,4 +12,4 @@ fn load(text: Str) ?Event {
 main {
     console.log(promote load("{}") { |e| => 1, ~> 0, });
 }
-using console from std:Console
+using console from std:console

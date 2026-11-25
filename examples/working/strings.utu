@@ -2,4 +2,4 @@ main {
     let greeting: Str = "hello"
     console.log(greeting + " from utu")
 }
-using console from std:Console
+using console from std:console

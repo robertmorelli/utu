@@ -1,7 +1,7 @@
 // Wutu behaviors once broken, checked in a browser by
 // scripts/test-wutu-regressions.mjs (built prerendered, then hydrated).
 using Browser from std:Browser
-using time from std:Time
+using time from std:time
 
 mem ticks: I32
 

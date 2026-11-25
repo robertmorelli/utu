@@ -14,4 +14,4 @@ fn length(head: ?Node) I32 {
 main {
     console.log(length(null));
 }
-using console from std:Console
+using console from std:console

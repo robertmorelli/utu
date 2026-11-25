@@ -11,4 +11,4 @@ fn label(n: I32) Result[Str, Str] {
 }
 
 main { console.log(label(4).value()); }
-using console from std:Console
+using console from std:console

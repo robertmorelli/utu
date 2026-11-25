@@ -12,4 +12,4 @@ fn second_name(head: Node) Str {
 main {
     console.log(second_name(Node { name: "a", next: Node { name: "b", next: null } }));
 }
-using console from std:Console
+using console from std:console

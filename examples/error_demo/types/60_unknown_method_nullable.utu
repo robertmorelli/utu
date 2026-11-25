@@ -4,4 +4,4 @@ main {
     let name: ?Str = "ada";
     console.log(name.len());
 }
-using console from std:Console
+using console from std:console

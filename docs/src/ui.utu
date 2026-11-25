@@ -43,7 +43,7 @@ mod ui {
             "Deep dive: "
             a {
                 href = repo() + "/blob/main/" + path
-                = label
+                | label
             }
         }
         \/
@@ -52,10 +52,10 @@ mod ui {
         return @wutu/\
         header.page-head {
             h1 {
-                = title
+                | title
             }
             p.lede {
-                = lede
+                | lede
             }
         }
         \/

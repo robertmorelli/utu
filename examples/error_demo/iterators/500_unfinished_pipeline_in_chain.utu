@@ -4,4 +4,4 @@ main {
     let xs = [1, 2, 3];
     console.log(xs chain(xs map |x| { x * 2; }) sum);
 }
-using console from std:Console
+using console from std:console

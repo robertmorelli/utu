@@ -3,4 +3,4 @@
 main {
     console.log((0..5) count);
 }
-using console from std:Console
+using console from std:console

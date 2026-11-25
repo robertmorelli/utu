@@ -5,4 +5,4 @@ fn never(x: I32) I32 => @wat/\ unreachable \/;
 main {
     console.log(never(1));
 }
-using console from std:Console
+using console from std:console

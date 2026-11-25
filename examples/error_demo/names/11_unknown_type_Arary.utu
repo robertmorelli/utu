@@ -4,4 +4,4 @@ main {
     let xs: Arary[I32] = [1, 2, 3];
     console.log(xs[0] + xs[2]);
 }
-using console from std:Console
+using console from std:console

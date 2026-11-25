@@ -10,4 +10,4 @@ main {
     let b = Box { width: width, height: hieght };
     console.log(b.width * b.height);
 }
-using console from std:Console
+using console from std:console

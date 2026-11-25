@@ -17,4 +17,4 @@ main {
     for (positives(t)) |v| { total += v; };
     console.log(total);
 }
-using console from std:Console
+using console from std:console

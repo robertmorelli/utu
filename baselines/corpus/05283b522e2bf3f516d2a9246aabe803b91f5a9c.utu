@@ -1,4 +1,4 @@
 gn a() I32 { for (b()) |x| { yield x; }; }
 gn b() I32 { for (a()) |x| { yield x; }; }
 main { for (a()) |x| { x; }; console.log(1); }
-using console from std:Console
+using console from std:console

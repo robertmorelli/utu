@@ -16,4 +16,4 @@ main {
     await for (Counter.new(3)) |v| { total += v; };
     console.log(total);
 }
-using console from std:Console
+using console from std:console

@@ -59,4 +59,4 @@ test "options actually reach minimatch through the flattening" {
     let base: Opts = &{ nocase: false, dot: false, match_base: true };
     assert matches("a/b/c.js", "*.js", base);
 }
-using console from std:Console
+using console from std:console

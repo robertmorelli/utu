@@ -2,4 +2,4 @@ enum(U8) T:
     | A
 fn f(t: T) I32 { return 1; }
 main { console.log(f(0)); }
-using console from std:Console
+using console from std:console

@@ -12,4 +12,4 @@ main {
     reset(c);
     console.log(c.count);
 }
-using console from std:Console
+using console from std:console

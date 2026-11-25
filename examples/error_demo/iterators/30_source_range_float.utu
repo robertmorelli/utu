@@ -3,4 +3,4 @@
 main {
     console.log((0.0 ..< 1.0) map |x| { x * 2.0; } sum);
 }
-using console from std:Console
+using console from std:console

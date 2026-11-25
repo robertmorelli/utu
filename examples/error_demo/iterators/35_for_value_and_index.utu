@@ -6,4 +6,4 @@ main {
     for (xs) |x, i| { total += x * i; };
     console.log(total);
 }
-using console from std:Console
+using console from std:console

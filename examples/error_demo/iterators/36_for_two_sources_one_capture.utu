@@ -7,4 +7,4 @@ main {
     for (a, b) |x| { total += x; };
     console.log(total);
 }
-using console from std:Console
+using console from std:console

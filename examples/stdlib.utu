@@ -1,10 +1,10 @@
 // stdlib.utu — the everyday standard library: text, math, maps, random
 // numbers, the console, and clocks.
 
-using console from std:Console
+using console from std:console
 using Random from std:Random
 using StrMap from std:StrMap
-using time from std:Time
+using time from std:time
 
 // Words counted, in a map from each word to how often it occurs.
 fn word_counts(text: Str) StrMap[I32] {

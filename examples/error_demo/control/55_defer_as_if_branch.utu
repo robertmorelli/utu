@@ -1,6 +1,6 @@
 // What: uses defer as the bare body of a match arm instead of inside a block.
 // Expect: defer must be a statement in a block: 1 => { defer ...; }
-using console from std:Console;
+using console from std:console;
 
 fn open(mode: I32) Void {
     match mode {

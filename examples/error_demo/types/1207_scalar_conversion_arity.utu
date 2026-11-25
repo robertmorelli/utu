@@ -2,4 +2,4 @@
 // Expect: Takes 0, given 1
 type X = distinct I32;
 main { let x: X = X(1); console.log(x.i32(1)); }
-using console from std:Console
+using console from std:console

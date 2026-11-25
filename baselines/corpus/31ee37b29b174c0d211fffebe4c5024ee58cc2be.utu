@@ -2,4 +2,4 @@
       mod Sum[T] { fn total(xs: Array[T]) T { return xs sum; } }
       main { let a: Array[I32] = [1,2]; let b: Array[F64] = [1.5,2.5]; console.log(Sum[I32].total(a).f64()+Sum[F64].total(b)); }
     
-using console from std:Console
+using console from std:console

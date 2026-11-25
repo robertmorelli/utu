@@ -7,4 +7,4 @@ fn negate(b: Bool) Bool {
 main {
     console.log(if negate(true) { 1; } else { 0; });
 }
-using console from std:Console
+using console from std:console

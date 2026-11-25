@@ -7,4 +7,4 @@ main {
     handler = other;
     console.log(handler(1));
 }
-using console from std:Console
+using console from std:console

@@ -5,4 +5,4 @@ main {
     let total = total + 2;
     console.log(total);
 }
-using console from std:Console
+using console from std:console

@@ -27,7 +27,7 @@ still one per instance. Outside, an instance's global is read by its path,
 `Stash[I32].items`, as a plain module's is by `M.items`.
 
 ```utu
-using console from std:Console
+using console from std:console
 using Buffer from std:Buffer
 
 mod Stash[T] {
@@ -83,7 +83,7 @@ checked: no dispatch and no boxing, so a scalar can be a T as well as a
 struct.
 
 ```utu
-using console from std:Console
+using console from std:console
 proto Ord:
     | cmp(&) I32                   // & is the implementing type
 

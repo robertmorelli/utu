@@ -2,4 +2,4 @@
       let value: I32 = 40 + 2;
       main { console.log(value); }
     
-using console from std:Console
+using console from std:console

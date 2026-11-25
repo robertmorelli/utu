@@ -6,4 +6,4 @@ main {
     bytes.push(1);
     console.log(bytes.length());
 }
-using console from std:Console
+using console from std:console

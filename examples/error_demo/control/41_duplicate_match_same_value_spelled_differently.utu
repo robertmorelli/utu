@@ -11,4 +11,4 @@ fn name(n: I32) Str {
 main {
     console.log(name(16));
 }
-using console from std:Console
+using console from std:console

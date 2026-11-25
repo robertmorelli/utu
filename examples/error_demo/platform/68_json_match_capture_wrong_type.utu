@@ -11,4 +11,4 @@ fn age_of(text: Str) I32 {
 main {
     console.log(age_of("{}"));
 }
-using console from std:Console
+using console from std:console

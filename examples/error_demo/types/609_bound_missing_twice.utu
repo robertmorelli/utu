@@ -14,4 +14,4 @@ main {
     let xs: Array[M] = [M { v: 3 }];
     console.log(Pick[M].top(M { v: 1 }, xs).v + Pick[M].top(M { v: 20 }, xs).v);
 }
-using console from std:Console
+using console from std:console

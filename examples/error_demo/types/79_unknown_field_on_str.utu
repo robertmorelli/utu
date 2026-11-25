@@ -4,4 +4,4 @@ main {
     let s = "hello";
     console.log(s.length);
 }
-using console from std:Console
+using console from std:console

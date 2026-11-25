@@ -10,4 +10,4 @@ fn find(xs: Array[I32], target: I32) I32 {
 main {
     console.log(find([1, 2], 2));
 }
-using console from std:Console
+using console from std:console

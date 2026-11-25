@@ -7,4 +7,4 @@ fn bucket(hash: I32, buckets: I32) I32 {
 main {
     console.log(bucket(12345, 0));
 }
-using console from std:Console
+using console from std:console

@@ -7,4 +7,4 @@ fn name_length(name: ?Str) I32 {
 main {
     console.log(name_length("Ada"));
 }
-using console from std:Console
+using console from std:console

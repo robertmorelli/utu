@@ -17,4 +17,4 @@ fn label(l: Level) Str {
 main {
     console.log(label(Level.High).len());
 }
-using console from std:Console
+using console from std:console

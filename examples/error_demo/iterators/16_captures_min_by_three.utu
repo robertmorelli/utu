@@ -8,4 +8,4 @@ main {
     let cheapest = items min_by(Item) |a, b, i| { a.price < b.price; };
     console.log((cheapest orelse fatal).value.price);
 }
-using console from std:Console
+using console from std:console

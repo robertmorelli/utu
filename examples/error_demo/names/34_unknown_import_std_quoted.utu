@@ -1,6 +1,6 @@
-// What: a std module written as a quoted path ("std:Console")
-// Expect: either accept it or say std modules are written unquoted: std:Console
-using console from "std:Console";
+// What: a std module written as a quoted path ("std:console")
+// Expect: either accept it or say std modules are written unquoted: std:console
+using console from "std:console";
 
 main {
     console.log("hi");

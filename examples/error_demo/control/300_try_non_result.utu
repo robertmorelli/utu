@@ -6,4 +6,4 @@ fn count(text: Str) Result[I32, Str] {
 }
 
 main { console.log(count("abc").value()); }
-using console from std:Console
+using console from std:console

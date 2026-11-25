@@ -10,4 +10,4 @@ main {
     bump();
     console.log(count);
 }
-using console from std:Console
+using console from std:console

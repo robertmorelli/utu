@@ -5,4 +5,4 @@ const mem bytes: U8 = @embed/\ \/;
 main {
     console.log(bytes.len());
 }
-using console from std:Console
+using console from std:console

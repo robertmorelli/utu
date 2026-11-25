@@ -9,4 +9,4 @@ main {
     for (squares(4)) |s, i| { total += s; };
     console.log(total);
 }
-using console from std:Console
+using console from std:console

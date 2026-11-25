@@ -5,4 +5,4 @@ main {
     let msg = "count: " + n;
     console.log(msg.len());
 }
-using console from std:Console
+using console from std:console

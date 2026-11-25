@@ -5,4 +5,4 @@ using shapes from "./import_parts/shapes.utu";
 main {
     console.log(shapes.area(2) + helper());
 }
-using console from std:Console
+using console from std:console

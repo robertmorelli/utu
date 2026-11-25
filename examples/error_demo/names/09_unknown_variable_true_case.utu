@@ -4,4 +4,4 @@ main {
     let ready = True;
     if ready { 1; } else { 0; };
 }
-using console from std:Console
+using console from std:console

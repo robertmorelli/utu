@@ -8,4 +8,4 @@ main {
     let part = data[0, 1];
     console.log(0);
 }
-using console from std:Console
+using console from std:console

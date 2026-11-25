@@ -11,4 +11,4 @@ main {
     let s: Sh = Sq { size: 2 };
     console.log(s.size);
 }
-using console from std:Console
+using console from std:console

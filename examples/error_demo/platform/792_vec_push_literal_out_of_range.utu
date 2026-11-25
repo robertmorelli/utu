@@ -6,4 +6,4 @@ main {
     ports.push(70000);
     console.log(ports[0]);
 }
-using console from std:Console
+using console from std:console

@@ -9,4 +9,4 @@ const mem t: I32 = @comptime/\ f() \/;
 main {
     console.log(t.len());
 }
-using console from std:Console
+using console from std:console

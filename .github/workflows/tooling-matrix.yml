@@ -12,17 +12,12 @@ permissions:
   contents: read
 
 jobs:
-  tooling-fedora:
-    name: Tooling (Fedora 42, Node 24)
+  tooling-linux:
+    name: Tooling (Ubuntu latest, Node 24)
     runs-on: ubuntu-latest
-    container:
-      image: fedora:42
-    timeout-minutes: 20
+    timeout-minutes: 25
 
     steps:
-      - name: Install Fedora dependencies
-        run: dnf install -y findutils gcc-c++ git make python3 tar gzip unzip which xz
-
       - name: Check out repository
         uses: actions/checkout@v4
 
@@ -41,6 +36,9 @@ jobs:
 
       - name: Reject runtime dependencies
         run: node -e 'const d=require("./package.json").dependencies||{}; if(Object.keys(d).length){console.error("Runtime deps not allowed:",d); process.exit(1)}'
+
+      - name: Install test browsers
+        run: bunx playwright install --with-deps chromium webkit
 
       - name: Build everything
         run: bun run build
@@ -57,7 +55,7 @@ jobs:
   tooling-macos:
     name: Tooling (macOS latest, Node 24)
     runs-on: macos-latest
-    timeout-minutes: 20
+    timeout-minutes: 25
 
     steps:
       - name: Check out repository
@@ -78,6 +76,9 @@ jobs:
 
       - name: Reject runtime dependencies
         run: node -e 'const d=require("./package.json").dependencies||{}; if(Object.keys(d).length){console.error("Runtime deps not allowed:",d); process.exit(1)}'
+
+      - name: Install test browsers
+        run: bunx playwright install chromium webkit
 
       - name: Build everything
         run: bun run build

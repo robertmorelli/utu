@@ -10,4 +10,4 @@ main {
     let c: bi = &{ v: "hello" };
     console.log(c.v);
 }
-using console from std:Console
+using console from std:console

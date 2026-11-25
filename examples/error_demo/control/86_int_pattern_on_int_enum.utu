@@ -11,4 +11,4 @@ fn label(l: Level) I32 {
 main {
     console.log(label(Level.High));
 }
-using console from std:Console
+using console from std:console

@@ -4,4 +4,4 @@ fn twice(f: fun(I32) I32) I32 { return f(); }
 fn double(x: I32) I32 { return x * 2; }
 
 main { console.log(twice(double)); }
-using console from std:Console
+using console from std:console

@@ -6,4 +6,4 @@ main {
     let id = Id.from_i32(5);
     console.log(0);
 }
-using console from std:Console
+using console from std:console

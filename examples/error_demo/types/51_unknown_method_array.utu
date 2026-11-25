@@ -4,4 +4,4 @@ main {
     let xs = [1, 2, 3];
     console.log(xs.length());
 }
-using console from std:Console
+using console from std:console

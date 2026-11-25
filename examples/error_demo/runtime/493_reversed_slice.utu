@@ -5,4 +5,4 @@ main {
     let b = a[2, 1];
     console.log(b.len());
 }
-using console from std:Console
+using console from std:console

@@ -45,6 +45,6 @@ using LiteralDefaults from std:LiteralDefaults
 using Found from std:Found
 using Group from std:Group
 using Result from std:Result
-using wutu from std:Wutu
-using Component from std:Wutu
+using wutu from std:wutu
+using Component from std:wutu
 using gpu from std:Gpu

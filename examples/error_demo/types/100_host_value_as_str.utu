@@ -6,4 +6,4 @@ main {
     let s: Str = new JS.Map();
     console.log(s.len());
 }
-using console from std:Console
+using console from std:console

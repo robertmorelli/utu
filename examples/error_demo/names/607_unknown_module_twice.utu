@@ -7,4 +7,4 @@ fn g() I32 {
 main {
     console.log(g());
 }
-using console from std:Console
+using console from std:console

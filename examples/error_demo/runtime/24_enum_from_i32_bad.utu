@@ -9,4 +9,4 @@ main {
     let l = Level(7);
     console.log(Level.name(l));
 }
-using console from std:Console
+using console from std:console

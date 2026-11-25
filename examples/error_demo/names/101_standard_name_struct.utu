@@ -7,4 +7,4 @@ main {
     let s = Found { x: 4 };
     console.log(s.x);
 }
-using console from std:Console
+using console from std:console

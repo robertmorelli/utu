@@ -5,4 +5,4 @@ mem words: I32 = @embed/\ odd_size.bin \/;
 main {
     console.log(words.len());
 }
-using console from std:Console
+using console from std:console

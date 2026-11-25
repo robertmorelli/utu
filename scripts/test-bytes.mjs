@@ -34,7 +34,7 @@ for (const optimize of ['none', 'size', 'speed']) {
 
 const dir = await fs.mkdtemp(path.join(os.tmpdir(), 'utu-bytes-'));
 try {
-  const body = 'using console from std:Console\nmain { console.log(1) }\n';
+  const body = 'using console from std:console\nmain { console.log(1) }\n';
   const wasm = async (name, source) => {
     const file = path.join(dir, name);
     await fs.writeFile(file, source);

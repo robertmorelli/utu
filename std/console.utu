@@ -1,4 +1,4 @@
-//! The host's console: `using console from std:Console;`, then
+//! The host's console: `using console from std:console;`, then
 //! `console.log("hello")`, `console.log(42)`, `console.log(p)`: any value
 //! with a `str()` (a Str is itself), written as its str. Nothing out; each
 //! function ships only when used.

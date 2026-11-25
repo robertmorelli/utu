@@ -7,4 +7,4 @@ mod m {
 main {
     console.log(m() + 2);
 }
-using console from std:Console
+using console from std:console

@@ -6,4 +6,4 @@ fn double(x: I32) I32 {
 }
 
 main { console.log(double(4)); }
-using console from std:Console
+using console from std:console

@@ -11,4 +11,4 @@ fn Shape[Circle].area |c| () F64 { return 3.0 * c.r * c.r; }
 fn edge(s: Shape) F64 { return s.perimeter(); }
 
 main { console.log(edge(Circle { r: 1.0 }).i32()); }
-using console from std:Console
+using console from std:console

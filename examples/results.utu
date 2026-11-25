@@ -2,7 +2,7 @@
 // line is an error the caller handles, not a crash.
 //
 //   utu examples/results.utu
-using console from std:Console
+using console from std:console
 
 /// A whole number, or why the text is not one.
 fn parse_number(text: Str) Result[I32, Str] {

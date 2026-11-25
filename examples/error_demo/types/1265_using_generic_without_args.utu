@@ -7,4 +7,4 @@ mod cell[T] {
 using cell;
 
 main { console.log(mk(3)); }
-using console from std:Console
+using console from std:console

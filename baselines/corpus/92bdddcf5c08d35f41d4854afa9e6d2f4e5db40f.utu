@@ -40,4 +40,4 @@ test "two awaits in sequence" {
     let b: Str = await digest_hex("x");
     assert a == b;
 }
-using console from std:Console
+using console from std:console

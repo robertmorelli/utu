@@ -10,7 +10,7 @@ const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const fixture = path.join(root, 'scripts/fixtures/wutu-positions.utu');
 const checked = spawnSync('bun', [path.join(root, 'cli/utu.mjs'), 'check', fixture], { encoding: 'utf8' });
 assert.equal(checked.status, 1);
-for (const [kind, line, column] of [['unknown-field', 9, 15], ['unknown-variable', 17, 15], ['wutu-hole', 18, 11]]) {
+for (const [kind, line, column] of [['unknown-field', 9, 15], ['unknown-variable', 17, 15], ['wutu-hole', 18, 12]]) {
   assert.match(checked.stdout + checked.stderr, new RegExp(`${kind} · [^\\n]*wutu-positions\\.utu:${line}:${column}`));
 }
 

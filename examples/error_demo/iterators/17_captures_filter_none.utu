@@ -3,4 +3,4 @@
 main {
     [1, 2, 3] filter console.log({ true; } count);
 }
-using console from std:Console
+using console from std:console

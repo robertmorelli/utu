@@ -107,4 +107,4 @@ main {
     m100.push(2);
     console.log(m0.len() + m100.len());
 }
-using console from std:Console
+using console from std:console

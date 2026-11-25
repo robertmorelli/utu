@@ -6,4 +6,4 @@ main {
     primes.push(7);
     console.log(primes.len());
 }
-using console from std:Console
+using console from std:console

@@ -5,4 +5,4 @@ fn yes() Bool => @ir/\ <ir-lit kind="bool" type-name="Bool" value="2"/> \/;
 main {
     console.log(yes());
 }
-using console from std:Console
+using console from std:console

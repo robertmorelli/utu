@@ -5,4 +5,4 @@ using other from "./01_unknown_variable_typo";
 main {
     console.log(0);
 }
-using console from std:Console
+using console from std:console

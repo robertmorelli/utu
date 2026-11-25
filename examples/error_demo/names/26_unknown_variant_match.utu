@@ -16,4 +16,4 @@ fn label(l: Level) Str {
 main {
     console.log(label(Level.Mid).len());
 }
-using console from std:Console
+using console from std:console

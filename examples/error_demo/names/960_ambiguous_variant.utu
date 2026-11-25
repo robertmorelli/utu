@@ -11,4 +11,4 @@ main {
     let c = Circle { r: 1.0 };
     console.log(c.r);
 }
-using console from std:Console
+using console from std:console

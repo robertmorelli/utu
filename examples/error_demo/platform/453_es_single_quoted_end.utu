@@ -5,4 +5,4 @@ let slash: fun(Str) Str = @es/\ (s) => s.split('\/').join("-") \/;
 main {
     console.log(slash("a/b"));
 }
-using console from std:Console
+using console from std:console

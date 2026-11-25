@@ -5,4 +5,4 @@ using shapes from "./import_parts/shapes.utu";
 main {
     console.log(ops.double(21));
 }
-using console from std:Console
+using console from std:console

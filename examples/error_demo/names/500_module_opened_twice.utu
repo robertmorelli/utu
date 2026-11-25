@@ -9,4 +9,4 @@ using cell[I32];
 using cell[Str];
 
 main { console.log(wrap(4).value); }
-using console from std:Console
+using console from std:console

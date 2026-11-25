@@ -8,4 +8,4 @@ main {
     let .{lo, hi} = stats([1, 9, 4]);
     console.log(lo + hi);
 }
-using console from std:Console
+using console from std:console

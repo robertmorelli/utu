@@ -37,4 +37,4 @@ test "a JS boolean must be hand-converted to utu Bool" {
 test "value imports read as zero-arg accessors" {
     assert sep == "/";
 }
-using console from std:Console
+using console from std:console

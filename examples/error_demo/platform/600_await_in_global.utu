@@ -6,4 +6,4 @@ let later: I32 = await fetch_n(4);
 main {
     console.log(later);
 }
-using console from std:Console
+using console from std:console

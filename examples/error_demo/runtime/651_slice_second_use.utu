@@ -6,4 +6,4 @@ main {
     let xs = [1, 2, 3];
     console.log(head(xs) + xs[2, n(1)].len());
 }
-using console from std:Console
+using console from std:console

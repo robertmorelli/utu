@@ -11,4 +11,4 @@ main {
     let s: Shape = Circle { name: "c", r: 1.0 };
     console.log(s.r.i32());
 }
-using console from std:Console
+using console from std:console

@@ -1,3 +1,3 @@
 gn g(n: I32) I32 { yield n; for (g(n - 1)) |x| { yield x; }; }
 main { for (g(3)) |x| { let f = cl() Void { prune; }; }; console.log(1); }
-using console from std:Console
+using console from std:console

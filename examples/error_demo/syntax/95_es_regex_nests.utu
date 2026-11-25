@@ -5,4 +5,4 @@ let words: fun(Str) I32 = @es/\ (s) => s.split(/\s\//).length \/;
 main {
     console.log(words("a /b"));
 }
-using console from std:Console
+using console from std:console

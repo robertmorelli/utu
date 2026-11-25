@@ -6,4 +6,4 @@ main {
     let t: Shapes.Tag = "a";
     console.log(t);
 }
-using console from std:Console
+using console from std:console

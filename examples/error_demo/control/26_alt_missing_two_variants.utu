@@ -16,4 +16,4 @@ fn weight(t: Token) I32 {
 main {
     console.log(weight(Plus {}));
 }
-using console from std:Console
+using console from std:console

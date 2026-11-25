@@ -6,4 +6,4 @@ main {
     await for (s) |v, i| { total += v; };
     console.log(total);
 }
-using console from std:Console
+using console from std:console

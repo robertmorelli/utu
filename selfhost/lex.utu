@@ -393,6 +393,22 @@ fn strings(m: Machine) Void {
     set(m, escape, 10, error_code)
 }
 
+/// `'…'` with backslash escapes; a newline or the end of the source inside is an error.
+fn chars(m: Machine) Void {
+    let body = inside(m)
+    let escape = inside(m)
+    let close = ends(m, Tok.Int, start_after)
+    both(m, 39, body)
+    for (0 ..< 255) |c| {
+        set(m, body, c, body)
+        set(m, escape, c, body)
+    }
+    set(m, body, 10, error_code)
+    set(m, body, 39, close)
+    set(m, body, 92, escape)
+    set(m, escape, 10, error_code)
+}
+
 /// Numbers, as the grammar's regular expressions take them: a float
 /// (`1.5`, `2.0e-3`) where one fits, else `0x1f`, `0b101`, or `15`.
 fn numbers(m: Machine) Void {
@@ -595,13 +611,78 @@ fn punctuation(m: Machine) Void {
     m.backs[optional] = Tok.Question.i32()
 }
 
+/// Merge states above the start states that agree on token kind, back-off,
+/// next start state, and transitions, until no more merge.
+fn minimize(m: Machine) Void {
+    let n = m.next
+    let fixed = start_type + 1
+    let cls = Array[I32].new(n, 0)
+    for (0 ..< fixed) |s| { cls[s] = s }
+    let count = fixed
+    for (fixed ..< n) |s| {
+        let found = -1
+        for (fixed ..< s) |p| {
+            if m.kinds[p] == m.kinds[s] and m.backs[p] == m.backs[s] and m.afters[p] == m.afters[s] {
+                found = cls[p]
+                break
+            }
+        }
+        if found >= 0 { cls[s] = found } else { cls[s] = count; count += 1 }
+    }
+    let next_cls = Array[I32].new(n, 0)
+    let rep = Array[I32].new(n, 0)
+    while (true) {
+        for (0 ..< fixed) |s| { next_cls[s] = s }
+        let next_count = fixed
+        for (fixed ..< n) |s| {
+            let found = -1
+            for (fixed ..< next_count) |c| {
+                let p = rep[c]
+                if cls[p] != cls[s] { continue }
+                let same = true
+                for (0 ..< 256) |b| {
+                    if cls[m.tabs[p * 256 + b]] != cls[m.tabs[s * 256 + b]] { same = false; break }
+                }
+                if same { found = c; break }
+            }
+            if found >= 0 { next_cls[s] = found } else { rep[next_count] = s; next_cls[s] = next_count; next_count += 1 }
+        }
+        for (0 ..< n) |s| { cls[s] = next_cls[s] }
+        if next_count == count { break }
+        count = next_count
+    }
+    let new_tabs = Array[I32].new(count * 256, error_code)
+    let new_kinds = Array[I32].new(count, Tok.Error.i32())
+    let new_backs = Array[I32].new(count, Tok.Error.i32())
+    let new_afters = Array[I32].new(count, same_start)
+    for (0 ..< fixed) |s| {
+        for (0 ..< 256) |b| { new_tabs[s * 256 + b] = cls[m.tabs[s * 256 + b]] }
+        new_kinds[s] = m.kinds[s]
+        new_backs[s] = m.backs[s]
+        new_afters[s] = m.afters[s]
+    }
+    for (fixed ..< count) |c| {
+        let s = rep[c]
+        for (0 ..< 256) |b| { new_tabs[c * 256 + b] = cls[m.tabs[s * 256 + b]] }
+        new_kinds[c] = m.kinds[s]
+        new_backs[c] = m.backs[s]
+        new_afters[c] = m.afters[s]
+    }
+    m.tabs = new_tabs
+    m.kinds = new_kinds
+    m.backs = new_backs
+    m.afters = new_afters
+    m.next = count
+}
+
 /// The state machine, made at compile time (the @dfa tables are its rows).
 fn build() Machine {
+    let cap = 320
     let m = Machine {
-        tabs: Array[I32].new(256 * 256, error_code),
-        kinds: Array[I32].new(256, Tok.Error.i32()),
-        backs: Array[I32].new(256, Tok.Error.i32()),
-        afters: Array[I32].new(256, same_start),
+        tabs: Array[I32].new(cap * 256, error_code),
+        kinds: Array[I32].new(cap, Tok.Error.i32()),
+        backs: Array[I32].new(cap, Tok.Error.i32()),
+        afters: Array[I32].new(cap, same_start),
         next: start_type + 1,
         word: 0,
     }
@@ -609,6 +690,7 @@ fn build() Machine {
     both(m, 96, template_code)
     whitespace(m)
     strings(m)
+    chars(m)
     numbers(m)
     words(m)
     punctuation(m)
@@ -620,6 +702,7 @@ fn build() Machine {
     // After `type`, as after an expression, except that `&` is never `&=`.
     for (0 ..< 256) |c| { set(m, start_type, c, get(m, start_after, c)) }
     set(m, start_type, 38, get(m, start_before, 38))
+    minimize(m)
     if m.next > 256 { fatal }
     m.tabs = m.tabs.slice(0, m.next * 256)
     m.kinds = m.kinds.slice(0, m.next)
@@ -830,9 +913,9 @@ fn first_invalid_utf8(first: I32, n: I32) I32 {
 fn runs_to(s: I32, k: I32) Bool {
     if s >= k { return false }
     let c = src[s]
-    if c == 34 {
+    if c == 34 or c == 39 {
         let j = s + 1
-        while (j < k and src[j] != 34 and src[j] != 10) {
+        while (j < k and src[j] != c and src[j] != 10) {
             j += if src[j] == 92 and src[j + 1] != 10 { 2 } else { 1 }
         }
         return j >= k

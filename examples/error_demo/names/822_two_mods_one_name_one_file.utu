@@ -11,4 +11,4 @@ mod util {
 main {
     console.log(util.v());
 }
-using console from std:Console
+using console from std:console

@@ -3,4 +3,4 @@
 main {
     console.log("face: \uD83D");
 }
-using console from std:Console
+using console from std:console

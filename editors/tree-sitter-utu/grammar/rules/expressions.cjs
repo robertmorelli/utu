@@ -191,13 +191,13 @@ exports.buildExpressionRules = function buildExpressionRules() {
         'promote',
         $._expr,
         '{',
-        seq('|', $.identifier, '|', '=>', $._expr, ','),
+        seq('|', $._binding_name, '|', '=>', $._expr, ','),
         optional(seq('~>', $._expr, ',')),
         '}',
       ),
 
     // try { ... } catch |e| { ... } — catches exceptions thrown by the host
-    try_expr: ($) => seq('try', $.block, 'catch', optional(seq('|', $.identifier, '|')), $.block),
+    try_expr: ($) => seq('try', $.block, 'catch', optional(seq('|', $._binding_name, '|')), $.block),
     // try r — r's value when it is ok; else the function returns its error.
     // Binds like await. `try {…}` without catch is this, on a block's value.
     try_result_expr: ($) => prec.right(13, seq('try', $._expr)),
@@ -212,7 +212,7 @@ exports.buildExpressionRules = function buildExpressionRules() {
 
     // alt on enum variants; ~> is the default arm
     alt_expr: ($) => seq('alt', $._expr, '{', repeat($.alt_arm), optional($.alt_default), '}'),
-    alt_arm: ($) => seq(choice($.type_ident, $.qualified_type_ref, alias($._variant_type_ref, $.qualified_type_ref)), optional(seq('|', $.identifier, '|')), '=>', $._expr, ','),
+    alt_arm: ($) => seq(choice($.type_ident, $.qualified_type_ref, alias($._variant_type_ref, $.qualified_type_ref)), optional(seq('|', $._binding_name, '|')), '=>', $._expr, ','),
     alt_default: ($) => seq('~>', $._expr, ','),
 
     // `for (xs) |x| f(x)`: a body of one statement, a block of it.
@@ -222,7 +222,9 @@ exports.buildExpressionRules = function buildExpressionRules() {
     for_sources: ($) => seq($.for_source, repeat(seq(',', $.for_source))),
     // `a..<b` / `a...b` count; a lone expression iterates an array's elements.
     for_source: ($) => prec(1, seq($._expr, optional(seq(choice('...', '..<'), $._expr)))),
-    capture: ($) => seq('|', $.identifier, repeat(seq(',', $.identifier)), '|'),
+    capture: ($) => seq('|', $._binding_name, repeat(seq(',', $._binding_name)), '|'),
+    // A name a let or capture binds; `_` drops its value.
+    _binding_name: ($) => choice($.identifier, alias('_', $.identifier)),
 
     block_expr: ($) => prec.right(seq(optional(seq($.identifier, ':')), $.block)),
     block: ($) => seq('{', repeat($._statement), '}'),
@@ -245,7 +247,7 @@ exports.buildExpressionRules = function buildExpressionRules() {
 
     // A let takes the whole expression after `=` (`let x = a orelse b`).
     bind_expr: ($) => prec.right(-1, choice(
-      seq('let', $.identifier, optional(seq(':', $._type)), '=', $._expr),
+      seq('let', $._binding_name, optional(seq(':', $._type)), '=', $._expr),
       // let .{node, ty} = f(); takes a tuple apart.
       seq('let', $.tuple_pattern, '=', $._expr),
     )),

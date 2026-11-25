@@ -3,4 +3,4 @@ enum(U8) T:
     | B
 fn f(t: T) I32 { return match t { T.A => 1, }; }
 main { console.log(1); }
-using console from std:Console
+using console from std:console

@@ -1,2 +1,2 @@
 main { console.log(match 1 { 99999999999 => 1, ~> 0, }); }
-using console from std:Console
+using console from std:console

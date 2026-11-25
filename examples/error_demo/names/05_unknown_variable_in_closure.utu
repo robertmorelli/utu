@@ -6,4 +6,4 @@ main {
     let offset = 10;
     console.log(apply(cl(n) { return n + offest; }, 5));
 }
-using console from std:Console
+using console from std:console

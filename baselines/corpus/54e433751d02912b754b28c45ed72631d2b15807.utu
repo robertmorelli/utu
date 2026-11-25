@@ -1,4 +1,4 @@
 struct H:
     | f: fun(I32) I32
 main { console.log(1); }
-using console from std:Console
+using console from std:console

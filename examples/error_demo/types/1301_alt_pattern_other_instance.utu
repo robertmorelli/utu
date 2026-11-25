@@ -9,4 +9,4 @@ mod cell[T] {
 using cell[I32] |a|;
 using cell[Str] |b|;
 main { let x = a.mk(7); console.log(alt x { b.E.A |p| => p.v.len(), b.E.B => 2, }); }
-using console from std:Console
+using console from std:console

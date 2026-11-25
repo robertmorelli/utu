@@ -19,4 +19,4 @@ mod Run[T[A, B]] {
 main {
     console.log(Run[S].go(S { n: 0 }));
 }
-using console from std:Console
+using console from std:console

@@ -1,2 +1,2 @@
 main { let k: cl(I32) .{I32, I32} = cl(a) .{I32, I32} { return .{a, a}; }; console.log(1); }
-using console from std:Console
+using console from std:console

@@ -13,4 +13,4 @@ fn biggest(found: ?Rect) F64 {
 main {
     console.log(biggest(Rect { w: 2.0, h: 3.0 }));
 }
-using console from std:Console
+using console from std:console

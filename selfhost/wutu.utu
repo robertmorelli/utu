@@ -1,7 +1,7 @@
 //! = Wutu: the expander
 //!
 //! Each `@wutu` template becomes ordinary utu that builds the DOM through
-//! the Browser declarations and std:Wutu's reconciler: a program (the
+//! the Browser declarations and std:wutu's reconciler: a program (the
 //! template's structure, as data) and the code that supplies its values.
 //! Every template works this way, so a component behaves alike wherever it is
 //! rendered: under an `@reactive` root it re-renders with the root; elsewhere
@@ -88,7 +88,7 @@ fn site_source_file(node: I32) I32 {
 
 /// Expand one `@wutu` site in place: a block that creates its elements,
 /// installs its CSS and attaches its listeners, and whose value is the root
-/// element. With `reconcile`, each element goes through `std:Wutu`'s
+/// element. With `reconcile`, each element goes through `std:wutu`'s
 /// reconciler, and a reactive template mounts a view.
 fn expand_wutu(site: I32) Void {
     let whole = bytes_text(tok_start[node_first[last_child(site)]], tok_end[node_first[last_child(site)]])

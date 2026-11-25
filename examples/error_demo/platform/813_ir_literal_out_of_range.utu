@@ -5,4 +5,4 @@ fn big() I32 => @ir/\ <ir-lit kind="int" type-name="I32" value="2147483648"/> \/
 main {
     console.log(big());
 }
-using console from std:Console
+using console from std:console

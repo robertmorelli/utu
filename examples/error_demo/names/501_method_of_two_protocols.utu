@@ -10,4 +10,4 @@ fn Pa[X].name |x| () Str { return "a"; }
 fn Pb[X].name |x| () Str { return "b"; }
 
 main { console.log(X { id: 1 }.name()); }
-using console from std:Console
+using console from std:console

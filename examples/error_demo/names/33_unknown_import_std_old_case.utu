@@ -1,0 +1,7 @@
+// What: a std module in its old capitalized spelling (std:Console)
+// Expect: Unknown platform import std:Console; fix: Use std:console
+using console from std:Console
+
+main {
+    console.log("hi")
+}

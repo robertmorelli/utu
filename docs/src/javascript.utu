@@ -18,7 +18,7 @@ mod javascript {
     }
     fn builtins_sample() Str {
         return \\using JS from std:JS
-        \\using console from std:Console
+        \\using console from std:console
         \\
         \\main {
         \\    let epoch = new JS.Date(0.0)
@@ -36,7 +36,7 @@ mod javascript {
     }
     fn json_host_sample() Str {
         return \\using JS from std:JS
-        \\using console from std:Console
+        \\using console from std:console
         \\
         \\main {
         \\    let text = JS.JSON.stringify(&{ name: "utu", tags: ["wasm", "gc"] })
@@ -114,7 +114,7 @@ mod javascript {
         \\    console.log(parse_or("[1, 2]", "") + " / " + parse_or("{oops", "bad"))
         \\    // [1,2] / bad (SyntaxError: ...)
         \\}
-        \\using console from std:Console
+        \\using console from std:console
     }
     fn fetch_sample() Str {
         return \\using Web from std:Web
@@ -128,11 +128,11 @@ mod javascript {
         \\main {
         \\    console.log(load("data:text/plain,hello from fetch"))   // hello from fetch
         \\}
-        \\using console from std:Console
+        \\using console from std:console
     }
     fn timers_sample() Str {
         return \\using Web from std:Web
-        \\using console from std:Console
+        \\using console from std:console
         \\
         \\main {
         \\    Web.setTimeout(cl() Void { console.log("later") }, 10)
@@ -146,7 +146,7 @@ mod javascript {
         return \\using Nano from "npm:nanoid"
         \\using Path from "node:path"
         \\using Fs from "node:fs"
-        \\using console from std:Console
+        \\using console from std:console
         \\
         \\main {
         \\    let id = Nano.nanoid(8)
@@ -167,7 +167,7 @@ mod javascript {
     fn page() Browser.HTMLElement {
         return @wutu/\
         article.page {
-            = ui.header("JavaScript, the browser, and npm", "TypeScript declarations are utu's foreign-function interface: import a declaration graph and call it in utu syntax. Only the operations a program uses become boundary code.")
+            |> ui.header("JavaScript, the browser, and npm", "TypeScript declarations are utu's foreign-function interface: import a declaration graph and call it in utu syntax. Only the operations a program uses become boundary code.")
             h2 {
                 "The platform"
             }
@@ -189,7 +189,7 @@ mod javascript {
                 }
                 "."
             }
-            = code.block(dom_sample())
+            |> code.block(dom_sample())
             table.modules {
                 thead {
                     tr {
@@ -281,8 +281,8 @@ mod javascript {
                 }
                 " when it reaches a typed slot."
             }
-            = code.block(builtins_sample())
-            = code.block(json_host_sample())
+            |> code.block(builtins_sample())
+            |> code.block(json_host_sample())
             h2 {
                 "Records, arrays, and callbacks"
             }
@@ -292,12 +292,12 @@ mod javascript {
                 }
                 " and array literals take their shape from the declaration they are passed to. Closures are real JavaScript functions, typed from the slot they reach."
             }
-            = code.block(records_sample())
-            = code.block(callbacks_sample())
+            |> code.block(records_sample())
+            |> code.block(callbacks_sample())
             h2 {
                 "Narrowing and absence"
             }
-            = code.block(narrowing_sample())
+            |> code.block(narrowing_sample())
             h2 {
                 "Exceptions"
             }
@@ -307,7 +307,7 @@ mod javascript {
                 }
                 " catches JavaScript exceptions and is an expression. Wasm traps are never caught."
             }
-            = code.block(try_sample())
+            |> code.block(try_sample())
             h2 {
                 "Promises and the web APIs"
             }
@@ -326,8 +326,8 @@ mod javascript {
                 }
                 " runs on servers as well as pages."
             }
-            = code.block(fetch_sample())
-            = code.block(timers_sample())
+            |> code.block(fetch_sample())
+            |> code.block(timers_sample())
             h2 {
                 "npm and Node packages"
             }
@@ -341,7 +341,7 @@ mod javascript {
                 }
                 " import a package's declarations through TypeScript's module resolution. The glue keeps named imports, so bundlers tree-shake the package."
             }
-            = code.block(packages_sample())
+            |> code.block(packages_sample())
             h2 {
                 "Your own declarations, and Rust"
             }
@@ -356,8 +356,8 @@ mod javascript {
                 }
                 " on its objects when done."
             }
-            = code.shell(link_shell())
-            = code.block(link_use_multi())
+            |> code.shell(link_shell())
+            |> code.block(link_use_multi())
             h2 {
                 "What it costs"
             }
@@ -368,7 +368,7 @@ mod javascript {
                 }
                 ", the browser task board is 2,565 bytes of JavaScript and Wasm gzipped, and the Pantry dashboard 4,658. A thousand unused declarations add zero bytes. Each boundary crossing still costs time, so call once per operation, not once per element."
             }
-            = ui.further("docs/language/typescript-abi.md", "TypeScript declarations as utu's JavaScript ABI")
+            |> ui.further("docs/language/typescript-abi.md", "TypeScript declarations as utu's JavaScript ABI")
         }
         \/
     }

@@ -3,4 +3,4 @@
 main {
     console.log([1, 2, 3] chain(["a"]) count);
 }
-using console from std:Console
+using console from std:console

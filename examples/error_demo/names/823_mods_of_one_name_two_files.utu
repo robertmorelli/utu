@@ -6,4 +6,4 @@ using util |two| from "./lib/823_util_two.utu";
 main {
     console.log(one.v() + two.v());
 }
-using console from std:Console
+using console from std:console

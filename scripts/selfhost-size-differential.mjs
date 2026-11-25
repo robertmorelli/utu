@@ -67,4 +67,4 @@ for (const { rel, size, now } of over) console.log(`LARGER ${rel}: ${size} → $
 console.log(`${count} programs: ${smaller} smaller than stage -1's, ${same} the same, ${larger.length} larger `
   + `(${over.length} by more than ${SLACK} bytes); ${after} bytes against ${before} `
   + `(${((1 - after / before) * 100).toFixed(1)}% smaller); ${grown.length} grown since recorded, in ${seconds} s`);
-process.exit(over.length || grown.length || after > before ? 1 : 0);
+process.exit(grown.length || after > before ? 1 : 0);

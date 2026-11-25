@@ -8,4 +8,4 @@ fn save() Result[I32, Str] {
 }
 
 main { console.log(save().value()); }
-using console from std:Console
+using console from std:console

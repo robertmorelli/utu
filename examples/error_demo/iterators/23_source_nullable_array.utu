@@ -5,4 +5,4 @@ fn maybe() ?Array[I32] { return [1, 2, 3]; }
 main {
     console.log(maybe() sum);
 }
-using console from std:Console
+using console from std:console

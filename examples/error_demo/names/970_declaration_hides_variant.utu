@@ -12,4 +12,4 @@ main {
     let c = Circle { r: 1.0 };   // the enum Circle: Shape.Circle { r: 1.0 }
     console.log(0.0);
 }
-using console from std:Console
+using console from std:console

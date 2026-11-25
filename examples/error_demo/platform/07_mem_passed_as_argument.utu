@@ -10,4 +10,4 @@ main {
     samples.push(1.5);
     console.log(total(samples));
 }
-using console from std:Console
+using console from std:console

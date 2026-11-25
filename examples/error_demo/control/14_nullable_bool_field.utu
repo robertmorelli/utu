@@ -8,4 +8,4 @@ main {
     let f = Flag { name: "debug", value: null };
     console.log(0);
 }
-using console from std:Console
+using console from std:console

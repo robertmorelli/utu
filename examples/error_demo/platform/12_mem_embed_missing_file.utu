@@ -5,4 +5,4 @@ mem font: U8 = @embed/\ font.binn \/;
 main {
     console.log(font.len());
 }
-using console from std:Console
+using console from std:console

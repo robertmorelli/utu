@@ -5,4 +5,4 @@ fn scale(x: F32, k: F64) F32 {
 }
 
 main { console.log(scale(1.0, 2.0).i32()); }
-using console from std:Console
+using console from std:console

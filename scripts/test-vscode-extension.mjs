@@ -50,7 +50,7 @@ try {
     if (!commands.has(name)) throw new Error(`activation did not register ${name}`);
   }
 
-  const source = 'main { let x: I32 = 41; console.log(x + 1) }\nusing console from std:Console\n';
+  const source = 'main { let x: I32 = 41; console.log(x + 1) }\nusing console from std:console\n';
   const document = makeDocument(vscode.Uri.parse('file:///activation.utu'), source);
   globalThis.__utuVscodeStub.textDocuments.push(document);
   const providers = globalThis.__utuVscodeStub.providers;
@@ -114,7 +114,7 @@ try {
 
   const webContext = { subscriptions: [], extensionUri: vscode.Uri.parse(`${pathToFileURL(ROOT).href}/`) };
   await webActivate(webContext);
-  const webDocument = makeDocument(vscode.Uri.parse('file:///web-activation.utu'), 'main { console.log(43) }\nusing console from std:Console\n');
+  const webDocument = makeDocument(vscode.Uri.parse('file:///web-activation.utu'), 'main { console.log(43) }\nusing console from std:console\n');
   globalThis.__utuVscodeStub.textDocuments.push(webDocument);
   const webBinary = await commands.get('utu.compileCurrentFile')(webDocument);
   if (!(webBinary instanceof Uint8Array) || webBinary.length === 0) throw new Error('web compile command did not return Wasm');

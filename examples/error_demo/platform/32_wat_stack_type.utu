@@ -5,4 +5,4 @@ fn widen(x: I32) I32 => @wat/\ local.get $x i64.extend_i32_s \/;
 main {
     console.log(widen(4));
 }
-using console from std:Console
+using console from std:console

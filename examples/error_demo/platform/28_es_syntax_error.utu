@@ -5,4 +5,4 @@ let parse: fun(Str) F64 = @es/\ (s) => Number(s \/;
 main {
     console.log(parse("12"));
 }
-using console from std:Console
+using console from std:console

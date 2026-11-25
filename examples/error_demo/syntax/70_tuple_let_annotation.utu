@@ -6,4 +6,4 @@ main {
     let qr: .{I32, I32} = divmod(17, 5);
     console.log(0);
 }
-using console from std:Console
+using console from std:console

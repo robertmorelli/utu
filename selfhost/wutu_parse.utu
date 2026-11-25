@@ -1153,6 +1153,15 @@ fn parse_telement(text: Str) I32 {
             wp_at += 1
             break
         }
+        // `html { @document { … } head { … } body { … } }`: the page's
+        // document CSS, as before a template's root.
+        if tag == wps(Wpt.Html) and wp_at_text(text, wps(Wpt.Document)) {
+            wp_at += 9
+            wp_trivia(text)
+            if wp_char(text) != 123 { wutu_fail(wps(Wpt.ExpectedDocumentCSSBlock), wp_at) }
+            tw_global.push(intern_text(wp_css_block(text)))
+            continue
+        }
         parse_element_statement(text, n)
     }
     wp_svg_kids = outer
@@ -1819,7 +1828,7 @@ fn wps_src(t: Wpt) Str {
         Wpt.Link => "link",
         Wpt.HrefRelTypeMediaSizesCrossorigin => "href rel type media sizes crossorigin as fetchpriority integrity referrerpolicy imagesrcset imagesizes hreflang blocking disabled",
         Wpt.Meta => "meta",
-        Wpt.NameContentCharsetHttpEquiv => "name content charset http-equiv",
+        Wpt.NameContentCharsetHttpEquiv => "name content charset http-equiv property media itemprop",
         Wpt.HrefTargetRelDownloadHreflangType => "href target rel download hreflang type referrerpolicy ping",
         Wpt.Button => "button",
         Wpt.TypeDisabledNameValueFormPopovertarget => "type disabled name value form popovertarget popovertargetaction formaction formmethod formenctype formtarget formnovalidate command commandfor",

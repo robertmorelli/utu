@@ -3,4 +3,4 @@
 mem a: I32;
 vec v: I32;
 main { a.push(); v.push(); a.resize(); a.len(1); console.log(0); }
-using console from std:Console
+using console from std:console

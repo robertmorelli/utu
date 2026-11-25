@@ -14,4 +14,4 @@ fn kind(p: Point) Str {
 main {
     console.log(kind(Point { x: 0.0, y: 0.0 }));
 }
-using console from std:Console
+using console from std:console

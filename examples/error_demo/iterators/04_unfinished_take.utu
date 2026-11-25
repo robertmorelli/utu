@@ -5,4 +5,4 @@ main {
     let top = scores take(2);
     console.log(top.len());
 }
-using console from std:Console
+using console from std:console

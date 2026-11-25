@@ -7,4 +7,4 @@ main {
     let n = add(1, "two");
     console.log(missing_function(n));
 }
-using console from std:Console
+using console from std:console

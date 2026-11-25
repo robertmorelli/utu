@@ -4,4 +4,4 @@ mod m[T] { struct S: | x : T  fn mk(x: T) S { return S { x: x }; } }
 using m[I32] |a|;
 fn h(v: a[Str].S) I32 { return 1; }
 main { console.log(a[Str].mk(1).x); }
-using console from std:Console
+using console from std:console

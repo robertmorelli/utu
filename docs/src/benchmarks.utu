@@ -5,7 +5,7 @@ mod benchmarks {
     fn page() Browser.HTMLElement {
         return @wutu/\
         article.page {
-            = ui.header("Benchmarks", "The same programs in utu and in nine other languages that compile for the browser: Rust, JavaScript, Dart, Kotlin, MoonBit, AssemblyScript, Go, Swift, and Haskell, each timed in V8, SpiderMonkey, and JavaScriptCore.")
+            |> ui.header("Benchmarks", "The same programs in utu and in nine other languages that compile for the browser: Rust, JavaScript, Dart, Kotlin, MoonBit, AssemblyScript, Go, Swift, and Haskell, each timed in V8, SpiderMonkey, and JavaScriptCore.")
             p {
                 "Each program is written once per language, the same way: the same data structures, loops, and order of operations, with only the language's idiom differing. Every port's result is checked against the others in every engine before it is timed."
             }
@@ -47,8 +47,8 @@ mod benchmarks {
             p {
                 "Each chart plots recorded d8 runtime against gzipped Wasm and JavaScript shipped together. Lower and farther left means faster and smaller. The orange line connects the Pareto frontier, where no other port is as fast and as small with a strict improvement in either. Orange dots are Utu ports. Open a workload for its chart and complete results."
             }
-            = frontiers.panel()
-            = ui.further("benchmarks/bg/results.json", "Recorded results and sample times")
+            |> frontiers.panel()
+            |> ui.further("benchmarks/bg/results.json", "Recorded results and sample times")
             h2 {
                 "DeltaBlue"
             }

@@ -6,4 +6,4 @@ main {
     let .{sum, count} = total(3, 4);
     console.log(sum + count);
 }
-using console from std:Console
+using console from std:console

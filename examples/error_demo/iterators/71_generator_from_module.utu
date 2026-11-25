@@ -11,4 +11,4 @@ main {
     for (seq.squares(4)) |s| { total += s; };
     console.log(total);
 }
-using console from std:Console
+using console from std:console

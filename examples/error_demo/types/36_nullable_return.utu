@@ -8,4 +8,4 @@ fn shown(u: User) Str {
 }
 
 main { console.log(shown(User { nickname: "x" }).len()); }
-using console from std:Console
+using console from std:console

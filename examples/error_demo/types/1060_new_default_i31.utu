@@ -4,4 +4,4 @@ main {
     let refs = Array[I31].new_default(3);
     console.log(I31.get_s(refs[0]));
 }
-using console from std:Console
+using console from std:console

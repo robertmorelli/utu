@@ -7,4 +7,4 @@ main {
     let u = User { name: "ada" };
     console.log(u.name().len());
 }
-using console from std:Console
+using console from std:console

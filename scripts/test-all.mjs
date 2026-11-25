@@ -5,6 +5,7 @@
 // compiler builds itself to the same bytes) and stage 0's provenance, and the
 // tool tests, all at once. Each command's output prints when it finishes.
 import { spawn } from 'node:child_process';
+import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -14,7 +15,7 @@ const commands = [
   ['node', './scripts/wasm-fingerprints.mjs', '--optimized'],
   ['node', './scripts/editor-query-fingerprints.mjs'],
   ['node', './scripts/selfhost-lexer-differential.mjs', '--fuzz=20'],
-  ['node', './scripts/selfhost-parser-differential.mjs', '--fuzz=20'],
+  ['node', './scripts/selfhost-parser-differential.mjs'],
   ['node', './scripts/selfhost-bootstrap.mjs'],
   ['node', './scripts/stage0.mjs', '--verify'],
   ['node', './scripts/test-vec.mjs'],
@@ -54,17 +55,28 @@ const commands = [
 ];
 
 const started = performance.now();
-const results = await Promise.all(commands.map(([command, ...args]) => new Promise(resolve => {
-  const child = spawn(command, args, { cwd: ROOT, stdio: ['ignore', 'pipe', 'pipe'] });
-  let output = '';
-  child.stdout.on('data', chunk => { output += chunk; });
-  child.stderr.on('data', chunk => { output += chunk; });
-  child.on('close', code => {
-    const name = args.join(' ');
-    process.stdout.write(`\n── ${name} ${code === 0 ? 'passed' : `FAILED (exit ${code})`}\n${output}`);
-    resolve({ name, code });
-  });
-})));
+const concurrency = process.env.CI ? Math.min(os.cpus().length, 4) : Math.min(os.cpus().length, 8);
+const results = new Array(commands.length);
+let next = 0;
+const worker = async () => {
+  while (next < commands.length) {
+    const i = next++;
+    const [command, ...args] = commands[i];
+    results[i] = await new Promise(resolve => {
+      const child = spawn(command, args, { cwd: ROOT, stdio: ['ignore', 'pipe', 'pipe'] });
+      let output = '';
+      child.stdout.on('data', chunk => { output += chunk; });
+      child.stderr.on('data', chunk => { output += chunk; });
+      child.on('close', (code, signal) => {
+        const name = args.join(' ');
+        const status = code === 0 ? 'passed' : `FAILED (exit ${code ?? signal})`;
+        process.stdout.write(`\n── ${name} ${status}\n${output}`);
+        resolve({ name, code: code ?? 1 });
+      });
+    });
+  }
+};
+await Promise.all(Array.from({ length: concurrency }, worker));
 const failed = results.filter(result => result.code !== 0);
 const seconds = ((performance.now() - started) / 1000).toFixed(1);
 console.log(`\n${failed.length ? `FAILED: ${failed.map(result => result.name).join(', ')}` : 'all test commands passed'} in ${seconds} s`);

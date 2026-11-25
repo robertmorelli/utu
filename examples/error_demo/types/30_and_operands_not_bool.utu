@@ -5,4 +5,4 @@ main {
     let b = 2;
     console.log(if a and b { 1; } else { 0; });
 }
-using console from std:Console
+using console from std:console

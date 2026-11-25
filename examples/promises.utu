@@ -57,4 +57,4 @@ main {
     subscribe(7)
     console.log(total(20, 22) + scaled(6))
 }
-using console from std:Console
+using console from std:console

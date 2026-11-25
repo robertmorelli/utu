@@ -7,4 +7,4 @@ mod box[T] {
 main {
     console.log(box.id(1.5));
 }
-using console from std:Console
+using console from std:console

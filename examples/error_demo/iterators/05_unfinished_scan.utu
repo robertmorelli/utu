@@ -4,4 +4,4 @@ main {
     let totals = [1, 2, 3] scan(0) |acc, v| { acc + v; };
     console.log(totals[2]);
 }
-using console from std:Console
+using console from std:console

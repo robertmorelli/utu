@@ -6,4 +6,4 @@ main {
     [1, 2, 3] each |a, b, i| { log(a); };
     console.log(0);
 }
-using console from std:Console
+using console from std:console

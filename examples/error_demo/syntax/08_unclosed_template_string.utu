@@ -1,6 +1,6 @@
 // What: a template string's closing backtick is missing.
 // Expect: a template string not closed, pointing at the opening backtick.
-using console from std:Console;
+using console from std:console;
 
 main {
     let name = "Ada";

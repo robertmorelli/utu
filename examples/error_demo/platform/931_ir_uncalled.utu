@@ -5,4 +5,4 @@ fn twice(a: I32) I32 => @ir/\ <ir-i32-add><ir-ident name="a"/><ir-ident name="b"
 main {
     console.log(0);
 }
-using console from std:Console
+using console from std:console

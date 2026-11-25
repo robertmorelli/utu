@@ -5,4 +5,4 @@ main {
     let shown = name orelse 0;
     console.log(shown.len());
 }
-using console from std:Console
+using console from std:console

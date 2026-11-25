@@ -1,0 +1,50 @@
+// chars.utu — character literals ('a' is 97) and `let _` (a value dropped).
+
+using console from std:console
+
+const mem vowels: U8 = ['a', 'e', 'i', 'o', 'u']
+
+fn is_vowel(c: I32) Bool {
+    for (0 ..< vowels.len()) |i| {
+        if vowels[i] == c {
+            return true
+        }
+    }
+    return false
+}
+
+fn upper(s: Str) Str {
+    let out = ""
+    for (0 ..< s.len()) |i| {
+        let c = s[i]
+        out += if c >= 'a' and c <= 'z' {
+            Str.from_code_point(c - 'a' + 'A')
+        } else {
+            Str.from_code_point(c)
+        }
+    }
+    return out
+}
+
+fn count(s: Str) I32 {
+    let n = 0
+    for (0 ..< s.len()) |i| {
+        if is_vowel(s[i]) {
+            n += 1
+        }
+    }
+    return n
+}
+
+main {
+    let _ = count("ignored")
+    let _ = upper("ignored")
+    console.log(upper("hello, world"))
+    console.log(count("hello, world"))
+    console.log(match '\n' {
+        '\n' => "newline",
+        '\'' => "quote",
+        ~> "other",
+    })
+    console.log('é')
+}

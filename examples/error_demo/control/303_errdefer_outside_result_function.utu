@@ -1,6 +1,6 @@
 // What: writes errdefer in a function that cannot return an error.
 // Expect: errdefer in a function returning I32, not a Result
-using console from std:Console;
+using console from std:console;
 
 fn work(n: I32) I32 {
     errdefer console.log("failed");

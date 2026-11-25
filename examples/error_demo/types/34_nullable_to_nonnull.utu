@@ -6,4 +6,4 @@ main {
     let name: ?Str = null;
     console.log(shout(name).len());
 }
-using console from std:Console
+using console from std:console

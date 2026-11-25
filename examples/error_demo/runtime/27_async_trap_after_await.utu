@@ -8,4 +8,4 @@ main {
     let i = await delay(7, 5);
     console.log(xs[i]);
 }
-using console from std:Console
+using console from std:console

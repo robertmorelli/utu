@@ -9,4 +9,4 @@ struct Square[Shape]:
 fn Shape[Square].area |s| () I32 { return s.side.i32() * s.side.i32(); }
 
 main { console.log(0); }
-using console from std:Console
+using console from std:console

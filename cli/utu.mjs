@@ -63,6 +63,9 @@ const VIEW_COMMANDS = new Set(['display', 'display:tests', 'display:benches', 'd
 async function main() {
   const [command, fileArg, ...rest] = process.argv.slice(2);
   if (!command || command === '-h' || command === '--help') usage(0);
+  // `utu build --help`: that command's options (not after `--`: the program's).
+  const own = process.argv.slice(3);
+  if ((own.includes('--') ? own.slice(0, own.indexOf('--')) : own).some(a => a === '-h' || a === '--help')) commandUsage(command);
   if (VIEW_COMMANDS.has(command)) return viewCommand(command, [fileArg, ...rest].filter(a => a !== undefined));
   if (command === 'lsp') {
     // (`--stdio`: what an editor's client may add.)
@@ -348,7 +351,7 @@ async function check(file, { utu }) {
   console.log('ok');
 }
 
-// Only reachable runtime bindings are emitted; merely loading std:Wutu is not usage.
+// Only reachable runtime bindings are emitted; merely loading std:wutu is not usage.
 function usesWutu(spec) {
   return Object.values(spec.es ?? {}).some(bindings =>
     Object.values(bindings).some(body => typeof body === 'string' && body.includes('function createWutuRuntime')));
@@ -1008,7 +1011,31 @@ function usage(code) {
   console.log(`usage: utu <file.utu> [options]          build it, then call its main
        utu <command> <file.utu> [options]
 
-  check <file>                 report what is wrong with the program
+${COMMANDS}
+${MODE_LINES}
+${VIEWS}
+
+  exit status: 0 done; 1 the program is wrong, failed, or could not be
+  read or written (grep: nothing matched); 2 utu was run wrong (a command,
+  an option, a file)`);
+  process.exit(code);
+}
+
+/** `utu COMMAND --help`: the lines of the usage that are COMMAND's, then the build modes if it takes one. */
+function commandUsage(command) {
+  const name = command === 'run' ? '<file>' : command.startsWith('display') ? 'display' : command;
+  const blocks = [...COMMANDS.split('\n'), ...VIEWS.split('\n')].reduce((all, line) => {
+    if (/^  \S/.test(line)) all.push([line]); else all.at(-1)?.push(line);
+    return all;
+  }, []);
+  const mine = blocks.filter(([first]) => first.trim().split(/[\s[]/)[0] === name);
+  if (!mine.length) fail(`Unknown command ${command}`, 'unknown-command');
+  const modes = ['run', 'test', 'bench', 'build'].includes(command);
+  console.log(`usage: utu ${command === 'run' ? '[run] <file.utu>' : `${command}${command === 'lsp' ? '' : ' …'}`}\n\n${mine.flat().join('\n')}${modes ? `\n\n${MODE_LINES}` : ''}`);
+  process.exit(0);
+}
+
+const COMMANDS = `  check <file>                 report what is wrong with the program
   <file> [-O mode] [-- args]   run main, or serve an html page (also: run <file>)
     [--port 4176] [--out dir] [--title Title]  page preview options
     [--profile [--interval ms] [-o dir]]  sampled: NAME.folded, NAME.speedscope.json, NAME.flame.html
@@ -1023,25 +1050,19 @@ function usage(code) {
   build-exe <file> [-o out]    a standalone executable (needs bun)
   lsp                          a language server on stdin and stdout
   grep <pattern> <paths…>      code by its syntax and types: '$v.push($x)' [--where 'x: I32']
-  grep --refs <name> <paths…>  a name's declaration and every use, by what it resolves to
+  grep --refs <name> <paths…>  a name's declaration and every use, by what it resolves to`;
 
-  -O small        the smallest module (the default)
+const MODE_LINES = `  -O small        the smallest module (the default)
   -O fast         the fastest module: it inlines
   -O smallUnsafe  small, without the checks Wasm does not make itself
   -O fastUnsafe   fast, without them (Buffer indexing, a last alt arm, …)
-  -O debug        the module as code generation leaves it, checked
+  -O debug        the module as code generation leaves it, checked`;
 
-  display[:tests|:benches|:modules|:exports|:debug] <file> [--noln]
+const VIEWS = `  display[:tests|:benches|:modules|:exports|:debug] <file> [--noln]
                                highlighted source or selected declarations
   graph <file> [-o out.html]  binding, call, import and type relationships
   syntax <file>                self-hosted syntax tree
-  wat <file>                   generated WebAssembly text
-
-  exit status: 0 done; 1 the program is wrong, failed, or could not be
-  read or written (grep: nothing matched); 2 utu was run wrong (a command,
-  an option, a file)`);
-  process.exit(code);
-}
+  wat <file>                   generated WebAssembly text`;
 
 /** What a file-system error code means, for a command that could not read or write. */
 const FS_REASONS = {

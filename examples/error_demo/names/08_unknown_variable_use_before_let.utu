@@ -6,4 +6,4 @@ main {
     let rate = 8;
     console.log(price + tax);
 }
-using console from std:Console
+using console from std:console

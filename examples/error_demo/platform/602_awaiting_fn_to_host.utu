@@ -10,4 +10,4 @@ fn waits() I32 {
 main {
     console.log(call(waits));
 }
-using console from std:Console
+using console from std:console

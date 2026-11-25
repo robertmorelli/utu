@@ -7,4 +7,4 @@ fn has_name(name: Str) Bool {
 main {
     console.log(if has_name("x") { 1; } else { 0; });
 }
-using console from std:Console
+using console from std:console

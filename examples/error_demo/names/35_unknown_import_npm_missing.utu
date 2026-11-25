@@ -5,4 +5,4 @@ using pad from "npm:left-pad-xyz";
 main {
     console.log(pad.leftPad("7", 3));
 }
-using console from std:Console
+using console from std:console

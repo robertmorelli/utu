@@ -7,4 +7,4 @@ main {
     await for (a, b) |x, y| { total += x * y; };
     console.log(total);
 }
-using console from std:Console
+using console from std:console

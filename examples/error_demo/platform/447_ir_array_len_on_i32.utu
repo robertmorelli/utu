@@ -5,4 +5,4 @@ fn len(a: I32) I32 => @ir/\ <ir-array-len><ir-ident name="a"/></ir-array-len> \/
 main {
     console.log(len(7));
 }
-using console from std:Console
+using console from std:console

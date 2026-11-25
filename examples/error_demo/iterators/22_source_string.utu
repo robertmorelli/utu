@@ -4,4 +4,4 @@ main {
     let text = "hello";
     console.log(text filter |c| { c == "l"; } count);
 }
-using console from std:Console
+using console from std:console

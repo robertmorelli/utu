@@ -57,4 +57,4 @@ main {
     assert insertion == 1
     console.log(1)
 }
-using console from std:Console
+using console from std:console

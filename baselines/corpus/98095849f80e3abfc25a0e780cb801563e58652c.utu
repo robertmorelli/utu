@@ -19,4 +19,4 @@
           console.log(total(values));
         }
       
-using console from std:Console
+using console from std:console

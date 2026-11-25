@@ -12,4 +12,4 @@ fn P[S].m |a| (b: S) I32 { return 2; }
 main {
     console.log(S { v: 0 }.m(S { v: 1 }));
 }
-using console from std:Console
+using console from std:console

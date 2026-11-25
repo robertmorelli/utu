@@ -6,4 +6,4 @@ main {
     items.append(3);
     console.log(items.len());
 }
-using console from std:Console
+using console from std:console

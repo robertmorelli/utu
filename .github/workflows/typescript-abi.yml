@@ -29,9 +29,31 @@ jobs:
       - run: bun install --frozen-lockfile
       - name: Verify generated browser declarations
         run: |
+          node -e '
+            import fs from "node:fs";
+            import { gunzipSync } from "node:zlib";
+            const mod = await import("./src/bindings/browser-catalog.generated.js");
+            fs.writeFileSync("/tmp/browser-before.json", gunzipSync(Buffer.from(mod.BROWSER_ABI_GZIP, "base64")));
+            fs.writeFileSync("/tmp/worker-before.json", gunzipSync(Buffer.from(mod.WORKER_ABI_GZIP, "base64")));
+          '
           bun run bindings:browser
           bun run build
-          git diff --exit-code -- src/bindings/browser-catalog.generated.js src/selfhost/platform-sources.generated.js
+          node -e '
+            import fs from "node:fs";
+            import { gunzipSync } from "node:zlib";
+            const mod = await import(`./src/bindings/browser-catalog.generated.js?after=${Date.now()}`);
+            const browserAfter = gunzipSync(Buffer.from(mod.BROWSER_ABI_GZIP, "base64"));
+            const workerAfter = gunzipSync(Buffer.from(mod.WORKER_ABI_GZIP, "base64"));
+            if (!browserAfter.equals(fs.readFileSync("/tmp/browser-before.json"))) {
+              console.error("BROWSER_ABI_GZIP JSON differs from checked-in browser-catalog.generated.js");
+              process.exit(1);
+            }
+            if (!workerAfter.equals(fs.readFileSync("/tmp/worker-before.json"))) {
+              console.error("WORKER_ABI_GZIP JSON differs from checked-in browser-catalog.generated.js");
+              process.exit(1);
+            }
+          '
+          git diff --exit-code -- src/selfhost/platform-sources.generated.js
       - name: Node ABI coverage
         run: |
           node scripts/dts-abi-tests.mjs

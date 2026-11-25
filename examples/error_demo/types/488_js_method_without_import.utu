@@ -4,4 +4,4 @@ main {
     let n = 3.14159;
     console.log(n.toFixed(2));
 }
-using console from std:Console
+using console from std:console

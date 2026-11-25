@@ -51,4 +51,4 @@ main {
     probe("after-early")
     console.log(sleepy())
 }
-using console from std:Console
+using console from std:console

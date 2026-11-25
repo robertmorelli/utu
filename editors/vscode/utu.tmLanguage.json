@@ -146,6 +146,10 @@
     "numbers": {
       "patterns": [
         {
+          "name": "constant.character.utu",
+          "match": "'(?:[^'\\\\\\n]|\\\\[^\\n])+'"
+        },
+        {
           "name": "constant.numeric.float.utu",
           "match": "\\b\\d+\\.\\d+(?:[eE][+-]?\\d+)?\\b"
         },

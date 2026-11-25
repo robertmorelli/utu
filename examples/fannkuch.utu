@@ -81,4 +81,4 @@ bench "fannkuch" {
 main {
     console.log(fannkuch(6))
 }
-using console from std:Console
+using console from std:console

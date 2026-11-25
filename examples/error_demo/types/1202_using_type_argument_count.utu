@@ -4,4 +4,4 @@ mod P[A, B] { struct Pr: | a : A | b : B
   fn mk(x: A, y: B) Pr { return Pr { a: x, b: y }; } }
 using P[I32] |q|;
 main { console.log(q.mk(3, 4).a); }
-using console from std:Console
+using console from std:console

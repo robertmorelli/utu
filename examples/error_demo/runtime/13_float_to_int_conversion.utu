@@ -5,4 +5,4 @@ main {
     let nan = (0.0 / 0.0).i32();
     console.log(big + nan);
 }
-using console from std:Console
+using console from std:console

@@ -1,2 +1,2 @@
 main { let .{a, b} = 5; console.log(a); }
-using console from std:Console
+using console from std:console

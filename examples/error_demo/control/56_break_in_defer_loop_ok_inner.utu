@@ -11,4 +11,4 @@ fn work() I32 {
 main {
     console.log(work());
 }
-using console from std:Console
+using console from std:console

@@ -856,7 +856,7 @@ export function createWutuRuntime() {
   return api;
 }
 
-// A shared stylesheet (`@style`, `@document`): std:Wutu's `style`, shipped
+// A shared stylesheet (`@style`, `@document`): std:wutu's `style`, shipped
 // only to pages that have one. Self-contained, as the runtime is.
 export function wutuStyle(sheet) {
   /** A shared sheet joins the `wutu.document` layer, below element styles; its `@import`s go first. */

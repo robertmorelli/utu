@@ -4,4 +4,4 @@ main {
     let logo: Array[U8] = @embed/\ odd_size.bin \/;
     console.log(logo.len());
 }
-using console from std:Console
+using console from std:console

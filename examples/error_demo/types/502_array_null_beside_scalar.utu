@@ -3,4 +3,4 @@
 main {
     console.log([1, null, 3].len());
 }
-using console from std:Console
+using console from std:console

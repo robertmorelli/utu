@@ -29,4 +29,4 @@ main {
     let inline_box: counter[I32].Box = counter[I32].Box.new(12)
     console.log(alias_box.get() + inline_box.get())
 }
-using console from std:Console
+using console from std:console

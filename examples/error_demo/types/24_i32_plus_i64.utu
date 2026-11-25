@@ -5,4 +5,4 @@ fn total(count: I32, bytes: I64) I64 {
 }
 
 main { console.log(total(1, 2.i64()).i32()); }
-using console from std:Console
+using console from std:console

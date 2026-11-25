@@ -9,7 +9,7 @@
 (type_binder) @type
 (module_name (identifier) @namespace)
 (module_name (type_ident) @namespace)
-; `std:Console`: a module, named like one (as the site shows it), not a string.
+; `std:console`: a module, named like one (as the site shows it), not a string.
 (platform_path) @namespace
 
 ((type_ident) @type.builtin

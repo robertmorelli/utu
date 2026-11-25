@@ -6,4 +6,4 @@ main {
     listen(1, 2);
     console.log(1);
 }
-using console from std:Console
+using console from std:console

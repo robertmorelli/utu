@@ -75,4 +75,4 @@ main {
     let best: Point = benchmark(points);
     console.log(best.x);
 }
-using console from std:Console
+using console from std:console

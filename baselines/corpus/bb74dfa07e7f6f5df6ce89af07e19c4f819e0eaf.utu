@@ -49,4 +49,4 @@ test "membership and round-trip through the same handle type" {
 test "methods promote onto the handle so calls read natively" {
     assert parse("k: v\n").str("k") == "v";
 }
-using console from std:Console
+using console from std:console

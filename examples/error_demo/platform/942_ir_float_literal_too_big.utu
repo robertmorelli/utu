@@ -5,4 +5,4 @@ fn huge() F32 => @ir/\ <ir-lit kind="int" type-name="F32" value="100000000000000
 main {
     console.log(huge());
 }
-using console from std:Console
+using console from std:console

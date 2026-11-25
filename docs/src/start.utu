@@ -9,7 +9,7 @@ mod start {
         \\bun run build
     }
     fn hello_sample() Str {
-        return \\using console from std:Console
+        return \\using console from std:console
         \\
         \\fn greeting(name: Str) Str {
         \\    return `hello, ${name}`
@@ -54,7 +54,7 @@ mod start {
     fn page() Browser.HTMLElement {
         return @wutu/\
         article.page {
-            = ui.header("Getting started", "utu lives in one repository. Clone it, build the bundle once, and the same compiler serves the command line, the editor, and the browser.")
+            |> ui.header("Getting started", "utu lives in one repository. Clone it, build the bundle once, and the same compiler serves the command line, the editor, and the browser.")
             h2 {
                 "Build the compiler"
             }
@@ -65,7 +65,7 @@ mod start {
                 }
                 ", the self-hosted compiler, using the checked-in Wasm compiler. Stage 0 builds stage 1, stage 1 builds stage 2, and stage 2 must reproduce itself exactly."
             }
-            = code.shell(clone_sample())
+            |> code.shell(clone_sample())
             h2 {
                 "Run a program"
             }
@@ -76,8 +76,8 @@ mod start {
                 }
                 ". Braced functions and closures use return to produce a value. Expression-bodied functions use =>. A line break ends a statement, and ; puts two on one line."
             }
-            = code.block(hello_sample())
-            = code.shell(run_sample())
+            |> code.block(hello_sample())
+            |> code.shell(run_sample())
             p {
                 "Builds are "
                 code {
@@ -111,7 +111,7 @@ mod start {
                 }
                 " from the editor."
             }
-            = code.shell(vscode_sample())
+            |> code.shell(vscode_sample())
             p {
                 "Open any "
                 code {
@@ -146,12 +146,12 @@ mod start {
                 }
                 ". The HTML is prerendered in build-time Chromium, so the page reads before any script loads."
             }
-            = code.block(site_sample())
-            = code.shell(wutu_sample())
+            |> code.block(site_sample())
+            |> code.shell(wutu_sample())
             p {
                 "In VS Code, run UTU: Create Wutu Website for a starter file and UTU: Preview Wutu Website for the live preview."
             }
-            = ui.further("docs/language/wutu.md", "Wutu: markup and CSS in one expression")
+            |> ui.further("docs/language/wutu.md", "Wutu: markup and CSS in one expression")
         }
         \/
     }

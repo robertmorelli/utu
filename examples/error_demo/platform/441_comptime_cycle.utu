@@ -8,4 +8,4 @@ const mem u: I32 = @comptime/\ g() \/;
 main {
     console.log(t[0] + u[0]);
 }
-using console from std:Console
+using console from std:console

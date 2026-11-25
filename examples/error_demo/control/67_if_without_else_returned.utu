@@ -7,4 +7,4 @@ fn abs(x: I32) I32 {
 main {
     console.log(abs(-4));
 }
-using console from std:Console
+using console from std:console

@@ -17,17 +17,18 @@ function stringEnd(source, start) {
   return -1;
 }
 
-export function formatWutuBody(source) {
+/** `page`: a top-level `html { … }`, whose `@document` blocks stay inside it. */
+export function formatWutuBody(source, { page = false } = {}) {
   // Comments carry meaning for authors. Preserve commented bodies rather than discard them.
   const code = source.replace(/"(?:[^"\\\n]|\\.)*"/g, '""');
   if (/^\s*#|\/\/|\/\*|^\s*\\\\/m.test(code)) return source;
   // (An opener in a string is text: strings are masked as they are.)
-  if (/@\w+\s*\/\\/.test(code)) return formatWithOpaquePayloads(source);
-  return new BodyFormatter().format(parseWutu(source));
+  if (/@\w+\s*\/\\/.test(code)) return formatWithOpaquePayloads(source, page);
+  return new BodyFormatter(source, page).format(parseWutu(source));
 }
 
 /** Format around nested DSL literals, which are restored byte-for-byte. */
-function formatWithOpaquePayloads(source) {
+function formatWithOpaquePayloads(source, page) {
   const payloads = [];
   let masked = '';
   for (let i = 0; i < source.length;) {
@@ -47,7 +48,7 @@ function formatWithOpaquePayloads(source) {
       masked += source[i++];
     }
   }
-  return formatWutuBody(masked).replace(/__wutu_payload_(\d+)/g, (_, index) => payloads[index]);
+  return formatWutuBody(masked, { page }).replace(/__wutu_payload_(\d+)/g, (_, index) => payloads[index]);
 }
 
 /** `expr` parenthesized when a top-level character of `chars` would end it early (`if`, `for`, `key`). */
@@ -101,8 +102,10 @@ function endsLine(current, rest, code) {
 }
 
 class BodyFormatter {
-  constructor() {
+  constructor(source, page) {
     this.lines = [];
+    this.source = source;
+    this.page = page;
   }
 
   add(depth, text) {
@@ -115,7 +118,9 @@ class BodyFormatter {
     if (tree.scope) this.add(0, `@island ${tree.scope}`);
     else if (tree.reactive) this.add(0, '@reactive');
     for (const use of tree.styleUses) this.add(0, `@style ${compactExpression(use.value)}`);
-    for (const css of tree.global) this.block(`@document {${css}}`, 0);
+    // (A page's go first inside its `html`: see element.)
+    if (this.page && tree.root.tag === 'html') this.pageCss = tree.global;
+    else for (const css of tree.global) this.block(`@document {${css}}`, 0);
     this.node(tree.root, 0);
     return '\n' + this.lines.join('\n') + '\n';
   }
@@ -165,6 +170,21 @@ class BodyFormatter {
       if (c === '"' || (!code && c === "'")) { quote = c; current += c; continue; }
       if (c === '(' || c === '[') parens++;
       if (c === ')' || c === ']') parens--;
+      // A CSS rule written on one line stays on one: `body { margin: 0 }`.
+      const rule = !code && c === '{' ? /^\{([^{}\n"'`]*)\}/.exec(text.slice(i)) : null;
+      if (rule && rule[1].trim() && !rule[1].includes('//') && INDENT.length * depth + current.trim().length + rule[0].length <= 100) {
+        const body = rule[1].trim().replace(/\s+/g, ' ').replace(/[\s;]*$/, '');
+        current = `${current.trim()} { ${body} }`;
+        flush();
+        i += rule[0].length - 1;
+        continue;
+      }
+      const struct = code && c === '{' ? oneLineStruct(current, text, i) : null;
+      if (struct && INDENT.length * depth + current.length + struct.length <= 100) {
+        current = current.trimEnd() + ' ' + compactExpression(struct);
+        i += struct.length - 1;
+        continue;
+      }
       if (c === '{') {
         braces.push(parens);
         current = current.trimEnd() + ' {';
@@ -242,7 +262,13 @@ class BodyFormatter {
   element(node, depth) {
     const classes = node.classes.map(name => '.' + name).join('');
     const ids = node.attrs.filter(attr => attr.shorthand).map(attr => '#' + JSON.parse(attr.value)).join('');
-    this.add(depth, `${node.tag}${classes}${ids}${node.binding ? ' as ' + node.binding : ''} {`);
+    const head = `${node.tag}${classes}${ids}${node.binding ? ' as ' + node.binding : ''} {`;
+    this.add(depth, head);
+    const from = this.lines.length;
+    if (this.pageCss && node.tag === 'html') {
+      for (const css of this.pageCss) this.block(`@document {${css}}`, depth + 1);
+      this.pageCss = null;
+    }
     // Each item where its author put it.
     const items = [];
     const at = (start, emit) => items.push({ start, emit });
@@ -267,6 +293,15 @@ class BodyFormatter {
       else at(event.start, () => this.block(`${head} = ${event.handler}`, depth + 1, true));
     }
     for (const { emit } of items.sort((a, b) => a.start - b.start)) emit();
+    // An element written on one line, of one-line items, stays on one: `meta { name = "x"; content = "y" }`.
+    const inner = this.lines.slice(from).map(line => line.slice(INDENT.length * (depth + 1)));
+    const line = `${head} ${inner.join('; ')} }`;
+    if (inner.length && node.end && !this.source.slice(node.start, node.end).includes('\n')
+        && inner.every(text => !/^\s|[{};]$/.test(text)) && INDENT.length * depth + line.length <= 100) {
+      this.lines.length = from - 1;
+      this.add(depth, line);
+      return;
+    }
     this.add(depth, '}');
   }
 }
@@ -443,7 +478,8 @@ export function createSyntaxShape(utu) {
         out.push(JSON.stringify(tree, (key, value) =>
           key === 'start' || key === 'end' || /range$/i.test(key) ? undefined
             : typeof value === 'string' ? value.replace(/[\s;]+/g, '') : value));
-        out.push(body.match(/"(?:[^"\\]|\\.)*"|`(?:[^`\\]|\\.)*`|[^\s]/g)?.join('') ?? '', ')');
+        // (A `;` is a line break: the tree says what it separates.)
+        out.push(body.match(/"(?:[^"\\]|\\.)*"|`(?:[^`\\]|\\.)*`|[^\s;]/g)?.join('') ?? '', ')');
         return;
       }
       const children = [];
@@ -489,6 +525,60 @@ function codeEnd(source, start) {
   return -1;
 }
 
+/**
+ * The struct literal written on one line at `text[i]` (a `{` after a type
+ * name, `before`), as `{ a: 1, b: 2 }`, or null: `Point { x: 1, y: 2 }`
+ * stays on its line.
+ */
+function oneLineStruct(before, text, i) {
+  if (!/(?:^|[^\w.])[A-Z]\w*(?:\[[^\]]*\])?\s*$/.test(before)) return null;
+  const m = /^\{\s*[a-z_]\w*\s*:(?!:)[^{}\n`]*\}/.exec(text.slice(i));
+  if (!m || /\/\/|\/\*/.test(m[0].replace(/"(?:[^"\\]|\\.)*"/g, '""'))) return null;
+  return m[0];
+}
+
+/**
+ * Offset just past the `}` closing the Wutu body (`wn f() {`, `html {`)
+ * whose `{` is at `open`, past strings, comments and DSLs (as lex.utu's
+ * wutu_brace_end); -1 if none.
+ */
+function wutuBraceEnd(source, open) {
+  let depth = 0;
+  for (let j = open; j < source.length; j++) {
+    const c = source[j];
+    if (c === '"' || c === "'" || c === '`') {
+      for (j++; j < source.length && source[j] !== c; j++) if (source[j] === '\\') j++;
+    } else if (source.startsWith('//', j)) j = lineEnd(source, j);
+    else if (source.startsWith('/*', j)) { j = source.indexOf('*/', j + 2); if (j < 0) return -1; j++; }
+    else if (source.startsWith('/\\', j)) {
+      let nest = 1;
+      for (j += 2; j < source.length && nest; j++) {
+        if (source[j] === '"') { for (j++; j < source.length && source[j] !== '"' && source[j] !== '\n'; j++) if (source[j] === '\\') j++; }
+        else if (source.startsWith('/\\', j)) { nest++; j++; }
+        else if (source.startsWith('\\/', j)) { nest--; j++; }
+      }
+      if (nest) return -1;
+      j--;
+    } else if (c === '{') depth++;
+    else if (c === '}' && --depth === 0) return j + 1;
+  }
+  return -1;
+}
+
+/**
+ * A Wutu body's lines, laid out as Wutu (relative to the body's own
+ * indent), or null to keep it as written: `body` is `{ … }`, of a top-level
+ * `html` (`page`) or a `wn`.
+ */
+function wutuBodyLines(body, page) {
+  const text = page ? `html ${body}` : body.slice(1, -1);
+  let out;
+  try { out = formatWutuBody(text, { page }); } catch { return null; }
+  if (out === text || !sameWutu(text, out)) return null;
+  const lines = out.replace(/^\n/, '').replace(/\n$/, '').split('\n');
+  return page ? lines.slice(1, -1).map(line => line.slice(INDENT.length)) : lines;
+}
+
 function layoutUtu(source) {
   let result = '', line = '', depth = 0, parens = 0, startParens = 0, raw = false;
   // Whether the line before was a declaration head (`struct P:`) or one of its `|` lines.
@@ -514,6 +604,7 @@ function layoutUtu(source) {
   };
   /** Whether `re` (sticky) matches at `i`. */
   const ahead = (re, i) => { re.lastIndex = i; return re.test(source); };
+  const CHAR = /'(?:[^'\\\n]|\\[^\n])+'/y;
   // A comment after the code on its line stays on that line.
   const TRAILER = /[ \t]*(\/\/[^\n]*)/y;
   const trailer = i => {
@@ -540,6 +631,12 @@ function layoutUtu(source) {
       i = end;
       continue;
     }
+    // A character literal (`'\\'` is no `\\` line).
+    if (source[i] === "'" && ahead(CHAR, i)) {
+      line += source.slice(i, CHAR.lastIndex);
+      i = CHAR.lastIndex;
+      continue;
+    }
     if (dslOpenerAt(source, i)) {
       let end;
       try { end = skipDsl(source, i); } catch { return source; }
@@ -554,6 +651,26 @@ function layoutUtu(source) {
       // An empty block stays `{}`.
       line = line.trimEnd() + ' {}';
       i = source.indexOf('}', i) + 1;
+    } else if (c === '{' && oneLineStruct(line, source, i - 1) && line.length + oneLineStruct(line, source, i - 1).length <= 100) {
+      const struct = oneLineStruct(line, source, i - 1);
+      line = line.trimEnd() + ' ' + compactExpression(struct);
+      i += struct.length - 1;
+    } else if (c === '{' && parens === 0 && (/^html$/.test(line.trim()) || /^wn\s+[A-Za-z_].*\)\s*$/.test(line.trim()))) {
+      // A Wutu body: laid out as Wutu, or kept as written.
+      const end = wutuBraceEnd(source, i - 1);
+      if (end < 0) return source;
+      const lines = wutuBodyLines(source.slice(i - 1, end), line.trim() === 'html');
+      if (!lines) {
+        line = line.trimEnd() + ' ' + source.slice(i - 1, end);
+        raw = true;
+      } else {
+        line = line.trimEnd() + ' {';
+        flush();
+        for (const text of lines) result += text.trim() ? INDENT.repeat(Math.max(0, depth) + 1) + text + '\n' : '\n';
+        line = '}';
+      }
+      i = trailer(end);
+      flush();
     } else if (c === '{') {
       line = line.trimEnd() + ' {';
       i = trailer(i);

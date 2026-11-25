@@ -10,4 +10,4 @@ main {
     for (doubled([1, 2])) |v| { total += v; };
     console.log(total);
 }
-using console from std:Console
+using console from std:console

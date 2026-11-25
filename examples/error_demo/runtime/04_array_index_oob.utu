@@ -13,4 +13,4 @@ fn sum(xs: Array[I32]) I32 {
 main {
     console.log(sum([1, 2, 3]));
 }
-using console from std:Console
+using console from std:console

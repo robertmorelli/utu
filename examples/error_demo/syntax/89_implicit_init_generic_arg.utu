@@ -8,4 +8,4 @@ main {
     let xs = [&{ x: 1.0, y: 2.0 }];
     console.log(xs.len());
 }
-using console from std:Console
+using console from std:console

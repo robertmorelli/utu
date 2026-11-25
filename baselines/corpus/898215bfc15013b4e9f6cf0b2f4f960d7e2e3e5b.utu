@@ -1,3 +1,3 @@
 mem s: I32;
 main { console.log(s.intern(0, 1)); }
-using console from std:Console
+using console from std:console

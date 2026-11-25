@@ -9,4 +9,4 @@ struct Box[Rec]:
 main {
     console.log(Box { x: 1 }.x);
 }
-using console from std:Console
+using console from std:console

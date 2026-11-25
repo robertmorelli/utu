@@ -5,4 +5,4 @@ struct S[P]:
     | x: I32
 fn P[S].tick |s| () Str { return "bad"; }
 main { console.log(0); }
-using console from std:Console
+using console from std:console

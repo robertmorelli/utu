@@ -1,2 +1,2 @@
 main { console.log(@json/\ match "{}" { { a: |a| I32 } => a, }\/); }
-using console from std:Console
+using console from std:console

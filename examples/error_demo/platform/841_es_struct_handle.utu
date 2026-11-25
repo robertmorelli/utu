@@ -12,4 +12,4 @@ main {
     let box = hold(Point { x: 1.0, y: 2.0 }, ["a", "b"]);
     console.log(point(box).x + names(box).len().f64());
 }
-using console from std:Console
+using console from std:console

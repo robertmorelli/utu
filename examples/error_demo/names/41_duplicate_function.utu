@@ -7,4 +7,4 @@ fn area(r: I32) I32 { return 3 * r * r; }
 main {
     console.log(area(2, 3));
 }
-using console from std:Console
+using console from std:console

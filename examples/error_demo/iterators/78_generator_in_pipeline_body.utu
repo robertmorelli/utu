@@ -7,4 +7,4 @@ gn squares(n: I32) I32 {
 main {
     console.log([1, 2, 3] flat_map |n| { squares(n); } sum);
 }
-using console from std:Console
+using console from std:console

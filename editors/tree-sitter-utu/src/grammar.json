@@ -4349,7 +4349,7 @@
             },
             {
               "type": "SYMBOL",
-              "name": "identifier"
+              "name": "_binding_name"
             },
             {
               "type": "STRING",
@@ -4427,7 +4427,7 @@
                 },
                 {
                   "type": "SYMBOL",
-                  "name": "identifier"
+                  "name": "_binding_name"
                 },
                 {
                   "type": "STRING",
@@ -4662,7 +4662,7 @@
                 },
                 {
                   "type": "SYMBOL",
-                  "name": "identifier"
+                  "name": "_binding_name"
                 },
                 {
                   "type": "STRING",
@@ -4883,7 +4883,7 @@
         },
         {
           "type": "SYMBOL",
-          "name": "identifier"
+          "name": "_binding_name"
         },
         {
           "type": "REPEAT",
@@ -4896,7 +4896,7 @@
               },
               {
                 "type": "SYMBOL",
-                "name": "identifier"
+                "name": "_binding_name"
               }
             ]
           }
@@ -4904,6 +4904,24 @@
         {
           "type": "STRING",
           "value": "|"
+        }
+      ]
+    },
+    "_binding_name": {
+      "type": "CHOICE",
+      "members": [
+        {
+          "type": "SYMBOL",
+          "name": "identifier"
+        },
+        {
+          "type": "ALIAS",
+          "content": {
+            "type": "STRING",
+            "value": "_"
+          },
+          "named": true,
+          "value": "identifier"
         }
       ]
     },
@@ -5154,7 +5172,7 @@
               },
               {
                 "type": "SYMBOL",
-                "name": "identifier"
+                "name": "_binding_name"
               },
               {
                 "type": "CHOICE",
@@ -5778,6 +5796,35 @@
           {
             "type": "PATTERN",
             "value": "0b[01]+"
+          },
+          {
+            "type": "SEQ",
+            "members": [
+              {
+                "type": "STRING",
+                "value": "'"
+              },
+              {
+                "type": "REPEAT",
+                "content": {
+                  "type": "CHOICE",
+                  "members": [
+                    {
+                      "type": "PATTERN",
+                      "value": "[^'\\\\\\n]"
+                    },
+                    {
+                      "type": "PATTERN",
+                      "value": "\\\\[^\\n]"
+                    }
+                  ]
+                }
+              },
+              {
+                "type": "STRING",
+                "value": "'"
+              }
+            ]
           }
         ]
       }

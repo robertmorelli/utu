@@ -10,4 +10,4 @@ fn helper() I32 {
 main {
     console.log(later);
 }
-using console from std:Console
+using console from std:console

@@ -5,4 +5,4 @@ const mem table: I32 = [~5, 3];
 main {
     console.log(table[0]);
 }
-using console from std:Console
+using console from std:console

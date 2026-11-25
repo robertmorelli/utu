@@ -8,4 +8,4 @@ main {
     let p = Pen { colour: "red", width: 2 };
     console.log(p.width);
 }
-using console from std:Console
+using console from std:console

@@ -5,4 +5,4 @@ fn greeting() Str {
 }
 
 main { console.log(greeting()); }
-using console from std:Console
+using console from std:console

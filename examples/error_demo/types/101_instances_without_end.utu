@@ -9,4 +9,4 @@ mod m[T] {
 main {
     console.log(m[I32].f(3));
 }
-using console from std:Console
+using console from std:console

@@ -1,6 +1,6 @@
 // What: uses ?. on a struct value that cannot be null.
 // Expect: '?.' needs a nullable value; p is Point, which is never null; use '.'
-using console from std:Console;
+using console from std:console;
 
 struct Point:
     | x: F64

@@ -1,4 +1,4 @@
 main {
     let x = ;
 }
-using console from std:Console
+using console from std:console

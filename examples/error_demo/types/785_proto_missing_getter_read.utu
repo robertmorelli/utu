@@ -13,4 +13,4 @@ main {
     let c: Counter = NoField { n: 1 };
     console.log(c.count);
 }
-using console from std:Console
+using console from std:console

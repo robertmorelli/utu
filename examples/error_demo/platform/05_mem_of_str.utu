@@ -6,4 +6,4 @@ main {
     names.push("ada");
     console.log(names.len());
 }
-using console from std:Console
+using console from std:console

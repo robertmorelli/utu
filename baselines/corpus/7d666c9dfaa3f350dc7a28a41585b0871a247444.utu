@@ -41,4 +41,4 @@ test "a set option changes behaviour and needs a second binding" {
     assert satisfies("1.2.3-alpha.1", "^1.0.0") == false;
     assert satisfies_prerelease("1.2.3-alpha.1", ">=1.0.0-0");
 }
-using console from std:Console
+using console from std:console

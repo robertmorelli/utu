@@ -4,4 +4,4 @@ main {
     let xs = [1, 2, 3, 4];
     console.log(xs map |n| { n * 2; } bisect |v| { v < 5; });
 }
-using console from std:Console
+using console from std:console

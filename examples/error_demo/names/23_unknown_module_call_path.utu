@@ -7,4 +7,4 @@ mod math {
 main {
     console.log(mathh.square(4));
 }
-using console from std:Console
+using console from std:console

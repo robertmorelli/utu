@@ -9,4 +9,4 @@ main {
     let e: MI.E = MI.E.A { value: 7 };
     console.log(alt e { MS.E.A |a| => a.value, });
 }
-using console from std:Console
+using console from std:console

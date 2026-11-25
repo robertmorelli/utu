@@ -6,4 +6,4 @@ main {
     let lang = read_setting("lang");
     console.log(lang.len());
 }
-using console from std:Console
+using console from std:console

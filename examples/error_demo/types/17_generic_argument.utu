@@ -13,4 +13,4 @@ main {
     s.push("four");
     console.log(s.size);
 }
-using console from std:Console
+using console from std:console

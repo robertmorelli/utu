@@ -6,4 +6,4 @@ main {
     let m = max(3, 4;
     console.log(m);
 }
-using console from std:Console
+using console from std:console

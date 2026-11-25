@@ -217,8 +217,9 @@ The compiler itself never touches a file system or TypeScript. The host passes
 `createCompiler({ resolvePackage })`:
 
 - `tools/dts/packages.mjs` resolves from `node_modules` for Node and Bun, and
-  caches each linked graph in `node_modules/.utu/abi` until a declaration file
-  changes. The CLI and `tools/dts/build-app.mjs` use it automatically.
+  caches each linked graph in the project's `node_modules/.utu/abi` (or, with
+  no package.json or node_modules up from the program, `~/.cache/utu/abi`)
+  until a declaration file changes. The CLI and `tools/dts/build-app.mjs` use it automatically.
 - `src/bindings/packages.js` is the host-neutral resolver behind it. It takes
   the TypeScript API and synchronous file callbacks, so a browser Worker can
   supply an in-memory file system (for example, packages fetched from a CDN).

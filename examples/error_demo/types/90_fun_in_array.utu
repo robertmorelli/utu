@@ -7,4 +7,4 @@ main {
     let ops: Array[fun(I32) I32] = [double, square];
     console.log(ops.len());
 }
-using console from std:Console
+using console from std:console

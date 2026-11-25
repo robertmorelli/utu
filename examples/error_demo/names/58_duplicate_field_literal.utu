@@ -8,4 +8,4 @@ main {
     let p = Point { x: 1, y: 2, x: 3 };
     console.log(p.x);
 }
-using console from std:Console
+using console from std:console

@@ -24,7 +24,8 @@ exports.buildLiteralRules = function buildLiteralRules() {
         // An integer enum's variant: `Tag.Leaf`, or `m.Tag.Leaf` of mod m.
         seq(choice($.type_ident, alias($.identifier, $.type_ident)), '.', $.type_ident, optional(seq('.', $.type_ident))),
       ),
-    int_lit: (_) => token(choice(/[0-9]+/, /0x[0-9a-fA-F]+/, /0b[01]+/)),
+    // `'a'`, `'\\n'`: a character's code, an integer.
+    int_lit: (_) => token(choice(/[0-9]+/, /0x[0-9a-fA-F]+/, /0b[01]+/, seq("'", repeat(choice(/[^'\\\n]/, /\\[^\n]/)), "'"))),
     float_lit: (_) => token(/[0-9]+\.[0-9]+([eE][+-]?[0-9]+)?/),
     // Backslash escapes as in JSON (\" \\ \n \t \uXXXX …); literals decode with JSON's rules.
     string_lit: (_) => token(seq('"', repeat(choice(/[^"\\\n]/, /\\[^\n]/)), '"')),

@@ -9,4 +9,4 @@ main {
     await for (ticks(3)) |t, i| { total += t; };
     console.log(total);
 }
-using console from std:Console
+using console from std:console

@@ -7,4 +7,4 @@ fn Array[I32].sum |a| () I32 {
 }
 
 main { console.log(1); }
-using console from std:Console
+using console from std:console

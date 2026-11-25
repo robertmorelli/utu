@@ -9,7 +9,7 @@ mod web {
         \\    section.greeting#hello {
         \\        display: grid
         \\        gap: 1rem
-        \\        h2 { "Hello, "; = name }
+        \\        h2 { "Hello, "; | name }
         \\        p.note.quiet { "Welcome back." }
         \\    }
         \\}
@@ -58,11 +58,11 @@ mod web {
         \\    p {
         \\        title = "Stats for " + user  // an attribute built from text
         \\        "User "
-        \\        b { = user }
+        \\        b { | user }
         \\        " has "
-        \\        = count                     // a number shows as its str
+        \\        | count                     // a number shows as its str
         \\        " items ("
-        \\        = ratio * 100.0
+        \\        |> ratio * 100.0
         \\        "%). Escapes: \"quoted\" →"
         \\    }
         \\    \/
@@ -82,7 +82,7 @@ mod web {
         \\fn plant_card(plant: Plant) Browser.HTMLElement {
         \\    return @wutu/\
         \\    article {
-        \\        h2 { = plant.name }
+        \\        h2 { | plant.name }
         \\        button as toggle {  // name the node: toggle
         \\            type = "button"
         \\            "Water me"
@@ -122,7 +122,7 @@ mod web {
         \\            placeholder = "Type"
         \\            on keydown |event| { state.last = event.key }
         \\        }
-        \\        p { = `${state.n} clicks, last event: ${state.last}` }
+        \\        p { |> `${state.n} clicks, last event: ${state.last}` }
         \\    }
         \\    \/
         \\    Browser.document.body.append(app)
@@ -136,13 +136,13 @@ mod web {
         \\        padding: 0.1rem 0.5rem
         \\        border-radius: 1rem
         \\        background: gold
-        \\        = label
+        \\        | label
         \\    }
         \\}
         \\
-        \\wn card(title: Str, content: Browser.HTMLElement) {
+        \\wn card(title: Str, content: Externref) {
         \\    article.card {
-        \\        h3 { = title }
+        \\        h3 { | title }
         \\        | content
         \\    }
         \\}
@@ -161,7 +161,7 @@ mod web {
         \\    | featured: Bool
         \\
         \\wn C[Label].render |label| () {
-        \\    li { = label.title }
+        \\    li { | label.title }
         \\}
         \\
         \\let labels: Array[Label] = [Label { title: "Syntax", featured: true },
@@ -192,7 +192,7 @@ mod web {
         \\            b { "Sold out" }
         \\        } else if stock < 5 {
         \\            "Only "
-        \\            = stock.str()
+        \\            | stock
         \\            " left"
         \\        } else {
         \\            "In stock"
@@ -214,7 +214,7 @@ mod web {
         \\        for names |name, i| {  // the index is a U64
         \\            li {
         \\                data-rank = (i.i32() + 1).str()
-        \\                = name
+        \\                | name
         \\            }
         \\        }
         \\    }
@@ -225,7 +225,7 @@ mod web {
         \\    return @wutu/\
         \\    ul {
         \\        for (words filter |w| { w.len() > 4 }) |w| {  // a pipeline, no temporary array
-        \\            li { = w }
+        \\            li { | w }
         \\        }
         \\    }
         \\    \/
@@ -257,7 +257,7 @@ mod web {
         \\    ul {
         \\        for state.todos |todo| key todo.id {  // identity follows the key
         \\            li {
-        \\                = todo.title
+        \\                | todo.title
         \\                button {
         \\                    "Done"
         \\                    on click {
@@ -291,7 +291,7 @@ mod web {
         \\        }
         \\        input { type = "number"; bind:number = order.amount }
         \\        p {
-        \\            = `${order.amount} for ${order.name}`
+        \\            |> `${order.amount} for ${order.name}`
         \\            if order.gift { " (wrapped)" }
         \\        }
         \\    }
@@ -315,7 +315,7 @@ mod web {
         \\    @reactive
         \\    main {
         \\        input { bind:value = prefs.name }
-        \\        p { = `Visit ${prefs.visits}, ${prefs.name}` }
+        \\        p { |> `Visit ${prefs.visits}, ${prefs.name}` }
         \\    }
         \\    \/
         \\    Browser.document.body.append(app)
@@ -496,7 +496,7 @@ mod web {
         \\    wutu.interval("tick", 1000.0, cl() { c.ticks += 1 })
         \\    return @wutu/\
         \\    @island "clock"  // updates on its own
-        \\    p { = `${c.ticks} seconds` }
+        \\    p { |> `${c.ticks} seconds` }
         \\    \/
         \\}
         \\
@@ -505,7 +505,7 @@ mod web {
         \\    let app = @wutu/\
         \\    @reactive
         \\    main {
-        \\        = clock(c)
+        \\        |> clock(c)
         \\        button {
         \\            "Reset"
         \\            on click {
@@ -570,7 +570,7 @@ mod web {
         \\    @reactive
         \\    main {
         \\        if wutu.route() == "/guide" {
-        \\            = guide.page("you")     // typed: a Browser.HTMLElement
+        \\            |> guide.page("you")     // typed: a Browser.HTMLElement
         \\        } else {
         \\            p { "Welcome." }
         \\        }
@@ -583,7 +583,7 @@ mod web {
         \\mod guide {
         \\    fn page(reader: Str) Browser.HTMLElement {
         \\        return @wutu/\
-        \\        article { h1 { = "A guide for " + reader } }
+        \\        article { h1 { |> "A guide for " + reader } }
         \\        \/
         \\    }
         \\}
@@ -596,7 +596,7 @@ mod web {
     fn page() Browser.HTMLElement {
         return @wutu/\
         article.page {
-            = ui.header("Wutu", "Write a page with html, define reusable views with wn, and compose them with | and |>.")
+            |> ui.header("Wutu", "Write a page with html, define reusable views with wn, and compose them with | and |>.")
             p {
                 "Every sample below is a whole program. Paste one into the "
                 a {
@@ -617,15 +617,21 @@ mod web {
                 code { "|> greeting(name)" }
                 " inserts the result of calling it."
             }
-            = code.block(hello_sample())
+            |> code.block(hello_sample())
             h2 {
                 "Components and slots"
             }
             p {
                 code { "wn" }
-                " declares a typed function with a Wutu body. A single element root returns that element, and a body with multiple roots returns a document fragment. Pass a DOM node as a parameter for a slot."
+                " declares a typed function with a Wutu body. Every "
+                code { "wn" }
+                " returns "
+                code { "Externref" }
+                ", so a single element, SVG, or multiple roots all share the same return type. Pass "
+                code { "Externref" }
+                " as a parameter for a slot."
             }
-            = code.block(components_sample())
+            |> code.block(components_sample())
             p {
                 "A struct that implements "
                 code { "Component" }
@@ -635,17 +641,19 @@ mod web {
                 code { "C" }
                 " is a shorthand for the protocol. Use "
                 code { "| items" }
-                " to insert components you already have and "
+                " to insert values or components you already have and "
                 code { "|> expression" }
                 " for a Utu expression such as a pipeline, conditional, or block. Start each insertion on its own line or separate them with a semicolon."
             }
-            = code.block(component_insertions_sample())
+            |> code.block(component_insertions_sample())
             p {
                 "Inside ordinary Utu code, use "
                 code { "@wutu/\\ … \\/" }
                 " to build a template as an expression. Use "
-                code { "= expression" }
-                " for text and scalar values as well as DOM insertion."
+                code { "| value" }
+                " for text, numbers, components, or DOM nodes, and "
+                code { "|> expression" }
+                " for evaluated expressions."
             }
             h2 {
                 "Elements, classes, and text"
@@ -679,14 +687,14 @@ mod web {
                 }
                 " CSS. Attributes are checked per tag."
             }
-            = code.block(namespaces_sample())
+            |> code.block(namespaces_sample())
             h2 {
                 "Text, numbers, and expressions"
             }
             p {
                 "An expression stands on its own: "
                 code {
-                    "= state.count;"
+                    "| state.count"
                 }
                 " shows a number, "
                 code {
@@ -694,7 +702,7 @@ mod web {
                 }
                 " takes a condition as written. Wrap one with braces or captures of its own in parentheses."
             }
-            = code.block(text_sample())
+            |> code.block(text_sample())
             h2 {
                 "Events"
             }
@@ -716,14 +724,14 @@ mod web {
                 }
                 " takes a closure value. String handlers are rejected."
             }
-            = code.block(events_closure_sample())
-            = code.block(events_on_sample())
+            |> code.block(events_closure_sample())
+            |> code.block(events_on_sample())
             h2 {
                 "Conditions and lists"
             }
-            = code.block(conditions_sample())
-            = code.block(for_sample())
-            = code.block(keyed_sample())
+            |> code.block(conditions_sample())
+            |> code.block(for_sample())
+            |> code.block(keyed_sample())
             h2 {
                 "Reactive views and bindings"
             }
@@ -757,7 +765,7 @@ mod web {
                 }
                 " cover radio groups, multiple selects, and file inputs."
             }
-            = code.block(bind_sample())
+            |> code.block(bind_sample())
             h2 {
                 "Stored state"
             }
@@ -767,8 +775,8 @@ mod web {
                 }
                 " keeps a struct in localStorage, validating it on load and falling back to the defaults."
             }
-            = code.block(stored_sample())
-            = code.block(stored_manual_sample())
+            |> code.block(stored_sample())
+            |> code.block(stored_manual_sample())
             h2 {
                 "CSS"
             }
@@ -795,10 +803,10 @@ mod web {
                 }
                 " installs anything else."
             }
-            = code.block(local_css_sample())
-            = code.block(dynamic_css_sample())
-            = code.block(document_sample())
-            = code.block(css_sheet_sample())
+            |> code.block(local_css_sample())
+            |> code.block(dynamic_css_sample())
+            |> code.block(document_sample())
+            |> code.block(css_sheet_sample())
             h2 {
                 "Named nodes"
             }
@@ -808,7 +816,7 @@ mod web {
                 }
                 " names a node within its template, typed as that element."
             }
-            = code.block(alias_sample())
+            |> code.block(alias_sample())
             h2 {
                 "Routes and islands"
             }
@@ -826,15 +834,15 @@ mod web {
                 }
                 " refreshes it from outside."
             }
-            = code.block(route_sample())
-            = code.block(island_sample())
+            |> code.block(route_sample())
+            |> code.block(island_sample())
             h2 {
                 "The nearer rule wins"
             }
             p {
                 "Document CSS and shared sheets sit in a cascade layer below element styles, so what is written on an element beats a document rule of any specificity."
             }
-            = code.block(layers_sample())
+            |> code.block(layers_sample())
             h2 {
                 "Elements JavaScript owns, and quiet handlers"
             }
@@ -856,7 +864,7 @@ mod web {
                 }
                 ")."
             }
-            = code.block(unmanaged_sample())
+            |> code.block(unmanaged_sample())
             h2 {
                 "Lazy pages"
             }
@@ -866,7 +874,7 @@ mod web {
                 }
                 " type-checks the module as usual but leaves it out of the page: it builds as its own chunk, fetched the first time a function of it is called. Calls keep their types; arguments are numbers, Bool, Str, or host values. This site loads each page that way."
             }
-            = code.block(lazy_multi())
+            |> code.block(lazy_multi())
             h2 {
                 "Build, preview, and prerender"
             }
@@ -885,9 +893,9 @@ mod web {
                 }
                 "."
             }
-            = code.shell(build_shell())
-            = ui.further("docs/language/wutu.md", "Wutu: markup and CSS in one expression")
-            = ui.further("examples/wutu-five/README.md", "five working Wutu websites")
+            |> code.shell(build_shell())
+            |> ui.further("docs/language/wutu.md", "Wutu: markup and CSS in one expression")
+            |> ui.further("examples/wutu-five/README.md", "five working Wutu websites")
         }
         \/
     }

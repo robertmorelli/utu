@@ -4,4 +4,4 @@ main {
     let names = Array[Str].new_default(3);
     console.log(names.len());
 }
-using console from std:Console
+using console from std:console

@@ -7,4 +7,4 @@ fn greet(name: Strng) Str {
 main {
     console.log(greet("ada").len());
 }
-using console from std:Console
+using console from std:console

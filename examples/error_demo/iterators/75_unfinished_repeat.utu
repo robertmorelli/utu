@@ -4,4 +4,4 @@ main {
     let tripled = [1, 2] repeat(3);
     console.log(tripled.len());
 }
-using console from std:Console
+using console from std:console

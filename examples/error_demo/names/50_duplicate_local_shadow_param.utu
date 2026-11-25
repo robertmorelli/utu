@@ -8,4 +8,4 @@ fn clamp(n: I32) I32 {
 main {
     console.log(clamp(42));
 }
-using console from std:Console
+using console from std:console

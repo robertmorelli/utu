@@ -7,4 +7,4 @@ gn squares(n: I32) I32 {
 main {
     console.log(squares(4) filter |s| { s % 2 == 0; } sum);
 }
-using console from std:Console
+using console from std:console

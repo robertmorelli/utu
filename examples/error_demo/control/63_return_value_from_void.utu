@@ -1,6 +1,6 @@
 // What: returns a value from a function declared void.
 // Expect: log_twice returns void; return takes no value here
-using console from std:Console;
+using console from std:console;
 
 fn log_twice(s: Str) Void {
     console.log(s);

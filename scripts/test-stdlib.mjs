@@ -1,5 +1,5 @@
 // The everyday standard library (examples/stdlib.utu: Str's text methods,
-// F64's math, std:StrMap, std:Random, std:Console, std:Time).
+// F64's math, std:StrMap, std:Random, std:console, std:time).
 import assert from 'node:assert/strict';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';

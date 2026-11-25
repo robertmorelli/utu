@@ -3,4 +3,4 @@
 main {
     console.log([1, 2, 3] map |a, b, c| { a * 2; } filter |n| { n > 2; } sum);
 }
-using console from std:Console
+using console from std:console

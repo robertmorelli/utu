@@ -9,4 +9,4 @@ fn m() I32 { return 2; }
 main {
     console.log(m.f());
 }
-using console from std:Console
+using console from std:console

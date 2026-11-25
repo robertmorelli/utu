@@ -4,4 +4,4 @@ main {
     let xs = Array[I32].new(5);
     console.log(xs.len());
 }
-using console from std:Console
+using console from std:console

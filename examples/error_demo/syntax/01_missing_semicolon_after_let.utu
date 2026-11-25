@@ -5,4 +5,4 @@ fn cost(price: I32, qty: I32) I32 {
 }
 
 main { console.log(cost(3, 4)); }
-using console from std:Console
+using console from std:console

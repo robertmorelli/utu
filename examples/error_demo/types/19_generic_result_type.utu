@@ -10,4 +10,4 @@ main {
     let s: Stack[I32] = Stack[Str].new("");
     console.log(s.items.len());
 }
-using console from std:Console
+using console from std:console

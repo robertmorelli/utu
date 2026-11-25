@@ -11,4 +11,4 @@ main {
     let all: Array[Ord] = [Version { major: 2 }, Version { major: 3 }];
     console.log(all[0].cmp(all[1]));
 }
-using console from std:Console
+using console from std:console

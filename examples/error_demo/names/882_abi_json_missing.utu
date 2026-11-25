@@ -5,4 +5,4 @@ using api from "./bindings/api.abi.json";
 main {
     console.log(api.twice(2.0));
 }
-using console from std:Console
+using console from std:console

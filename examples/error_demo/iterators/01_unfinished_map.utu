@@ -5,4 +5,4 @@ main {
     let doubled = xs map |n| { n * 2; };
     console.log(doubled[0]);
 }
-using console from std:Console
+using console from std:console

@@ -9,4 +9,4 @@ fn color(name: Str) I32 {
 main {
     console.log(color("red"));
 }
-using console from std:Console
+using console from std:console

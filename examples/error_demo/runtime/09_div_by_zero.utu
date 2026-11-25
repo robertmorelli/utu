@@ -8,4 +8,4 @@ main {
     let items: Array[I32] = [];
     console.log(average(0, items.len()));
 }
-using console from std:Console
+using console from std:console

@@ -6,4 +6,4 @@ mod Zero[T] {
 }
 
 main { console.log(Zero[I32].get() + Zero[Str].get().len()); }
-using console from std:Console
+using console from std:console

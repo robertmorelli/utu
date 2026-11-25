@@ -8,4 +8,4 @@ main {
     };
     console.log(score + bonus);
 }
-using console from std:Console
+using console from std:console

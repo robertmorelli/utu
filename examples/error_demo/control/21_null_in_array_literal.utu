@@ -7,4 +7,4 @@ main {
     let users: Array[User] = [User { name: "a" }, null];
     console.log(users.len());
 }
-using console from std:Console
+using console from std:console

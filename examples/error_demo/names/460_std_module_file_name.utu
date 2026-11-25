@@ -1,4 +1,4 @@
-// What: Time.now() with no import; the module in std:Time is time
-// Expect: Unknown type Time; note: using time from std:Time; (the module is time)
+// What: Time.now() with no import; the module in std:time is time
+// Expect: Unknown type Time; note: using time from std:time; (the module is time)
 main { console.log(Time.now()); }
-using console from std:Console
+using console from std:console

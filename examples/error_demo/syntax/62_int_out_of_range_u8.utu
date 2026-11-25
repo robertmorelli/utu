@@ -4,4 +4,4 @@ main {
     let level: U8 = 300;
     console.log(level.i32());
 }
-using console from std:Console
+using console from std:console

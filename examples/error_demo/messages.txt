@@ -132,7 +132,7 @@
    │                 ━━━━━━━━━━━━━━
    │                 ╰─ may be null
 10 │ }
-11 │ using console from std:Console
+11 │ using console from std:console
 --- exit 1
 
 === utu check examples/error_demo/control/03_method_on_nullable_str.utu
@@ -290,7 +290,7 @@ ok
    │                       ━
    │                       ╰─ here
  8 │ }
- 9 │ using console from std:Console
+ 9 │ using console from std:console
 --- exit 1
 
 === utu check examples/error_demo/control/12_optional_chain_non_nullable.utu
@@ -392,7 +392,7 @@ ok
    │                       ━━━━
    │                       ╰─ no type
  7 │ }
- 8 │ using console from std:Console
+ 8 │ using console from std:console
 --- exit 1
 
 === utu check examples/error_demo/control/20_null_in_non_nullable_field.utu
@@ -1542,7 +1542,7 @@ ok
    │                 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
    │                 ╰─ here
  5 │ }
- 6 │ using console from std:Console
+ 6 │ using console from std:console
 --- exit 1
 
 === utu check examples/error_demo/iterators/08_terminal_then_stage.utu
@@ -1556,7 +1556,7 @@ ok
    │                                          │     ╰─ cannot follow
    │                                          ╰─ ends here
  6 │ }
- 7 │ using console from std:Console
+ 7 │ using console from std:console
 --- exit 1
 
 === utu check examples/error_demo/iterators/09_terminal_collect_then_sort.utu
@@ -1584,7 +1584,7 @@ ok
    │                           │                    ╰─ cannot follow
    │                           ╰─ ends here
  7 │ }
- 8 │ using console from std:Console
+ 8 │ using console from std:console
 --- exit 1
 
 === utu check examples/error_demo/iterators/1185_recursive_generator_method.utu
@@ -1612,7 +1612,7 @@ ok
    │                 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
    │                 ╰─ here
  5 │ }
- 6 │ using console from std:Console
+ 6 │ using console from std:console
 --- exit 1
 
 === utu check examples/error_demo/iterators/12_captures_fold_one.utu
@@ -1625,7 +1625,7 @@ ok
    │                 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
    │                 ╰─ here
  5 │ }
- 6 │ using console from std:Console
+ 6 │ using console from std:console
 --- exit 1
 
 === utu check examples/error_demo/iterators/13_captures_zip_one.utu
@@ -1638,7 +1638,7 @@ ok
    │                 ━━━━━━━━━━━━━━━━━━━━━━━
    │                 ╰─ here
  7 │ }
- 8 │ using console from std:Console
+ 8 │ using console from std:console
 --- exit 1
 
 === utu check examples/error_demo/iterators/14_captures_sort_one.utu
@@ -1690,7 +1690,7 @@ ok
    │                      ━━━━━━━
    │                      ╰─ '|'?
  5 │ }
- 6 │ using console from std:Console
+ 6 │ using console from std:console
 --- exit 1
 
 === utu check examples/error_demo/iterators/18_captures_each_two_no_index.utu
@@ -1729,7 +1729,7 @@ ok
    │                 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
    │                 ╰─ here
  5 │ }
- 6 │ using console from std:Console
+ 6 │ using console from std:console
 --- exit 1
 
 === utu check examples/error_demo/iterators/21_source_integer.utu
@@ -1742,7 +1742,7 @@ ok
    │                 ━
    │                 ╰─ I32
  6 │ }
- 7 │ using console from std:Console
+ 7 │ using console from std:console
 
   note  Use a range: 0 ..< n
 --- exit 1
@@ -1757,7 +1757,7 @@ ok
    │                 ━━━━
    │                 ╰─ Str
  6 │ }
- 7 │ using console from std:Console
+ 7 │ using console from std:console
 --- exit 1
 
 === utu check examples/error_demo/iterators/23_source_nullable_array.utu
@@ -1770,7 +1770,7 @@ ok
    │                 ━━━━━━━
    │                 ╰─ ?Array[I32]
  7 │ }
- 8 │ using console from std:Console
+ 8 │ using console from std:console
 
   note  Unwrap with promote or orelse
 --- exit 1
@@ -1785,7 +1785,7 @@ ok
    │                 ━━━━
    │                 ╰─ Cart
  9 │ }
-10 │ using console from std:Console
+10 │ using console from std:console
 --- exit 1
 
 === utu check examples/error_demo/iterators/25_source_zip_other.utu
@@ -1798,7 +1798,7 @@ ok
    │                        ━
    │                        ╰─ I32
  6 │ }
- 7 │ using console from std:Console
+ 7 │ using console from std:console
 --- exit 1
 
 === utu check examples/error_demo/iterators/26_source_chain_other.utu
@@ -1811,7 +1811,7 @@ ok
    │                                 ━
    │                                 ╰─ I32
  5 │ }
- 6 │ using console from std:Console
+ 6 │ using console from std:console
 --- exit 1
 
 === utu check examples/error_demo/iterators/27_source_flat_map_body.utu
@@ -1824,7 +1824,7 @@ ok
    │                                        ━━━━━━━━━━
    │                                        ╰─ I32
  5 │ }
- 6 │ using console from std:Console
+ 6 │ using console from std:console
 --- exit 1
 
 === utu check examples/error_demo/iterators/28_source_bisect_after_map.utu
@@ -1837,7 +1837,7 @@ ok
    │                 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
    │                 ╰─ here
  6 │ }
- 7 │ using console from std:Console
+ 7 │ using console from std:console
 --- exit 1
 
 === utu check examples/error_demo/iterators/29_source_bisect_integer.utu
@@ -1850,7 +1850,7 @@ ok
    │                 ━
    │                 ╰─ I32
  6 │ }
- 7 │ using console from std:Console
+ 7 │ using console from std:console
 
   note  Use a range: 0 ..< n
 --- exit 1
@@ -1865,7 +1865,7 @@ ok
    │                 ━━━━━━━━━━━━━
    │                 ╰─ here
  5 │ }
- 6 │ using console from std:Console
+ 6 │ using console from std:console
 --- exit 1
 
 === utu check examples/error_demo/iterators/31_source_stream.utu
@@ -1878,7 +1878,7 @@ ok
    │                 ━
    │                 ╰─ Stream[I32]
  6 │ }
- 7 │ using console from std:Console
+ 7 │ using console from std:console
 --- exit 1
 
 === utu check examples/error_demo/iterators/32_for_integer.utu
@@ -2108,7 +2108,7 @@ ok
    │                 ━━━━━━━━━━
    │                 ╰─ here
  9 │ }
-10 │ using console from std:Console
+10 │ using console from std:console
 --- exit 1
 
 === utu check examples/error_demo/iterators/44_generator_return_value.utu
@@ -2174,7 +2174,7 @@ ok
    │                 │      ╰─ the source meant?
    │                 ╰─ piped
  6 │ }
- 7 │ using console from std:Console
+ 7 │ using console from std:console
 
   note  Parenthesize the pipeline: a and (xs all |x| { … })
 --- exit 1
@@ -2214,7 +2214,7 @@ ok
    │                          ━━━━━━━━━━━━━━━━━━━━━
    │                          ╰─ here
  6 │ }
- 7 │ using console from std:Console
+ 7 │ using console from std:console
 --- exit 1
 
 === utu check examples/error_demo/iterators/50_generator_pass_through_transform.utu
@@ -2523,7 +2523,7 @@ ok
    │                                ━
    │                                ╰─ '('?
  5 │ }
- 6 │ using console from std:Console
+ 6 │ using console from std:console
 --- exit 1
 
 === utu check examples/error_demo/iterators/75_unfinished_repeat.utu
@@ -2575,7 +2575,7 @@ ok
    │                                          ━━━━━━━━━━
    │                                          ╰─ here
  9 │ }
-10 │ using console from std:Console
+10 │ using console from std:console
 --- exit 1
 
 === utu check examples/error_demo/iterators/79_generator_unused_with_pipeline.utu
@@ -2613,7 +2613,7 @@ ok
    │                                  ━━━
    │                                  ╰─ Str
  5 │ }
- 6 │ using console from std:Console
+ 6 │ using console from std:console
 --- exit 1
 
 === utu check examples/error_demo/iterators/82_windows_wrong_element_type.utu
@@ -2639,7 +2639,7 @@ ok
    │                 ━━━━━━━━━━━━━━
    │                 ╰─ here
  5 │ }
- 6 │ using console from std:Console
+ 6 │ using console from std:console
 --- exit 1
 
 === utu check examples/error_demo/iterators/84_bisect_extra_names.utu
@@ -2652,7 +2652,7 @@ ok
    │                 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
    │                 ╰─ here
  5 │ }
- 6 │ using console from std:Console
+ 6 │ using console from std:console
 --- exit 1
 
 === utu check examples/error_demo/iterators/85_generator_method.utu
@@ -2669,7 +2669,7 @@ ok
    │                 ━━━━━━━━━
    │                 ╰─ here
  6 │ }
- 7 │ using console from std:Console
+ 7 │ using console from std:console
 --- exit 1
 
 === utu check examples/error_demo/iterators/920_stream_of_promise.utu
@@ -2710,7 +2710,7 @@ ok
    │                 ━━━━━
    │                 ╰─ not defined
  7 │ }
- 8 │ using console from std:Console
+ 8 │ using console from std:console
 
   fix   Use length
  6 │     console.log(length * width);
@@ -2726,7 +2726,7 @@ ok
    │                         ━━━━━
    │                         ╰─ not defined
 10 │ }
-11 │ using console from std:Console
+11 │ using console from std:console
 --- exit 1
 
 === utu check examples/error_demo/names/03_unknown_variable_loop_capture.utu
@@ -2739,7 +2739,7 @@ ok
    │                         ━
    │                         ╰─ not defined
  9 │ }
-10 │ using console from std:Console
+10 │ using console from std:console
 --- exit 1
 
 === utu check examples/error_demo/names/04_unknown_function_typo.utu
@@ -2755,7 +2755,7 @@ ok
    │                 ━━━━━
    │                 ╰─ not defined
  7 │ }
- 8 │ using console from std:Console
+ 8 │ using console from std:console
 
   fix   Use square
  6 │     console.log(square(7));
@@ -2773,7 +2773,7 @@ ok
    │                                          ━━━━━━
    │                                          ╰─ not defined
  8 │ }
- 9 │ using console from std:Console
+ 9 │ using console from std:console
 
   fix   Use offset
  7 │     console.log(apply(cl(n) { return n + offset; }, 5));
@@ -2873,7 +2873,7 @@ ok
    │                                  ━━━━━━
    │                                  ╰─ not defined
  7 │ }
- 8 │ using console from std:Console
+ 8 │ using console from std:console
 --- exit 1
 
 === utu check examples/error_demo/names/103_variant_as_value.utu
@@ -2911,7 +2911,7 @@ ok
    │                 ━━━
    │                 ╰─ here
  9 │ }
-10 │ using console from std:Console
+10 │ using console from std:console
 --- exit 1
 
 === utu check examples/error_demo/names/10_unknown_type_Strng.utu
@@ -2973,17 +2973,8 @@ ok
 --- exit 1
 
 === utu check examples/error_demo/names/1201_module_global_assignment_label.utu
- ERROR  total is immutable
-        assignment-to-immutable · examples/error_demo/names/1201_module_global_assignment_label.utu:7:13
-
- 5 │ }
- 6 │ main {
- 7 │     Counter.total = 99;
-   │             ━━━━━
-   │             ╰─ constant
- 8 │     console.log(0);
- 9 │ }
---- exit 1
+ok
+--- exit 0
 
 === utu check examples/error_demo/names/1220_method_lenght.utu
  ERROR  No method Array[I32].lenght; did you mean len?
@@ -2995,7 +2986,7 @@ ok
    │                 ━━━━━━━━━━
    │                 ╰─ no such method
  6 │ }
- 7 │ using console from std:Console
+ 7 │ using console from std:console
 
   fix   Use len
  5 │     console.log(a.len());
@@ -3215,7 +3206,7 @@ ok
    │                 ━━━━━
    │                 ╰─ not defined
  9 │ }
-10 │ using console from std:Console
+10 │ using console from std:console
 
   fix   Use math
  8 │     console.log(math.square(4));
@@ -3350,38 +3341,41 @@ ok
         unknown-import · examples/error_demo/names/32_unknown_import_std_typo.utu:3:1
 
  1 │ // What: a std module name misspelled (std:Consle)
- 2 │ // Expect: Unknown std module 'std:Consle'; did you mean std:Console?
- 3 │ using console from std:Consle;
+ 2 │ // Expect: Unknown std module 'std:Consle'; did you mean std:console?
+ 3 │ using console from std:Consle
    │ ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
    │ ╰─ here
  4 │
  5 │ main {
 
-  note  using console from std:Console;
+  note  using console from std:console
 --- exit 1
 
-=== utu check examples/error_demo/names/33_unknown_import_std_lowercase.utu
- ERROR  Unknown platform import: std:console
-        unknown-import · examples/error_demo/names/33_unknown_import_std_lowercase.utu:3:1
+=== utu check examples/error_demo/names/33_unknown_import_std_old_case.utu
+ ERROR  Unknown platform import: std:Console
+        unknown-import · examples/error_demo/names/33_unknown_import_std_old_case.utu:3:1
 
- 1 │ // What: a std module written in lowercase (std:console)
- 2 │ // Expect: Unknown std module 'std:console'; did you mean std:Console?
- 3 │ using console from std:console;
+ 1 │ // What: a std module in its old capitalized spelling (std:Console)
+ 2 │ // Expect: Unknown platform import std:Console; fix: Use std:console
+ 3 │ using console from std:Console
    │ ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
    │ ╰─ here
  4 │
  5 │ main {
 
-  note  using console from std:Console;
+  note  using console from std:console
+
+  fix   Use std:console
+ 3 │ using console from std:console
 --- exit 1
 
 === utu check examples/error_demo/names/34_unknown_import_std_quoted.utu
- ERROR  No file std:Console (examples/error_demo/names/std:Console)
+ ERROR  No file std:console (examples/error_demo/names/std:console)
         unknown-import · examples/error_demo/names/34_unknown_import_std_quoted.utu:3:1
 
- 1 │ // What: a std module written as a quoted path ("std:Console")
- 2 │ // Expect: either accept it or say std modules are written unquoted: std:Console
- 3 │ using console from "std:Console";
+ 1 │ // What: a std module written as a quoted path ("std:console")
+ 2 │ // Expect: either accept it or say std modules are written unquoted: std:console
+ 3 │ using console from "std:console";
    │ ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
    │ ╰─ here
  4 │
@@ -3453,7 +3447,7 @@ ok
    │                ━━━━━━━
    │                ╰─ ';'?
  7 │ }
- 8 │ using console from std:Console
+ 8 │ using console from std:console
 --- exit 1
 
 === utu check examples/error_demo/names/400_module_as_value.utu
@@ -3492,7 +3486,7 @@ ok
    │                 ━━━
    │                 ╰─ not a value
  8 │ }
- 9 │ using console from std:Console
+ 9 │ using console from std:console
 --- exit 1
 
 === utu check examples/error_demo/names/40_not_a_module_type_path.utu
@@ -3531,7 +3525,7 @@ ok
    │                 ━━━━━━━━━━
    │                 ╰─ given 2
  9 │ }
-10 │ using console from std:Console
+10 │ using console from std:console
 --- exit 1
 
 === utu check examples/error_demo/names/42_duplicate_struct_and_enum.utu
@@ -3597,14 +3591,14 @@ ok
  ERROR  Unknown type Time
         unknown-type · examples/error_demo/names/460_std_module_file_name.utu:3:20
 
- 1 │ // What: Time.now() with no import; the module in std:Time is time
- 2 │ // Expect: Unknown type Time; note: using time from std:Time; (the module is time)
+ 1 │ // What: Time.now() with no import; the module in std:time is time
+ 2 │ // Expect: Unknown type Time; note: using time from std:time; (the module is time)
  3 │ main { console.log(Time.now()); }
    │                    ━━━━
    │                    ╰─ no such type
- 4 │ using console from std:Console
+ 4 │ using console from std:console
 
-  note  using time from std:Time (the module is time)
+  note  using time from std:time (the module is time)
 --- exit 1
 
 === utu check examples/error_demo/names/461_console_without_import.utu
@@ -3612,40 +3606,40 @@ ok
         unknown-variable · examples/error_demo/names/461_console_without_import.utu:3:8
 
  1 │ // What: console.log with no import
- 2 │ // Expect: Unknown variable console; note: using console from std:Console;
+ 2 │ // Expect: Unknown variable console; note: using console from std:console;
  3 │ main { console.log("hi"); }
    │        ━━━━━━━
    │        ╰─ not defined
 
-  note  using console from std:Console
+  note  using console from std:console
 --- exit 1
 
 === utu check examples/error_demo/names/462_std_module_named_as_file.utu
  ERROR  Unknown module Time; the file defines 'time'
         unknown-module · examples/error_demo/names/462_std_module_named_as_file.utu:3:7
 
- 1 │ // What: importing std:Time under its file's name
- 2 │ // Expect: Unknown module Time; note: using time from std:Time; (the module is time)
- 3 │ using Time from std:Time;
+ 1 │ // What: importing std:time under its file's name
+ 2 │ // Expect: Unknown module Time; note: using time from std:time; (the module is time)
+ 3 │ using Time from std:time;
    │       ━━━━
    │       ╰─ no such module
  4 │
  5 │ main { console.log(time.now()); }
 
-  note  using time from std:Time (the module is time)
+  note  using time from std:time (the module is time)
   note  The file has no mod Time: declare one there, mod Time { … }
 
  ERROR  Unknown variable time
         unknown-variable · examples/error_demo/names/462_std_module_named_as_file.utu:5:20
 
- 3 │ using Time from std:Time;
+ 3 │ using Time from std:time;
  4 │
  5 │ main { console.log(time.now()); }
    │                    ━━━━
    │                    ╰─ not defined
- 6 │ using console from std:Console
+ 6 │ using console from std:console
 
-  note  using time from std:Time
+  note  using time from std:time
 --- exit 1
 
 === utu check examples/error_demo/names/46_duplicate_closure_parameter.utu
@@ -3744,7 +3738,7 @@ ok
 12 │ main { console.log(X { id: 1 }.name()); }
    │                                ━━━━
    │                                ╰─ as which protocol?
-13 │ using console from std:Console
+13 │ using console from std:console
 --- exit 1
 
 === utu check examples/error_demo/names/502_impl_for_one_instance.utu
@@ -4210,7 +4204,7 @@ ok
    │                          ━━━━
    │                          ╰─ no such method
 10 │ }
-11 │ using console from std:Console
+11 │ using console from std:console
 --- exit 1
 
 === utu check examples/error_demo/names/763_duplicate_protocol_impl.utu
@@ -4267,7 +4261,7 @@ ok
  ERROR  Duplicate declaration console
         duplicate-declaration · examples/error_demo/names/780_using_named_like_own_mod.utu:5:5
 
- 3 │ using console from std:Console;
+ 3 │ using console from std:console;
    │       ───────
    │       ╰─ first here
  4 │
@@ -4288,7 +4282,7 @@ ok
    ┆
  5 │ }
  6 │
- 7 │ using console from std:Console;
+ 7 │ using console from std:console;
    │       ━━━━━━━
    │       ╰─ again
  8 │
@@ -4438,16 +4432,8 @@ ok
 --- exit 0
 
 === utu check examples/error_demo/names/82_assign_global.utu
- ERROR  count is immutable
-        assignment-to-immutable · examples/error_demo/names/82_assign_global.utu:6:5
-
- 4 │
- 5 │ fn bump() Void {
- 6 │     count += 1;
-   │     ━━━━━
-   │     ╰─ cannot be assigned
- 7 │ }
---- exit 1
+ok
+--- exit 0
 
 === utu check examples/error_demo/names/830_duplicate_bench_name.utu
  ERROR  Duplicate bench "adds"
@@ -4543,7 +4529,7 @@ ok
    │                 ━
    │                 ╰─ not a value
  9 │ }
-10 │ using console from std:Console
+10 │ using console from std:console
 --- exit 1
 
 === utu check examples/error_demo/names/86_assign_enum_variant.utu
@@ -4671,7 +4657,7 @@ ok
    │                 ━
    │                 ╰─ ambiguous
 10 │ }
-11 │ using console from std:Console
+11 │ using console from std:console
 --- exit 1
 
 === utu check examples/error_demo/names/92_enum_base_i64.utu
@@ -4709,7 +4695,7 @@ ok
    │                 ━━━
    │                 ╰─ not defined
  7 │ }
- 8 │ using console from std:Console
+ 8 │ using console from std:console
 --- exit 1
 
 === utu check examples/error_demo/names/95_distinct_wrong_conversion.utu
@@ -4883,7 +4869,7 @@ ok
    │                 ━━━━━━━━━━━━
    │                 ╰─ here
  8 │ }
- 9 │ using console from std:Console
+ 9 │ using console from std:console
 --- exit 1
 
 === utu check examples/error_demo/platform/04_vec_unknown_method_append.utu
@@ -4935,7 +4921,7 @@ ok
    │                       ━━━━━━━
    │                       ╰─ here
 12 │ }
-13 │ using console from std:Console
+13 │ using console from std:console
 --- exit 1
 
 === utu check examples/error_demo/platform/08_mem_slice.utu
@@ -5017,14 +5003,14 @@ ok
 --- exit 1
 
 === utu check examples/error_demo/platform/1121_wutu_call_hole_error_once.utu
- ERROR  Stock has no field nope
-        unknown-field · examples/error_demo/platform/1121_wutu_call_hole_error_once.utu:17:31
+ ERROR  child expressions use | value or |> expr, not = expr
+        dsl-error · examples/error_demo/platform/1121_wutu_call_hole_error_once.utu:17:17
 
 15 │         for state.items |item| key item.id {
 16 │             p {
 17 │                 = wutu.number(item.nope)
-   │                               ━━━━━━━━━
-   │                               ╰─ no such field
+   │                 ━
+   │                 ╰─ here
 18 │             }
 19 │         }
 --- exit 1
@@ -5147,14 +5133,14 @@ ok
 --- exit 1
 
 === utu check examples/error_demo/platform/1323_wutu_for_range_parens.utu
- ERROR  Invalid Utu interpolation at offset 231: 0..<state.n (a range needs parentheses: for (0 ..< n) |i|)
-        dsl-error · examples/error_demo/platform/1323_wutu_for_range_parens.utu:12:16
+ ERROR  child expressions use | value or |> expr, not = expr
+        dsl-error · examples/error_demo/platform/1323_wutu_for_range_parens.utu:12:38
 
 10 │     let app = @wutu/\
 11 │     @reactive
 12 │     main { for 0..<state.n |i| { p { = i } } }
-   │                ━
-   │                ╰─ here
+   │                                      ━
+   │                                      ╰─ here
 13 │     \/;
 14 │     Browser.document.body.append(app);
 --- exit 1
@@ -5234,7 +5220,7 @@ ok
    │                 ━━━━━━━━━━━━
    │                 ╰─ here
  9 │ }
-10 │ using console from std:Console
+10 │ using console from std:console
 --- exit 1
 
 === utu check examples/error_demo/platform/19_too_many_mems.utu
@@ -5347,7 +5333,7 @@ ok
    │                       ━━━━━━━━━━━━━━━━━━━━━
    │                       ╰─ here
  7 │ }
- 8 │ using console from std:Console
+ 8 │ using console from std:console
 --- exit 1
 
 === utu check examples/error_demo/platform/27_es_untyped_let.utu
@@ -5744,7 +5730,7 @@ ok
    │                                                                                                                                 ━━━━━━━━━━━
    │                                                                                                                                 ╰─ too deep
  5 │ }
- 6 │ using console from std:Console
+ 6 │ using console from std:console
 --- exit 1
 
 === utu check examples/error_demo/platform/44_foreign_readonly_write.utu
@@ -5947,7 +5933,7 @@ ok
    │                                        ━━━
    │                                        ╰─ here
  6 │ }
- 7 │ using console from std:Console
+ 7 │ using console from std:console
 --- exit 1
 
 === utu check examples/error_demo/platform/540_wutu_reactive_inside.utu
@@ -6029,53 +6015,53 @@ ok
 --- exit 1
 
 === utu check examples/error_demo/platform/546_wutu_hole_void.utu
- ERROR  A hole needs a value: this gives none
-        wutu-hole · examples/error_demo/platform/546_wutu_hole_void.utu:17:18
+ ERROR  child expressions use | value or |> expr, not = expr
+        dsl-error · examples/error_demo/platform/546_wutu_hole_void.utu:17:16
 
 15 │     let app = @wutu/\
 16 │     @reactive
 17 │     main { p { = Browser.console.log("x") } }
-   │                  ━━━━━━━━━━━━━━━━━━━━━━━━
-   │                  ╰─ Void
+   │                ━
+   │                ╰─ here
 18 │     \/;
 19 │     Browser.document.body.append(app);
 --- exit 1
 
 === utu check examples/error_demo/platform/547_wutu_hole_array.utu
- ERROR  Item is not a Component (a hole shows text, a number, a Bool, an element, or a Component)
-        wutu-hole · examples/error_demo/platform/547_wutu_hole_array.utu:17:18
+ ERROR  child expressions use | value or |> expr, not = expr
+        dsl-error · examples/error_demo/platform/547_wutu_hole_array.utu:17:16
 
 15 │     let app = @wutu/\
 16 │     @reactive
 17 │     main { p { = state.items } }
-   │                  ━━━━━━━━━━━
-   │                  ╰─ Item
+   │                ━
+   │                ╰─ here
 18 │     \/;
 19 │     Browser.document.body.append(app);
 --- exit 1
 
 === utu check examples/error_demo/platform/548_wutu_key_struct.utu
- ERROR  A key is text or a number, not Item
-        wutu-key · examples/error_demo/platform/548_wutu_key_struct.utu:17:42
+ ERROR  child expressions use | value or |> expr, not = expr
+        dsl-error · examples/error_demo/platform/548_wutu_key_struct.utu:17:52
 
 15 │     let app = @wutu/\
 16 │     @reactive
 17 │     main { ul { for state.items |it| key it { li { = it.id } } } }
-   │                                          ━━
-   │                                          ╰─ Item
+   │                                                    ━
+   │                                                    ╰─ here
 18 │     \/;
 19 │     Browser.document.body.append(app);
 --- exit 1
 
 === utu check examples/error_demo/platform/548_wutu_non_component.utu
- ERROR  Plain is not a Component (a hole shows text, a number, a Bool, an element, or a Component)
-        wutu-hole · examples/error_demo/platform/548_wutu_non_component.utu:9:50
+ ERROR  child expressions use | value or |> expr, not = expr
+        dsl-error · examples/error_demo/platform/548_wutu_non_component.utu:9:48
 
  7 │
  8 │ main {
  9 │     Browser.document.body.append(@wutu/\ div { = Plain { value: 1 } } \/)
-   │                                                  ━━━━━━━━━━━━━━━━━━
-   │                                                  ╰─ Plain
+   │                                                ━
+   │                                                ╰─ here
 10 │ }
 --- exit 1
 
@@ -6217,7 +6203,7 @@ ok
    │                      ━━━━━
    │                      ╰─ may suspend
 12 │ }
-13 │ using console from std:Console
+13 │ using console from std:console
 
   note  A stack suspends only through utu's calls, not the host's; pass a function that does not await
 --- exit 1
@@ -6679,20 +6665,16 @@ ok
 --- exit 1
 
 === utu check examples/error_demo/platform/84_wutu_two_roots.utu
- ERROR  view returns Browser.HTMLElement, got Browser.DocumentFragment
-        type-mismatch · examples/error_demo/platform/84_wutu_two_roots.utu:6:12
+ ERROR  child expressions use | value or |> expr, not = expr
+        dsl-error · examples/error_demo/platform/84_wutu_two_roots.utu:7:10
 
- 4 │
  5 │ fn view(title: Str, items: Array[Str]) Browser.HTMLElement {
-   │                                        ───────────────────
-   │                                        ╰─ Browser.HTMLElement
  6 │     return @wutu/\
-   │            ━━━━━━━
-   │            ╰─ Browser.DocumentFragment
  7 │     h2 { = title }
+   │          ━
+   │          ╰─ here
  8 │     p { "Some text" }
  9 │     \/;
-10 │ }
 --- exit 1
 
 === utu check examples/error_demo/platform/85_wutu_text_root.utu
@@ -6788,7 +6770,7 @@ ok
 --- exit 1
 
 === utu check examples/error_demo/platform/89_wutu_old_interpolation.utu
- ERROR  Wutu no longer writes $[…]: an expression stands on its own (= expr for text, name = expr for an attribute, if cond {, prop: = expr)
+ ERROR  Wutu no longer writes $[…]: an expression stands on its own (| value or |> expr for children, name = expr for an attribute, if cond {, prop: { expr })
         dsl-error · examples/error_demo/platform/89_wutu_old_interpolation.utu:7:10
 
  5 │ fn view(title: Str, items: Array[Str]) Browser.HTMLElement {
@@ -6840,7 +6822,7 @@ ok
 --- exit 1
 
 === utu check examples/error_demo/platform/912_wutu_script_dynamic_text.utu
- ERROR  a script's text is code, so Wutu writes it only as written: script { "…" }
+ ERROR  child expressions use | value or |> expr, not = expr
         dsl-error · examples/error_demo/platform/912_wutu_script_dynamic_text.utu:8:18
 
  6 │     return @wutu/\
@@ -6853,16 +6835,16 @@ ok
 --- exit 1
 
 === utu check examples/error_demo/platform/91_wutu_unterminated_element.utu
- ERROR  unterminated element 'section'
-        dsl-error · examples/error_demo/platform/91_wutu_unterminated_element.utu:7:5
+ ERROR  child expressions use | value or |> expr, not = expr
+        dsl-error · examples/error_demo/platform/91_wutu_unterminated_element.utu:8:14
 
- 5 │ fn view(title: Str, items: Array[Str]) Browser.HTMLElement {
  6 │     return @wutu/\
  7 │     section {
-   │     ━
-   │     ╰─ here
  8 │         h2 { = title }
+   │              ━
+   │              ╰─ here
  9 │     \/;
+10 │ }
 --- exit 1
 
 === utu check examples/error_demo/platform/92_wutu_for_without_capture.utu
@@ -7110,20 +7092,20 @@ ok
 --- exit 1
 
 === utu check examples/error_demo/platform/94_wutu_bad_interpolation.utu
- ERROR  Invalid Utu interpolation at offset 243: title +
-        dsl-error · examples/error_demo/platform/94_wutu_bad_interpolation.utu:7:12
+ ERROR  child expressions use | value or |> expr, not = expr
+        dsl-error · examples/error_demo/platform/94_wutu_bad_interpolation.utu:7:10
 
  5 │ fn view(title: Str, items: Array[Str]) Browser.HTMLElement {
  6 │     return @wutu/\
  7 │     h2 { = title + }
-   │            ━
-   │            ╰─ here
+   │          ━
+   │          ╰─ here
  8 │     \/;
  9 │ }
 --- exit 1
 
 === utu check examples/error_demo/platform/950_wutu_style_dynamic_text.utu
- ERROR  a style's text is unescaped in HTML (a value could close it), so Wutu writes it only as written: style { "…" }
+ ERROR  child expressions use | value or |> expr, not = expr
         dsl-error · examples/error_demo/platform/950_wutu_style_dynamic_text.utu:8:17
 
  6 │     return @wutu/\
@@ -7136,7 +7118,7 @@ ok
 --- exit 1
 
 === utu check examples/error_demo/platform/951_wutu_noscript_dynamic_text.utu
- ERROR  a noscript's text is unescaped in HTML (a value could close it), so Wutu writes it only as written: noscript { "…" }
+ ERROR  child expressions use | value or |> expr, not = expr
         dsl-error · examples/error_demo/platform/951_wutu_noscript_dynamic_text.utu:8:20
 
  6 │     return @wutu/\
@@ -7301,7 +7283,7 @@ ok
    │                 ━━━━
    │                 ╰─ called here
 11 │ }
-12 │ using console from std:Console
+12 │ using console from std:console
 
   in &.get_index  std:Buffer:32:55  (inlined into main)
   in main  examples/error_demo/runtime/06_buffer_past_length.utu:10:17
@@ -7317,7 +7299,7 @@ ok
    │                 ━━━━━━
    │                 ╰─ called here
  9 │ }
-10 │ using console from std:Console
+10 │ using console from std:console
 
   in &.get_index  std:Buffer:32:55  (inlined into main)
   in main  examples/error_demo/runtime/07_buffer_past_capacity.utu:8:17
@@ -7333,7 +7315,7 @@ ok
    │                 ━━━━━━━
    │                 ╰─ called here
  8 │ }
- 9 │ using console from std:Console
+ 9 │ using console from std:console
 
   in &.pop  std:Buffer:43:44  (inlined into main)
   in main  examples/error_demo/runtime/08_buffer_pop_empty.utu:7:17
@@ -7379,7 +7361,7 @@ ok
    │                 ━━━━━━━
    │                 ╰─ here
  7 │ }
- 8 │ using console from std:Console
+ 8 │ using console from std:console
 
   in main  examples/error_demo/runtime/11_div_overflow.utu:6:17
 --- exit 1
@@ -7394,7 +7376,7 @@ ok
    │                 ━━━━━
    │                 ╰─ here
  7 │ }
- 8 │ using console from std:Console
+ 8 │ using console from std:console
 
   in main  examples/error_demo/runtime/12_i64_div_by_zero.utu:6:17
 --- exit 1
@@ -7489,7 +7471,7 @@ ok
    │                 ━━━━━━━━━━━━━━━
    │                 ╰─ here
 11 │ }
-12 │ using console from std:Console
+12 │ using console from std:console
 
   in main  examples/error_demo/runtime/19_es_throws.utu:10:17
 --- exit 1
@@ -7504,7 +7486,7 @@ ok
    │                 ━━━━━━━━━
    │                 ╰─ here
  7 │ }
- 8 │ using console from std:Console
+ 8 │ using console from std:console
 
   in main  examples/error_demo/runtime/20_es_throws_string.utu:6:17
 --- exit 1
@@ -7595,7 +7577,7 @@ ok
    │                                            ━━━━━━━━━━━━━
    │                                            ╰─ here
  8 │ }
- 9 │ using console from std:Console
+ 9 │ using console from std:console
 
   in closure  examples/error_demo/runtime/26_es_callback_traps.utu:7:44
   in main  examples/error_demo/runtime/26_es_callback_traps.utu:7:17
@@ -7611,7 +7593,7 @@ ok
    │                 ━━━━━
    │                 ╰─ here
 10 │ }
-11 │ using console from std:Console
+11 │ using console from std:console
 
   in main  examples/error_demo/runtime/27_async_trap_after_await.utu:9:17
 --- exit 1
@@ -7655,7 +7637,7 @@ scheduled
  8 │ main { console.log(half(3).value()); }
    │                    ━━━━━━━━━━━━━━━
    │                    ╰─ called here
- 9 │ using console from std:Console
+ 9 │ using console from std:console
 
   in &.value  std:Result:42:27  (inlined into main)
   in main  examples/error_demo/runtime/309_result_value_of_error.utu:8:20
@@ -7671,7 +7653,7 @@ scheduled
    │                 ━━━━━
    │                 ╰─ here
  6 │ }
- 7 │ using console from std:Console
+ 7 │ using console from std:console
 
   in main  examples/error_demo/runtime/30_string_index_oob.utu:5:17
 --- exit 1
@@ -7701,7 +7683,7 @@ scheduled
    │                 ━━━━━━━━━━━━━━
    │                 ╰─ here
  8 │ }
- 9 │ using console from std:Console
+ 9 │ using console from std:console
 
   in main  examples/error_demo/runtime/32_mem_out_of_bounds.utu:7:17
 --- exit 1
@@ -7716,7 +7698,7 @@ scheduled
    │                 ━━━━━━━━
    │                 ╰─ here
  8 │ }
- 9 │ using console from std:Console
+ 9 │ using console from std:console
 
   in main  examples/error_demo/runtime/33_vec_out_of_bounds.utu:7:17
 --- exit 1
@@ -7784,7 +7766,7 @@ scheduled
    │                       ━━━━━━━━
    │                       ╰─ here
 13 │ }
-14 │ using console from std:Console
+14 │ using console from std:console
 
   in Level
   in main  examples/error_demo/runtime/362_match_no_arm.utu:12:23
@@ -7872,7 +7854,7 @@ FAIL third item: Buffer index out of range  at examples/error_demo/runtime/48_te
    │                 ━━━━
    │                 ╰─ here
  6 │ }
- 7 │ using console from std:Console
+ 7 │ using console from std:console
 
   in main  examples/error_demo/runtime/494_string_index_past_end.utu:5:17
 --- exit 1
@@ -7941,7 +7923,7 @@ FAIL third item: Buffer index out of range  at examples/error_demo/runtime/48_te
    │                 ━━━━━━━━━━━━━━━━
    │                 ╰─ not defined
  9 │ }
-10 │ using console from std:Console
+10 │ using console from std:console
 --- exit 1
 
 === utu examples/error_demo/runtime/54_main_takes_args.utu
@@ -7961,7 +7943,7 @@ FAIL third item: Buffer index out of range  at examples/error_demo/runtime/48_te
 
 === utu examples/error_demo/runtime/55_main_returns_struct.utu
  ERROR  No method Point.str
-        unknown-method · std:Console:12:35
+        unknown-method · std:console:12:35
 
 10 │
 11 │     /// A line on standard output (`console.log`): `x.str()`.
@@ -7993,7 +7975,7 @@ FAIL third item: Buffer index out of range  at examples/error_demo/runtime/48_te
    │              ━━━━━━━━
    │              ╰─ here
  6 │ main { console.log(g); }
- 7 │ using console from std:Console
+ 7 │ using console from std:console
 
   in g.init  examples/error_demo/runtime/650_global_init_trap.utu:5:14
   in start
@@ -8009,7 +7991,7 @@ FAIL third item: Buffer index out of range  at examples/error_demo/runtime/48_te
    │                            ━━━━━━━━━━━
    │                            ╰─ here
  8 │ }
- 9 │ using console from std:Console
+ 9 │ using console from std:console
 
   in array.slice
   in main  examples/error_demo/runtime/651_slice_second_use.utu:7:28
@@ -8179,7 +8161,7 @@ FAIL after tests: boom
    │                      ━━━━━
    │                      ╰─ a type
 13 │ }
-14 │ using console from std:Console
+14 │ using console from std:console
 --- exit 1
 
 === utu check examples/error_demo/syntax/102_too_many_parameters.utu
@@ -8303,7 +8285,7 @@ FAIL after tests: boom
  ERROR  Unexpected '{'
         parse-error · examples/error_demo/syntax/14_missing_return_type.utu:5:21
 
- 3 │ using console from std:Console;
+ 3 │ using console from std:console;
  4 │
  5 │ fn greet(name: Str) {
    │                     ━
@@ -8435,7 +8417,7 @@ FAIL after tests: boom
 
  2 │ // Expect: `using` is only allowed at the top level of a file; move it above `mod report`.
  3 │ mod report {
- 4 │     using console from std:Console;
+ 4 │     using console from std:console;
    │     ━━━━━
    │     ╰─ unexpected
  5 │     fn show(n: I32) Void { console.log(n.str()); }
@@ -8523,7 +8505,7 @@ FAIL after tests: boom
    │                       ━━━
    │                       ╰─ not a closure
  7 │ }
- 8 │ using console from std:Console
+ 8 │ using console from std:console
 --- exit 1
 
 === utu check examples/error_demo/syntax/31_js_arrow_closure.utu
@@ -8536,7 +8518,7 @@ FAIL after tests: boom
    │                           ━━
    │                           ╰─ not a closure
  7 │ }
- 8 │ using console from std:Console
+ 8 │ using console from std:console
 --- exit 1
 
 === utu check examples/error_demo/syntax/32_c_style_for.utu
@@ -8745,7 +8727,7 @@ FAIL after tests: boom
 
  1 │ // What: a using declaration that forgets the word `from`.
  2 │ // Expect: expected 'from' (or ';') after `using console`, got 'std'.
- 3 │ using console std:Console;
+ 3 │ using console std:console;
    │               ━━━
    │               ╰─ ';'?
  4 │
@@ -8778,7 +8760,7 @@ FAIL after tests: boom
    │                   ━━
    │                   ╰─ ..<
  5 │ }
- 6 │ using console from std:Console
+ 6 │ using console from std:console
 
   fix   Use ..<
  4 │     console.log((0..<5) count);
@@ -8976,26 +8958,8 @@ FAIL after tests: boom
 --- exit 1
 
 === utu check examples/error_demo/syntax/551_html_without_browser.utu
- ERROR  Unknown module Browser
-        unknown-module · examples/error_demo/syntax/551_html_without_browser.utu:3:1
-
- 1 │ // What: html { } in a file that does not import std:Browser.
- 2 │ // Expect: Unknown module Browser
- 3 │ html {
-   │ ━━━━━━
-   │ ╰─ no such module
- 4 │     body {
- 5 │         h1 { "hi" }
- 6 │     }
- 7 │ }
-
-  note  wn and html { } build on std:Browser, which the file does not import
-
-  fix   import std:Browser
- 1 │ using Browser from std:Browser
- 2 │
- 3 │ // What: html { } in a file that does not import std:Browser.
---- exit 1
+ok
+--- exit 0
 
 === utu check examples/error_demo/syntax/55_closure_with_fun_keyword.utu
  ERROR  Expected ')', got ':'
@@ -9007,7 +8971,7 @@ FAIL after tests: boom
    │                            ━
    │                            ╰─ ')'?
  7 │ }
- 8 │ using console from std:Console
+ 8 │ using console from std:console
 --- exit 1
 
 === utu check examples/error_demo/syntax/56_nested_fn.utu
@@ -9035,7 +8999,7 @@ FAIL after tests: boom
    │                 ━━━━━━━━━━━━━━━━━━
    │                 ╰─ here
  5 │ }
- 6 │ using console from std:Console
+ 6 │ using console from std:console
 --- exit 1
 
 === utu check examples/error_demo/syntax/58_escape_lone_surrogate.utu
@@ -9048,7 +9012,7 @@ FAIL after tests: boom
    │                 ━━━━━━━━━━━━━━
    │                 ╰─ here
  5 │ }
- 6 │ using console from std:Console
+ 6 │ using console from std:console
 --- exit 1
 
 === utu check examples/error_demo/syntax/59_escape_unknown_letter.utu
@@ -9074,7 +9038,7 @@ FAIL after tests: boom
    │                 ━━━━━━━━━━━━━━━━━
    │                 ╰─ here
  5 │ }
- 6 │ using console from std:Console
+ 6 │ using console from std:console
 --- exit 1
 
 === utu check examples/error_demo/syntax/61_escape_nul.utu
@@ -9139,7 +9103,7 @@ FAIL after tests: boom
    │                      ━━━━━━━━━━
    │                      ╰─ I32
  7 │ }
- 8 │ using console from std:Console
+ 8 │ using console from std:console
 --- exit 1
 
 === utu check examples/error_demo/syntax/66_int_hex_mask_i32.utu
@@ -9679,7 +9643,7 @@ FAIL after tests: boom
    │                             ━━━━━
    │                             ╰─ F64
  8 │ }
- 9 │ using console from std:Console
+ 9 │ using console from std:console
 --- exit 1
 
 === utu check examples/error_demo/types/05_method_argument.utu
@@ -9878,7 +9842,7 @@ FAIL after tests: boom
    │                 ━━━━━━
    │                 ╰─ set-only
 12 │ }
-13 │ using console from std:Console
+13 │ using console from std:console
 --- exit 1
 
 === utu check examples/error_demo/types/1060_new_default_i31.utu
@@ -10026,7 +9990,7 @@ FAIL after tests: boom
    │                         ━━━━━━
    │                         ╰─ E
 11 │ }
-12 │ using console from std:Console
+12 │ using console from std:console
 --- exit 1
 
 === utu check examples/error_demo/types/11_global_annotation.utu
@@ -10054,7 +10018,7 @@ FAIL after tests: boom
  7 │ main { console.log(P.tick(7.5)); }
    │                           ━━━
    │                           ╰─ F32
- 8 │ using console from std:Console
+ 8 │ using console from std:console
 --- exit 1
 
 === utu check examples/error_demo/types/1202_using_type_argument_count.utu
@@ -10067,7 +10031,7 @@ FAIL after tests: boom
    │        ━━━━━
    │        ╰─ here
  6 │ main { console.log(q.mk(3, 4).a); }
- 7 │ using console from std:Console
+ 7 │ using console from std:console
 --- exit 1
 
 === utu check examples/error_demo/types/1203_generator_module_type_argument_count.utu
@@ -10079,7 +10043,7 @@ FAIL after tests: boom
  4 │ main { let t = 0; for (P[I32].gen(1, 2)) |x| { t += x; }; console.log(t); }
    │                        ━━━━━━━━━━━━━━━━
    │                        ╰─ here
- 5 │ using console from std:Console
+ 5 │ using console from std:console
 --- exit 1
 
 === utu check examples/error_demo/types/1204_type_path_type_argument_count.utu
@@ -10092,7 +10056,7 @@ FAIL after tests: boom
    │          ━━━━━━
    │          ╰─ here
  5 │ main { console.log(f(null)); }
- 6 │ using console from std:Console
+ 6 │ using console from std:console
 --- exit 1
 
 === utu check examples/error_demo/types/1205_mem_method_arity.utu
@@ -10104,7 +10068,7 @@ FAIL after tests: boom
  5 │ main { a.push(); v.push(); a.resize(); a.len(1); console.log(0); }
    │        ━━━━━━━━
    │        ╰─ takes 1, given 0
- 6 │ using console from std:Console
+ 6 │ using console from std:console
 
  ERROR  Takes 1, given 0
         wrong-arity · examples/error_demo/types/1205_mem_method_arity.utu:5:18
@@ -10114,7 +10078,7 @@ FAIL after tests: boom
  5 │ main { a.push(); v.push(); a.resize(); a.len(1); console.log(0); }
    │                  ━━━━━━━━
    │                  ╰─ takes 1, given 0
- 6 │ using console from std:Console
+ 6 │ using console from std:console
 
  ERROR  Takes 1, given 0
         wrong-arity · examples/error_demo/types/1205_mem_method_arity.utu:5:28
@@ -10124,7 +10088,7 @@ FAIL after tests: boom
  5 │ main { a.push(); v.push(); a.resize(); a.len(1); console.log(0); }
    │                            ━━━━━━━━━━
    │                            ╰─ takes 1, given 0
- 6 │ using console from std:Console
+ 6 │ using console from std:console
 
  ERROR  Takes 0, given 1
         wrong-arity · examples/error_demo/types/1205_mem_method_arity.utu:5:40
@@ -10134,7 +10098,7 @@ FAIL after tests: boom
  5 │ main { a.push(); v.push(); a.resize(); a.len(1); console.log(0); }
    │                                        ━━━━━━━━
    │                                        ╰─ takes 0, given 1
- 6 │ using console from std:Console
+ 6 │ using console from std:console
 --- exit 1
 
 === utu check examples/error_demo/types/1206_enum_count_arity.utu
@@ -10146,7 +10110,7 @@ FAIL after tests: boom
  5 │ main { console.log(E.count(1)); }
    │                    ━━━━━━━━━━
    │                    ╰─ takes 0, given 1
- 6 │ using console from std:Console
+ 6 │ using console from std:console
 --- exit 1
 
 === utu check examples/error_demo/types/1207_scalar_conversion_arity.utu
@@ -10158,7 +10122,7 @@ FAIL after tests: boom
  4 │ main { let x: X = X(1); console.log(x.i32(1)); }
    │                                     ━━━━━━━━
    │                                     ╰─ takes 0, given 1
- 5 │ using console from std:Console
+ 5 │ using console from std:console
 --- exit 1
 
 === utu check examples/error_demo/types/1240_mem_of_unknown_type.utu
@@ -10194,7 +10158,7 @@ FAIL after tests: boom
  6 │ main { console.log(f(b.wrap("a"))); }
    │                      ━━━━━━━━━━━
    │                      ╰─ Cell
- 7 │ using console from std:Console
+ 7 │ using console from std:console
 --- exit 1
 
 === utu check examples/error_demo/types/1260_operator_one_capture.utu
@@ -10283,7 +10247,7 @@ FAIL after tests: boom
  9 │ main { console.log(mk(3)); }
    │                    ━━
    │                    ╰─ not defined
-10 │ using console from std:Console
+10 │ using console from std:console
 --- exit 1
 
 === utu check examples/error_demo/types/12_array_literal_mixed.utu
@@ -10329,7 +10293,7 @@ FAIL after tests: boom
 11 │ main { let x = a.mk(7); console.log(alt x { b.E.A |p| => p.v.len(), b.E.B => 2, }); }
    │                                             ━━━━━
    │                                             ╰─ E
-12 │ using console from std:Console
+12 │ using console from std:console
 --- exit 1
 
 === utu check examples/error_demo/types/1302_using_alias_type_arguments.utu
@@ -10342,7 +10306,7 @@ FAIL after tests: boom
    │          ━━━━━
    │          ╰─ here
  6 │ main { console.log(a[Str].mk(1).x); }
- 7 │ using console from std:Console
+ 7 │ using console from std:console
 
  ERROR  a takes 0 type arguments, given 1
         invalid-module-arity · examples/error_demo/types/1302_using_alias_type_arguments.utu:6:21
@@ -10352,7 +10316,7 @@ FAIL after tests: boom
  6 │ main { console.log(a[Str].mk(1).x); }
    │                     ━━━━━
    │                     ╰─ here
- 7 │ using console from std:Console
+ 7 │ using console from std:console
 --- exit 1
 
 === utu check examples/error_demo/types/1303_type_named_as_type_parameter.utu
@@ -10397,7 +10361,7 @@ FAIL after tests: boom
 
 === utu check examples/error_demo/types/1358_console_log_no_str.utu
  ERROR  No method Point.str
-        unknown-method · std:Console:12:35
+        unknown-method · std:console:12:35
 
 10 │
 11 │     /// A line on standard output (`console.log`): `x.str()`.
@@ -10425,7 +10389,7 @@ FAIL after tests: boom
    │                     ━━━
    │                     ╰─ here
  7 │ main { console.log(0); }
- 8 │ using console from std:Console
+ 8 │ using console from std:console
 --- exit 1
 
 === utu check examples/error_demo/types/1361_proto_parameter_type.utu
@@ -10438,7 +10402,7 @@ FAIL after tests: boom
    │                      ━━━
    │                      ╰─ here
  7 │ main { console.log(0); }
- 8 │ using console from std:Console
+ 8 │ using console from std:console
 --- exit 1
 
 === utu check examples/error_demo/types/1362_promoted_fn_outside_mod.utu
@@ -10646,7 +10610,7 @@ FAIL after tests: boom
    │                       ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
    │                       ╰─ cl(F64) I32
  7 │ }
- 8 │ using console from std:Console
+ 8 │ using console from std:console
 --- exit 1
 
 === utu check examples/error_demo/types/22_closure_call_argument.utu
@@ -10659,7 +10623,7 @@ FAIL after tests: boom
    │                        ━━━
    │                        ╰─ Str
  6 │ }
- 7 │ using console from std:Console
+ 7 │ using console from std:console
 --- exit 1
 
 === utu check examples/error_demo/types/23_fun_value_signature.utu
@@ -10673,7 +10637,7 @@ FAIL after tests: boom
  7 │ main { console.log(twice(halve, 8)); }
    │                          ━━━━━
    │                          ╰─ fun(F64) F64
- 8 │ using console from std:Console
+ 8 │ using console from std:console
 --- exit 1
 
 === utu check examples/error_demo/types/24_i32_plus_i64.utu
@@ -10740,7 +10704,7 @@ FAIL after tests: boom
    │                    │        ╰─ I32
    │                    ╰─ Str
  6 │ }
- 7 │ using console from std:Console
+ 7 │ using console from std:console
 --- exit 1
 
 === utu check examples/error_demo/types/29_if_condition_not_bool.utu
@@ -10753,7 +10717,7 @@ FAIL after tests: boom
    │                    ━
    │                    ╰─ I32
  6 │ }
- 7 │ using console from std:Console
+ 7 │ using console from std:console
 --- exit 1
 
 === utu check examples/error_demo/types/307_result_private_field.utu
@@ -10765,7 +10729,7 @@ FAIL after tests: boom
  8 │ main { console.log(half(8)._value); }
    │                    ━━━━━━━━━━━━━━
    │                    ╰─ no such field
- 9 │ using console from std:Console
+ 9 │ using console from std:console
 --- exit 1
 
 === utu check examples/error_demo/types/308_result_built_by_hand.utu
@@ -10790,7 +10754,7 @@ FAIL after tests: boom
    │                    ━
    │                    ╰─ I32
  7 │ }
- 8 │ using console from std:Console
+ 8 │ using console from std:console
 
  ERROR  and takes Bool, got I32
         type-mismatch · examples/error_demo/types/30_and_operands_not_bool.utu:6:26
@@ -10802,7 +10766,7 @@ FAIL after tests: boom
    │                    │     ╰─ I32
    │                    ╰─ Bool
  7 │ }
- 8 │ using console from std:Console
+ 8 │ using console from std:console
 --- exit 1
 
 === utu check examples/error_demo/types/31_assert_not_bool.utu
@@ -10907,7 +10871,7 @@ FAIL after tests: boom
    │                 ━━━━━━━━━━━━━━━━━━
    │                 ╰─ any Ord
 13 │ }
-14 │ using console from std:Console
+14 │ using console from std:console
 --- exit 1
 
 === utu check examples/error_demo/types/32_proto_value_wrong_type.utu
@@ -10921,7 +10885,7 @@ FAIL after tests: boom
 16 │ main { console.log(total(Label { text: "x" }).i32()); }
    │                          ━━━━━━━━━━━━━━━━━━━
    │                          ╰─ Label
-17 │ using console from std:Console
+17 │ using console from std:console
 --- exit 1
 
 === utu check examples/error_demo/types/33_array_of_protos.utu
@@ -10952,7 +10916,7 @@ FAIL after tests: boom
    │                       ━━━━
    │                       ╰─ ?Str
  8 │ }
- 9 │ using console from std:Console
+ 9 │ using console from std:console
 --- exit 1
 
 === utu check examples/error_demo/types/35_null_to_nonnull_field.utu
@@ -11023,7 +10987,7 @@ FAIL after tests: boom
    │                        ━━━
    │                        ╰─ I32
 10 │ }
-11 │ using console from std:Console
+11 │ using console from std:console
 --- exit 1
 
 === utu check examples/error_demo/types/400_global_cycle.utu
@@ -11078,7 +11042,7 @@ FAIL after tests: boom
 13 │ main { console.log(paint(Size.Small)); }
    │                          ━━━━━━━━━━
    │                          ╰─ Size
-14 │ using console from std:Console
+14 │ using console from std:console
 --- exit 1
 
 === utu check examples/error_demo/types/41_unknown_operator_struct.utu
@@ -11104,7 +11068,7 @@ FAIL after tests: boom
    │                    ━━━━━
    │                    ╰─ Version
 10 │ }
-11 │ using console from std:Console
+11 │ using console from std:console
 --- exit 1
 
 === utu check examples/error_demo/types/43_unknown_operator_bool_add.utu
@@ -11156,7 +11120,7 @@ FAIL after tests: boom
    │                 ━━━━
    │                 ╰─ Grid
  9 │ }
-10 │ using console from std:Console
+10 │ using console from std:console
 --- exit 1
 
 === utu check examples/error_demo/types/47_unknown_operator_setindex.utu
@@ -11197,7 +11161,7 @@ FAIL after tests: boom
    │                 ━━━━━━━━━━━━
    │                 ╰─ no such method
  6 │ }
- 7 │ using console from std:Console
+ 7 │ using console from std:console
 
   note  JavaScript's methods come with using JS from std:JS;
 --- exit 1
@@ -11214,7 +11178,7 @@ FAIL after tests: boom
    │                 ━━━━
    │                 ╰─ not defined
  6 │ }
- 7 │ using console from std:Console
+ 7 │ using console from std:console
 
   fix   Use total
  5 │     console.log(total + 1);
@@ -11247,7 +11211,7 @@ FAIL after tests: boom
    │                 ━━━━━━━━━━━━━
    │                 ╰─ no such method
 12 │ }
-13 │ using console from std:Console
+13 │ using console from std:console
 --- exit 1
 
 === utu check examples/error_demo/types/501_alias_instance_field_type.utu
@@ -11277,7 +11241,7 @@ FAIL after tests: boom
    │                     ━━━━
    │                     ╰─ here
  5 │ }
- 6 │ using console from std:Console
+ 6 │ using console from std:console
 --- exit 1
 
 === utu check examples/error_demo/types/503_generic_instance_mistake.utu
@@ -11309,7 +11273,7 @@ FAIL after tests: boom
    │                 ━━━━━━━━━━━━━━━
    │                 ╰─ no such method
  6 │ }
- 7 │ using console from std:Console
+ 7 │ using console from std:console
 
   fix   Use to_upper
  5 │     console.log(s.to_upper().len());
@@ -11325,7 +11289,7 @@ FAIL after tests: boom
    │                 ━━━━━━━━━━━
    │                 ╰─ no such method
  6 │ }
- 7 │ using console from std:Console
+ 7 │ using console from std:console
 
   fix   Use len
  5 │     console.log(xs.len());
@@ -11387,7 +11351,7 @@ FAIL after tests: boom
    │                 ━━━━━━━━━━━━━
    │                 ╰─ no such method
  6 │ }
- 7 │ using console from std:Console
+ 7 │ using console from std:console
 
   fix   Use str
  5 │     console.log(n.str().len());
@@ -11441,7 +11405,7 @@ FAIL after tests: boom
  7 │ main { console.log(geometry.cube(2.0).i32()); }
    │                             ━━━━
    │                             ╰─ no such member
- 8 │ using console from std:Console
+ 8 │ using console from std:console
 --- exit 1
 
 === utu check examples/error_demo/types/57_unknown_method_static_as_method.utu
@@ -11467,7 +11431,7 @@ FAIL after tests: boom
    │                 ━━━━━━━━
    │                 ╰─ no such method
  6 │ }
- 7 │ using console from std:Console
+ 7 │ using console from std:console
 --- exit 1
 
 === utu check examples/error_demo/types/59_unknown_method_module_fn.utu
@@ -11480,7 +11444,7 @@ FAIL after tests: boom
    │                 ━━━━━━━━━━━
    │                 ╰─ no such method
 12 │ }
-13 │ using console from std:Console
+13 │ using console from std:console
 --- exit 1
 
 === utu check examples/error_demo/types/605_fun_array_global_read.utu
@@ -11524,7 +11488,7 @@ FAIL after tests: boom
    │                      ━
    │                      ╰─ no biggest
 16 │ }
-17 │ using console from std:Console
+17 │ using console from std:console
 
   note  implement it: fn Big[M].biggest |a| (b: Array[M]) M { … }
 --- exit 1
@@ -11539,7 +11503,7 @@ FAIL after tests: boom
    │                 ━━━━━━━━
    │                 ╰─ may be null
  6 │ }
- 7 │ using console from std:Console
+ 7 │ using console from std:console
 --- exit 1
 
 === utu check examples/error_demo/types/61_arity_function_few.utu
@@ -11551,7 +11515,7 @@ FAIL after tests: boom
  9 │ main { console.log(clamp(5, 0)); }
    │                    ━━━━━━━━━━━
    │                    ╰─ given 2
-10 │ using console from std:Console
+10 │ using console from std:console
 --- exit 1
 
 === utu check examples/error_demo/types/62_arity_method.utu
@@ -11564,7 +11528,7 @@ FAIL after tests: boom
    │                 ━━━━━━━━━━━
    │                 ╰─ takes 0, given 1
 12 │ }
-13 │ using console from std:Console
+13 │ using console from std:console
 --- exit 1
 
 === utu check examples/error_demo/types/63_arity_static_ctor.utu
@@ -11590,7 +11554,7 @@ FAIL after tests: boom
    │                 ━━━━━━━━━━
    │                 ╰─ takes 2, given 1
  6 │ }
- 7 │ using console from std:Console
+ 7 │ using console from std:console
 --- exit 1
 
 === utu check examples/error_demo/types/65_arity_array_new.utu
@@ -11616,7 +11580,7 @@ FAIL after tests: boom
    │                 ━━━━━━━━━
    │                 ╰─ takes 1, given 2
  6 │ }
- 7 │ using console from std:Console
+ 7 │ using console from std:console
 --- exit 1
 
 === utu check examples/error_demo/types/67_arity_fun_value.utu
@@ -11680,7 +11644,7 @@ FAIL after tests: boom
    │                 ━━━━━━━━
    │                 ╰─ not a function
  6 │ }
- 7 │ using console from std:Console
+ 7 │ using console from std:console
 --- exit 1
 
 === utu check examples/error_demo/types/72_not_callable_field.utu
@@ -11693,7 +11657,7 @@ FAIL after tests: boom
    │                 ━━━━━━━━
    │                 ╰─ no such method
  9 │ }
-10 │ using console from std:Console
+10 │ using console from std:console
 --- exit 1
 
 === utu check examples/error_demo/types/73_not_callable_struct_name.utu
@@ -11759,7 +11723,7 @@ FAIL after tests: boom
    │                 ━━━
    │                 ╰─ no such field
 10 │ }
-11 │ using console from std:Console
+11 │ using console from std:console
 --- exit 1
 
 === utu check examples/error_demo/types/75_unknown_field_init.utu
@@ -11860,7 +11824,7 @@ FAIL after tests: boom
    │                 ━━━
    │                 ╰─ no such field
 13 │ }
-14 │ using console from std:Console
+14 │ using console from std:console
 --- exit 1
 
 === utu check examples/error_demo/types/795_proto_get_set_types_differ.utu
@@ -11899,7 +11863,7 @@ FAIL after tests: boom
    │                 ━━━━━━━━
    │                 ╰─ no such field
  6 │ }
- 7 │ using console from std:Console
+ 7 │ using console from std:console
 
   fix   Call len()
  5 │     console.log(s.len());

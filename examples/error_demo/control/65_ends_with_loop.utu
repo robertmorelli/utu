@@ -8,4 +8,4 @@ fn join(xs: Array[Str]) Str {
 main {
     console.log(join(["a", "b"]));
 }
-using console from std:Console
+using console from std:console

@@ -1,6 +1,6 @@
 // What: an alt used as a statement (void arms) still misses a variant.
 // Expect: Missing variant 'Quit' in alt over enum Command (or accepted, since a void alt may skip variants)
-using console from std:Console;
+using console from std:console;
 
 enum Command:
     | Say { text: Str }

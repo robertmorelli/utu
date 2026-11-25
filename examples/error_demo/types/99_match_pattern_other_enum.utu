@@ -17,4 +17,4 @@ fn f(c: Color) I32 {
 }
 
 main { console.log(f(Color.Red)); }
-using console from std:Console
+using console from std:console

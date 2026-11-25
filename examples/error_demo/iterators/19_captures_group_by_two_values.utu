@@ -4,4 +4,4 @@ main {
     let groups = [1, 2, 3, 4] group_by(I32, I32) |k, v, i| { v % 2; };
     console.log(groups.len());
 }
-using console from std:Console
+using console from std:console

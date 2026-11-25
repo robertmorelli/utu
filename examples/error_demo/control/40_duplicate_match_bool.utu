@@ -7,4 +7,4 @@ fn bit(b: Bool) I32 {
 main {
     console.log(bit(true));
 }
-using console from std:Console
+using console from std:console

@@ -7,4 +7,4 @@ mod Str {
 main {
     console.log("abc".len());
 }
-using console from std:Console
+using console from std:console

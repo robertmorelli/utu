@@ -7,4 +7,4 @@ main {
     await for (Stream[Promise[I32]].of([later(1), later(2)])) |p| { total += await p; };
     console.log(total);
 }
-using console from std:Console
+using console from std:console

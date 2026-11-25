@@ -41,4 +41,4 @@ test "index-signature membership and size are hand-written" {
     assert has_color("notacolor") == false;
     assert color_count > 100;
 }
-using console from std:Console
+using console from std:console

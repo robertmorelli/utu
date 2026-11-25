@@ -7,4 +7,4 @@ main {
     let prefs = @stored/\ Prefs "prefs" Prefs { name: "a" } \/;
     console.log(prefs.name);
 }
-using console from std:Console
+using console from std:console

@@ -13,4 +13,4 @@ main {
     let s: Sh = Sq { s: 3 };
     console.log(s.area());
 }
-using console from std:Console
+using console from std:console

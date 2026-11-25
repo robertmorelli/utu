@@ -4,4 +4,4 @@ main {
     let big: F32 = 1.0e39;
     console.log(big);
 }
-using console from std:Console
+using console from std:console

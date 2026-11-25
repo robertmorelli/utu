@@ -4,4 +4,4 @@ main {
     let s = "hi";
     console.log(s.toUpperCase().len());
 }
-using console from std:Console
+using console from std:console

@@ -33,4 +33,4 @@ test "number form formats to a string" {
 test "the options-selected third signature needs its own binding too" {
     assert ms_format_long(7200000) == "2 hours";
 }
-using console from std:Console
+using console from std:console

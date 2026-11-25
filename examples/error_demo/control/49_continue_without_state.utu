@@ -17,4 +17,4 @@ fn count_words(text: Str) I32 {
 main {
     console.log(count_words("a b"));
 }
-using console from std:Console
+using console from std:console

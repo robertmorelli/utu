@@ -7,4 +7,4 @@ fn label(n: I32) I32 {
 main {
     console.log(label(1));
 }
-using console from std:Console
+using console from std:console

@@ -3,4 +3,4 @@
 main {
     console.log([1, 2, 3] chain(4) sum);
 }
-using console from std:Console
+using console from std:console

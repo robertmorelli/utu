@@ -6,4 +6,4 @@ main {
     let .{q, q} = divmod(17, 5);
     console.log(q);
 }
-using console from std:Console
+using console from std:console

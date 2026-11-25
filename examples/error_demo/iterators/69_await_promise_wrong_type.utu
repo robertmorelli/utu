@@ -6,4 +6,4 @@ main {
     let n: I32 = await fetch_name();
     console.log(n);
 }
-using console from std:Console
+using console from std:console

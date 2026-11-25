@@ -6,4 +6,4 @@ main {
     let v = await compute();
     console.log(v);
 }
-using console from std:Console
+using console from std:console

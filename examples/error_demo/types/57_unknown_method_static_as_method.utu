@@ -10,4 +10,4 @@ main {
     let s = r.square(2.0);
     console.log(s.w.i32());
 }
-using console from std:Console
+using console from std:console

@@ -1,5 +1,5 @@
 Standard library `.utu` files are embedded under `std:<basename>` at build time.
-Basenames must be unique.
+Basenames must be unique; a file is named as its module (`std:console` holds `console`, `std:StrMap` `StrMap`).
 
 `std:JsonRuntime` is not a module: it is the reader and writer `@json` grafts
 into each container that uses it (stage 0's RUNTIME in `json.js at stage-1-final`,
@@ -69,9 +69,9 @@ host's own (JavaScript's string methods, `Math`).
   a new `Uint8Array` of each value's low eight bits. Four bytes a host call;
   wrap an `ArrayBuffer` first (`new JS.Uint8Array(buf)`). For bytes in place,
   a `mem`'s `copy_in` and `view`.
-- `std:Console` — `using console from std:Console;` then `console.log(x)`,
+- `std:console` — `using console from std:console;` then `console.log(x)`,
   `warn`, `error`: any value with a `str()` (`console.log(42)`, a Str as is).
-- `std:Time` — `using time from std:Time;` then `time.now()` (milliseconds,
+- `std:time` — `using time from std:time;` then `time.now()` (milliseconds,
   for measuring) and `time.epoch_ms()`.
 
 Their doc comments are Typst: `node tools/utudoc/utudoc.mjs std -o std.pdf`.

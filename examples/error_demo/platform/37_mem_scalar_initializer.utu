@@ -5,4 +5,4 @@ mem counts: U8 = 5;
 main {
     console.log(counts.len());
 }
-using console from std:Console
+using console from std:console

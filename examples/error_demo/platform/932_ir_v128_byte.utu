@@ -5,4 +5,4 @@ fn lanes() V128 => @ir/\ <ir-v128-const data-type-name="V128" bytes="256,0,0,0,0
 main {
     console.log(V128.any_true(lanes()));
 }
-using console from std:Console
+using console from std:console

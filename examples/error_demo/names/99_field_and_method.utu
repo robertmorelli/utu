@@ -9,4 +9,4 @@ main {
     let p = P { f: cl() I32 { return 1; } };
     console.log(p.f());
 }
-using console from std:Console
+using console from std:console

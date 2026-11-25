@@ -5,4 +5,4 @@ let count: fun() I32 = @es/\ () => "12" \/;
 main {
     console.log(count() + 1);
 }
-using console from std:Console
+using console from std:console

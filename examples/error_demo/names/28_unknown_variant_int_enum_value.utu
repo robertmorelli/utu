@@ -9,4 +9,4 @@ main {
     let c = Color.Purple;
     console.log(c.i32());
 }
-using console from std:Console
+using console from std:console

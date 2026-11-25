@@ -1,6 +1,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import crypto from 'node:crypto';
+import os from 'node:os';
 import { createRequire } from 'node:module';
 import { createPackageResolver } from '../../src/bindings/packages.js';
 import { LINK_REVISION } from '../../src/bindings/link.js';
@@ -13,15 +14,16 @@ const fresh = files => files.every(entry => { const s = stat(entry.path); return
 
 /**
  * `resolvePackage` for Node/Bun hosts: links `npm:` and `node:` imports from
- * `node_modules` and caches each declaration graph in `node_modules/.utu/abi`.
- * TypeScript loads only when a graph is not cached. A root with no
+ * `node_modules` and caches each declaration graph in the project's
+ * `node_modules/.utu/abi` (the nearest folder up with a package.json or
+ * node_modules), or, with no project, in ~/.cache/utu/abi. TypeScript loads only when a graph is not cached. A root with no
  * `@types/node` links `node:` imports from utu's own.
  *
  * With `ready`, it gives the declarations as the self-hosted compiler reads
  * them ({ document, view }, as the platform catalog does), cached beside the
  * graph in `ready/` as bytes, so a cached package is read, not parsed.
  */
-export function nodePackageResolver({ root = process.cwd(), cacheDir = path.join(root, 'node_modules/.utu/abi'), ready = false } = {}) {
+export function nodePackageResolver({ root = process.cwd(), cacheDir = defaultCacheDir(root), ready = false } = {}) {
   let resolve;
   const linked = (specifier, request) => {
     if (!resolve) {
@@ -62,6 +64,17 @@ export function nodePackageResolver({ root = process.cwd(), cacheDir = path.join
     memory.set(key, entry);
     return entry.abi;
   };
+}
+
+// The project's node_modules/.utu/abi, or the user's cache when there is no
+// project: a repo with no npm packages gets no node_modules.
+function defaultCacheDir(root) {
+  for (let dir = path.resolve(root); ; dir = path.dirname(dir)) {
+    if (stat(path.join(dir, 'node_modules')) || stat(path.join(dir, 'package.json'))) return path.join(dir, 'node_modules/.utu/abi');
+    if (path.dirname(dir) === dir) break;
+  }
+  const cache = process.env.XDG_CACHE_HOME || (os.homedir() ? path.join(os.homedir(), '.cache') : os.tmpdir());
+  return path.join(cache, 'utu', 'abi');
 }
 
 // A package's declarations ready to read ({ files, abi: { document, view } }):

@@ -4,4 +4,4 @@ main {
     let n: I64 = 10;
     console.log((0 ..< n) bisect |v| { v < 4; });
 }
-using console from std:Console
+using console from std:console

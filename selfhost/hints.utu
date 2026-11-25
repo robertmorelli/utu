@@ -289,15 +289,14 @@ fn report_unknown(kind: Diag, node: I32, word: I32, seek: Seek) Void {
 fn std_module(t: Str) Str {
     if t == hs(Ht.Console) or t == hs(Ht.ConsoleLc) { return hs(Ht.ConsoleLc) }
     if t == hs(Ht.Time) or t == "time" { return "time" }
+    if t == "wutu" { return t }
     if t == hs(Ht.StrMap) or t == hs(Ht.IntMap) or t == hs(Ht.List) or t == hs(Ht.Buffer) or t == hs(Ht.Interner) or t == "Random"
         or t == hs(Ht.SegmentTree) or t == hs(Ht.PersistentSegmentTree) or t == hs(Ht.Spatial) or t == hs(Ht.NumberField) { return t }
     return ""
 }
 
-/// The std file module `m` is in (`console` in std:Console).
-fn std_file(m: Str) Str {
-    return if m == hs(Ht.ConsoleLc) { hs(Ht.Console) } else if m == "time" { hs(Ht.Time) } else { m }
-}
+/// The std file module `m` is in: its own name (`console` in std:console).
+fn std_file(m: Str) Str => m
 
 /// Suggest the member of `owner` in `space` nearest the name at `at`.
 fn suggest_member(owner: I32, at: I32, space: Space) Void {

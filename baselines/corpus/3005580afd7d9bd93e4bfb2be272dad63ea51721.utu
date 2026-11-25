@@ -1,2 +1,2 @@
 main { let xs = [1, 2]; let s = 0; for (xs) |x| { s += x; }; xs each |y| { s += y; }; console.log(s); }
-using console from std:Console
+using console from std:console

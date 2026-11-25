@@ -13,4 +13,4 @@ mod Largest[T] {
 main {
     console.log(Largest[I32].of([3, 9, 4]));
 }
-using console from std:Console
+using console from std:console

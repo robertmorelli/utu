@@ -8,4 +8,4 @@ fn parse(s: Str) I32 {
 main {
     console.log(parse("abc"));
 }
-using console from std:Console
+using console from std:console

@@ -5,4 +5,4 @@ main {
     for ("banana") |c| { if c == "a" { vowels += 1; }; };
     console.log(vowels);
 }
-using console from std:Console
+using console from std:console

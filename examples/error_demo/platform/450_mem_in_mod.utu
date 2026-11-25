@@ -8,4 +8,4 @@ mod counts {
 main {
     console.log(counts.second());
 }
-using console from std:Console
+using console from std:console

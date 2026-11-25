@@ -6,4 +6,4 @@ main {
     let results = [divmod(7, 2), divmod(9, 4)];
     console.log(results.len());
 }
-using console from std:Console
+using console from std:console

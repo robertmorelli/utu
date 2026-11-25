@@ -3,4 +3,4 @@
 let INF = 1000000;
 
 main { console.log(INF); }
-using console from std:Console
+using console from std:console

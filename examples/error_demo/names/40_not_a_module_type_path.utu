@@ -8,4 +8,4 @@ fn f(p: Point.Inner) I32 { return 0; }
 main {
     console.log(0);
 }
-using console from std:Console
+using console from std:console

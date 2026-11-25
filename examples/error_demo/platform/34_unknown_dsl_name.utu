@@ -4,4 +4,4 @@ main {
     let port: I32 = @yaml/\ port: 8080 \/;
     console.log(port);
 }
-using console from std:Console
+using console from std:console

@@ -7,4 +7,4 @@ main {
     let cart = Cart { items: [5, 10, 15] };
     console.log(cart sum);
 }
-using console from std:Console
+using console from std:console

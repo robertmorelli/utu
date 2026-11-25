@@ -58,4 +58,4 @@ main {
     my_ps[2] = Circle { x: 0.0, y: 0.0, r: 0.0 };
     console.log(perimeter_sum(my_ps));
 }
-using console from std:Console
+using console from std:console

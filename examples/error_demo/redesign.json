@@ -1330,7 +1330,7 @@
       },
       {
        "n": 4,
-       "text": "    using console from std:Console;",
+       "text": "    using console from std:console;",
        "marks": [
         {
          "from": 5,
@@ -2581,7 +2581,7 @@
      "lines": [
       {
        "n": 3,
-       "text": "using console std:Console;",
+       "text": "using console std:console;",
        "marks": [
         {
          "from": 15,
@@ -2597,8 +2597,8 @@
    "fix": {
     "label": "Add from",
     "line": 3,
-    "before": "using console std:Console;",
-    "after": "using console from std:Console;"
+    "before": "using console std:console;",
+    "after": "using console from std:console;"
    }
   },
   "provide": {
@@ -2615,7 +2615,7 @@
    "fixcheck": "clean",
    "changed": "",
    "mechanism": "insert-expected-token",
-   "mechanism_check": "Of the expected set {from, ;} after `using console`, only `from` lets `std:Console` parse, so the insertion is unique."
+   "mechanism_check": "Of the expected set {from, ;} after `using console`, only `from` lets `std:console` parse, so the insertion is unique."
   },
   "fixcheck": "clean"
  },
@@ -7128,11 +7128,11 @@
   "file": "names/32_unknown_import_std_typo.utu",
   "category": "names",
   "what": "a std module name misspelled (std:Consle)",
-  "verdict": "misleading (names the alias, never mentions std:Consle; no \"did you mean std:Console\")",
+  "verdict": "misleading (names the alias, never mentions std:Consle; no \"did you mean std:console\")",
   "ideal": {
    "severity": "error",
    "code": "unknown-import",
-   "title": "There is no std module {f:std:Consle}; did you mean {e:std:Console}?",
+   "title": "There is no std module {f:std:Consle}; did you mean {e:std:console}?",
    "snippets": [
     {
      "lines": [
@@ -7152,10 +7152,10 @@
     }
    ],
    "fix": {
-    "label": "Use {e:std:Console}",
+    "label": "Use {e:std:console}",
     "line": 3,
     "before": "using console from std:Consle;",
-    "after": "using console from std:Console;"
+    "after": "using console from std:console;"
    }
   },
   "provide": {
@@ -7186,7 +7186,7 @@
   "ideal": {
    "severity": "error",
    "code": "unknown-import",
-   "title": "There is no std module {f:std:console}; did you mean {e:std:Console}?",
+   "title": "There is no std module {f:std:console}; did you mean {e:std:console}?",
    "snippets": [
     {
      "lines": [
@@ -7206,10 +7206,10 @@
     }
    ],
    "fix": {
-    "label": "Use {e:std:Console}",
+    "label": "Use {e:std:console}",
     "line": 3,
     "before": "using console from std:console;",
-    "after": "using console from std:Console;"
+    "after": "using console from std:console;"
    }
   },
   "provide": {
@@ -7235,18 +7235,18 @@
  {
   "file": "names/34_unknown_import_std_quoted.utu",
   "category": "names",
-  "what": "a std module written as a quoted path (\"std:Console\")",
-  "verdict": "unclear (treated as a relative file; no \"write std:Console unquoted\")",
+  "what": "a std module written as a quoted path (\"std:console\")",
+  "verdict": "unclear (treated as a relative file; no \"write std:console unquoted\")",
   "ideal": {
    "severity": "error",
    "code": "unknown-import",
-   "title": "std modules are written without quotes: {e:std:Console}",
+   "title": "std modules are written without quotes: {e:std:console}",
    "snippets": [
     {
      "lines": [
       {
        "n": 3,
-       "text": "using console from \"std:Console\";",
+       "text": "using console from \"std:console\";",
        "marks": [
         {
          "from": 20,
@@ -7262,8 +7262,8 @@
    "fix": {
     "label": "Drop the quotes",
     "line": 3,
-    "before": "using console from \"std:Console\";",
-    "after": "using console from std:Console;"
+    "before": "using console from \"std:console\";",
+    "after": "using console from std:console;"
    }
   },
   "provide": {
@@ -7280,7 +7280,7 @@
    "fixcheck": "clean",
    "changed": "",
    "mechanism": "keyword-form",
-   "mechanism_check": "a quoted \"std:X\" path has one correct form, the unquoted std:X, and std:Console exists."
+   "mechanism_check": "a quoted \"std:X\" path has one correct form, the unquoted std:X, and std:console exists."
   },
   "fixcheck": "clean"
  },

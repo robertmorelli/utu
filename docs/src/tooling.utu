@@ -69,7 +69,7 @@ mod tooling {
     fn page() Browser.HTMLElement {
         return @wutu/\
         article.page {
-            = ui.header("Tooling", "One compiler answers every tool. Diagnostics, hover, definitions, formatting, and semantic tokens all come from the same bundle the command line runs; there is no second analyzer.")
+            |> ui.header("Tooling", "One compiler answers every tool. Diagnostics, hover, definitions, formatting, and semantic tokens all come from the same bundle the command line runs; there is no second analyzer.")
             h2 {
                 "The command line"
             }
@@ -83,7 +83,7 @@ mod tooling {
                 }
                 ". It checks, runs, tests, and builds programs, and serves the language server."
             }
-            = code.shell(cli_sample())
+            |> code.shell(cli_sample())
             p {
                 "A program's arguments go after "
                 code {
@@ -141,11 +141,11 @@ mod tooling {
                 }
                 " finds a declaration and every use that resolves to it."
             }
-            = code.shell(grep_sample())
+            |> code.shell(grep_sample())
             p {
                 "The Wutu command line formats, previews, and builds browser apps."
             }
-            = code.shell(wutu_sample())
+            |> code.shell(wutu_sample())
             h2 {
                 "Diagnostics"
             }
@@ -160,7 +160,7 @@ mod tooling {
                 }
                 " warning flags lines dense enough to hurt reading."
             }
-            = code.shell(diagnostic_sample())
+            |> code.shell(diagnostic_sample())
             h2 {
                 "Debugging"
             }
@@ -187,7 +187,7 @@ mod tooling {
                 }
                 " takes."
             }
-            = code.shell(trap_sample())
+            |> code.shell(trap_sample())
             p {
                 "The place comes from a source map: the compiler notes where each instruction came from, and the trap's offset in the module, from the engine's stack, finds it. In "
                 code {
@@ -272,17 +272,17 @@ mod tooling {
                 }
                 ", indentation, and text objects."
             }
-            = code.shell(neovim_sample())
+            |> code.shell(neovim_sample())
             p {
                 "Another editor takes the command alone:"
             }
-            = code.shell(helix_sample())
+            |> code.shell(helix_sample())
             p {
                 "Zed, Sublime, Emacs, and Kakoune take the same command."
             }
-            = ui.further("docs/tooling/language-server.md", "The language server")
-            = ui.further("docs/tooling/profiling.md", "Profiling")
-            = ui.further("docs/tooling/grep.md", "utu grep")
+            |> ui.further("docs/tooling/language-server.md", "The language server")
+            |> ui.further("docs/tooling/profiling.md", "Profiling")
+            |> ui.further("docs/tooling/grep.md", "utu grep")
         }
         \/
     }

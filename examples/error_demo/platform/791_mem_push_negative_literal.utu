@@ -6,4 +6,4 @@ main {
     deltas.push(-129);
     console.log(deltas[0]);
 }
-using console from std:Console
+using console from std:console

@@ -10,4 +10,4 @@ main {
     let p = Point.new(1.0);
     console.log(p.x.i32());
 }
-using console from std:Console
+using console from std:console

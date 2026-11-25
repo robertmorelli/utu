@@ -13,4 +13,4 @@ fn Rec[Sq].area |self| () I32 {
 main {
     console.log(Sq { s: 2 }.s);
 }
-using console from std:Console
+using console from std:console

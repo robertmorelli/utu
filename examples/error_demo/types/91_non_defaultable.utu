@@ -8,4 +8,4 @@ main {
     let ps = Array[Point].new_default(4);
     console.log(ps.len());
 }
-using console from std:Console
+using console from std:console

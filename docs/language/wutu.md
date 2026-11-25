@@ -23,7 +23,8 @@ html {
 }
 ```
 
-The `head` and `body` blocks supply the document's head and body. A top-level
+The `head` and `body` blocks supply the document's head and body; an
+`@document { … }` block before them holds the page's document CSS. A top-level
 `html` block is reactive by default, so top-level state can drive the page
 without an `@reactive` directive. Run `utu main.utu` to preview with live
 reload, or `utu build main.utu --out dist/site` to build the site.
@@ -480,8 +481,8 @@ Arguments cross into the chunk as they are, so a lazy module's functions take
 numbers, Bool, Str, and host values, and return a host element; anything else
 is a compile error naming the type. A chunk is its own program: share state
 with the page through those arguments, the DOM, the URL, or storage. It uses
-the page's Wutu runtime rather than shipping its own, and `sizes.json` lists
-each chunk under `chunks`, apart from the page's `total`.
+the page's Wutu runtime rather than shipping its own, and the size `utu build`
+prints is the page's, without its chunks.
 
 Each call site has its own placeholder, made again when its arguments change.
 A call outside any template (in `main`, say, before the first render) works
@@ -498,7 +499,7 @@ using Browser from std:Browser
 mod guide {
     fn page(who: Str) Browser.HTMLElement {
         return @wutu/\
-        article { h1 { = "Hello, " + who } }
+        article { h1 { |> "Hello, " + who } }
         \/
     }
 }
@@ -509,9 +510,9 @@ using guide lazy from "./guide.utu"
 
 // …
 if wutu.route() == "/guide" {
-    = guide.page("you")
+    |> guide.page("you")
 } else {
-    = home.page()
+    |> home.page()
 }
 ```
 

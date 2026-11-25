@@ -2,4 +2,4 @@
 // Expect: P takes 2 type arguments, given 1; no crash
 mod P[A, B] { gn gen(a: A, b: B) A { yield a; } }
 main { let t = 0; for (P[I32].gen(1, 2)) |x| { t += x; }; console.log(t); }
-using console from std:Console
+using console from std:console

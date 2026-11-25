@@ -612,12 +612,17 @@ orelse
 ```
 // literals
 42        0xff      0b1010    // int
+'a'       '\n'      'é'       // int: the character's code (97, 10, 233)
 3.14      1.0e-9              // float
 "hello"                       // string
 \\multiline                   // multiline string (each line prefixed \\)
 `x is ${x}`                   // template string: see below
 true  false  null
 ```
+
+A character literal is an integer literal, so it takes the type its place
+expects (`s[i] == 'a'`, `const mem m: U8 = ['a', 'z']`, `match` arms): one character, or one
+of a string's escapes (`'\''`, `'\\'`, `'\u00e9'`).
 
 A `\\` line is text to the end of its line, so the statement's `;` goes on
 a line of its own after the last one (a `;` on a `\\` line is text):
@@ -751,6 +756,7 @@ fn quarter(n: I32) Result[I32, Str] {
 
 // bind (let)
 let x: I32 = expr
+let _ = expr      // evaluated, its value dropped; `_` may repeat and is never read
 
 // assert / fatal
 assert cond

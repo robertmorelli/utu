@@ -8,4 +8,4 @@ main {
     let it = Item { name: "bolt", qty: "12" };
     console.log(it.qty);
 }
-using console from std:Console
+using console from std:console

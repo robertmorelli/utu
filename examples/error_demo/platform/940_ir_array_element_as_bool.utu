@@ -11,4 +11,4 @@ mod Flags[T1] {
 main {
     console.log(Flags[I32].new(2, 5).on(0));
 }
-using console from std:Console
+using console from std:console

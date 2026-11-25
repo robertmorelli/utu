@@ -14,4 +14,4 @@ fn area(s: Shape) F64 {
 main {
     console.log(area(Square { side: 2.0 }));
 }
-using console from std:Console
+using console from std:console

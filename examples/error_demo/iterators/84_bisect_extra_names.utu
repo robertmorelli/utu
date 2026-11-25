@@ -3,4 +3,4 @@
 main {
     console.log([1, 2, 3] bisect |v, i, j| { v < 2; });
 }
-using console from std:Console
+using console from std:console

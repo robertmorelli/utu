@@ -1535,6 +1535,12 @@ fn resolve_names() I32 {
         // (`using console from std:Consle`: the std module it names.)
         let m = std_module(node_text(name_node(first_child(at))))
         if missing_why == 2 and m.len() > 0 { diag_note(rss2(Rst.UsingFromStd, m, std_file(m))) }
+        // `std:Console`, as std's files were once named: their names now.
+        let path = using_path(at)
+        let now = if path >= 0 and is_kind(path, Node.Platform_path) { node_text(path).to_lower() } else { "" }
+        if missing_why == 2 and (now == "std:console" or now == "std:time" or now == "std:wutu") and now != node_text(path) {
+            diag_fix(tok_start[node_first[path]], tok_end[node_last[path] - 1], now, rss1(Rst.UseStd, now.slice(4, now.len())))
+        }
     }
     save_diagnostics()
     return diag_kind.len()
@@ -2676,6 +2682,7 @@ enum(U8) Rst:
     | ABCTick
     | Node
     | UseNode
+    | UseStd
     | UsingFromStd
     | FnWutu
     | TheFileHasNoModDeclare
@@ -2708,7 +2715,8 @@ fn rss_src(t: Rst) Str {
         Rst.ABCTick => "{0}{1}{2}'",
         Rst.Node => "node:{0}",
         Rst.UseNode => "Use node:{0}",
-        Rst.UsingFromStd => "using {0} from std:{1};",
+        Rst.UseStd => "Use std:{0}",
+        Rst.UsingFromStd => "using {0} from std:{1}",
         Rst.FnWutu => "fn{0} {1} => @wutu/\\ \\/",
         Rst.TheFileHasNoModDeclare => "The file has no mod {0}: declare one there, mod {1} { … }",
         Rst.NameATypeInItT => "Name a type in it ({0}.T), or declare one: struct &: …",

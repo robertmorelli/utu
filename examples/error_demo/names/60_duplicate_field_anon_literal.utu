@@ -11,4 +11,4 @@ fn origin() Point {
 main {
     console.log(origin().y);
 }
-using console from std:Console
+using console from std:console

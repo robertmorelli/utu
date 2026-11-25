@@ -11,4 +11,4 @@ fn load(parts: Array[Str]) ?User {
 main {
     console.log(promote load(["{}"]) { |u| => u.age, ~> 0, });
 }
-using console from std:Console
+using console from std:console

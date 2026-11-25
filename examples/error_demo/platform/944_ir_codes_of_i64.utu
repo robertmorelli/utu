@@ -5,4 +5,4 @@ fn text(codes: Array[I64], n: I32) Str => @ir/\ <ir-string-from-codes><ir-ident 
 main {
     console.log(text(Array[I64].new(2, 65), 2));
 }
-using console from std:Console
+using console from std:console

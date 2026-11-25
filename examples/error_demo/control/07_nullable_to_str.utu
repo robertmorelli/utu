@@ -12,4 +12,4 @@ fn show(b: ?Box) Str {
 main {
     console.log(show(Box { n: 4 }));
 }
-using console from std:Console
+using console from std:console

@@ -6,15 +6,15 @@ struct Thing:
 wn card(text: Str) {
     section {
         "ok"
-        p { = text.nope }
+        p { | text.nope }
     }
 }
 
 html {
     head { title { "Test" } }
     body {
-        = card("a")
-        p { = missing_name }
-        = Thing { value: 1 }
+        |> card("a")
+        p { | missing_name }
+        |> Thing { value: 1 }
     }
 }

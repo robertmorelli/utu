@@ -9,4 +9,4 @@ mod M {
 main {
     console.log(M.get());
 }
-using console from std:Console
+using console from std:console

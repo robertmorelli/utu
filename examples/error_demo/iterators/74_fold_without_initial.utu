@@ -3,4 +3,4 @@
 main {
     console.log([1, 2, 3] fold |acc, n| { acc + n; });
 }
-using console from std:Console
+using console from std:console

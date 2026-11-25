@@ -1,6 +1,6 @@
 // What: printing a struct that has no str()
 // Expect: No method Point.str: console.log prints a value's str(); give Point one (fn Point.str |p| () Str)
-using console from std:Console
+using console from std:console
 
 struct Point:
     | x: I32

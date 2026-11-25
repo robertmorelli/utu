@@ -5,4 +5,4 @@ fn in_range(x: I32, lo: I32, hi: I32) Bool {
 }
 
 main { console.log(if in_range(3, 0, 10) { 1; } else { 0; }); }
-using console from std:Console
+using console from std:console

@@ -1,6 +1,6 @@
 // What: breaks out of a loop from inside a defer.
 // Expect: break cannot appear inside deferred code
-using console from std:Console;
+using console from std:console;
 
 main {
     let n = 0;

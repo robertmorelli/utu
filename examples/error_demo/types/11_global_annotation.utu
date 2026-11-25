@@ -3,4 +3,4 @@
 let limit: I32 = "ten";
 
 main { console.log(limit); }
-using console from std:Console
+using console from std:console

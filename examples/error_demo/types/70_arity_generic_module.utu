@@ -10,4 +10,4 @@ main {
     let b = Box[I32, Str].new(1);
     console.log(b.value);
 }
-using console from std:Console
+using console from std:console

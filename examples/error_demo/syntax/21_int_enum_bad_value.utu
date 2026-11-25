@@ -6,4 +6,4 @@ enum(U8) Level:
     | High = MAX
 
 main { console.log(Level.High.i32()); }
-using console from std:Console
+using console from std:console

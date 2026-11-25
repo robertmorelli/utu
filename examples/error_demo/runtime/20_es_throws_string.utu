@@ -5,4 +5,4 @@ let risky: fun(I32) I32 = @es/\ (n) => { if (n < 0) throw "negative"; return n *
 main {
     console.log(risky(-5));
 }
-using console from std:Console
+using console from std:console

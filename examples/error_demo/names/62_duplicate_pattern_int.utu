@@ -12,4 +12,4 @@ fn name(n: I32) Str {
 main {
     console.log(name(2).len());
 }
-using console from std:Console
+using console from std:console

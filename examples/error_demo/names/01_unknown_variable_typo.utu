@@ -5,4 +5,4 @@ main {
     let width = 3;
     console.log(lengh * width);
 }
-using console from std:Console
+using console from std:console

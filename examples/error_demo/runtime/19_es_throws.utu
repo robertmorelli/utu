@@ -9,4 +9,4 @@ let parse: fun(Str) F64 = @es/\ (s) => {
 main {
     console.log(parse("twelve"));
 }
-using console from std:Console
+using console from std:console

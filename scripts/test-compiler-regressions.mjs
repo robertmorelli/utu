@@ -2022,8 +2022,8 @@ lib { fn run() I32 { return 1; } }
     ['mod M { let g: I32 = 3; let g: I32 = 4; fn get() I32 { return g; } }\nlib { fn run() I32 { return M.get(); } }\n', 'Duplicate declaration g'],
     ['mod M[T] { fn f() I32 { return 1; } fn f() I32 { return 2; } fn get() I32 { return f(); } }\nlib { fn run() I32 { return M[I32].get(); } }\n', 'Duplicate declaration f'],
     // A using's name is the file's: its own mod, fn, or type of that name is reported (the using won silently).
-    ['using console from std:Console;\nmod console { fn f() I32 { return 3; } }\nlib { fn run() I32 { return console.f(); } }\n', 'Duplicate declaration console'],
-    ['mod console { fn f() I32 { return 3; } }\nusing console from std:Console;\nlib { fn run() I32 { return console.f(); } }\n', 'Duplicate declaration console'],
+    ['using console from std:console;\nmod console { fn f() I32 { return 3; } }\nlib { fn run() I32 { return console.f(); } }\n', 'Duplicate declaration console'],
+    ['mod console { fn f() I32 { return 3; } }\nusing console from std:console;\nlib { fn run() I32 { return console.f(); } }\n', 'Duplicate declaration console'],
     ['mod Stack[T] { fn f() I32 { return 1; } }\nusing Stack[I32] |W|;\nstruct W:\n    | a: I32\nlib { fn run() I32 { return 0; } }\n', 'Duplicate declaration W'],
     ['mod Stack[T] { fn f() I32 { return 1; } }\nusing Stack[I32] |W|;\nusing Stack[Str] |W|;\nlib { fn run() I32 { return 0; } }\n', 'Duplicate declaration W'],
     ['proto P:\n    | m(&) I32\nstruct S[P]:\n    | v: I32\nfn P[S].m |a| (b: S) I32 { return 1; }\nfn P[S].m |a| (b: S) I32 { return 2; }\nlib { fn run() I32 { return 0; } }\n', 'Duplicate method P[S].m'],
@@ -2130,7 +2130,7 @@ lib { fn run() I32 { return f(Many.V1); } }
     // $T: bound once; a value needs its types; a body that does not fit a call's types is a mistake at that call.
     ['fn f(a: $T, b: $T) I32 { return 0; }\nlib { fn run() I32 { return f(1, 2); } }\n', '$T twice: bind it once, then write T'],
     ['fn show(x: $T) Str { return "a"; }\nlib { fn run() I32 { let g = show; return 0; } }\n', 'show has a $ type: call it, or name its types (let g: fun(I32) Str = show)'],
-    ['using console from std:Console;\nstruct Q:\n    | x: I32\nlib { fn run() I32 { console.log(Q { x: 1 }); return 0; } }\n', 'No method Q.str'],
+    ['using console from std:console;\nstruct Q:\n    | x: I32\nlib { fn run() I32 { console.log(Q { x: 1 }); return 0; } }\n', 'No method Q.str'],
     ['fn f(a: $T, b: T) T { return a; }\nlib { fn run() I32 { let x: I64 = 1; f("s", x); return 0; } }\n', 'f takes Str, got I64'],
     // F64(x), I64(n): a literal of that type, or x converted.
     ['lib { fn run() I32 { let s = F64("a"); return 0; } }\n', 'No method Str.f64'],
@@ -2189,9 +2189,9 @@ lib { fn run() I32 { return f(Many.V1); } }
   }
   // A std module not imported: the note names the module, and its file.
   for (const [source, note] of [
-    ['lib { fn run() F64 { return Time.now(); } }\n', 'using time from std:Time (the module is time)'],
-    ['using Time from std:Time;\nlib { fn run() F64 { return time.now(); } }\n', 'using time from std:Time (the module is time)'],
-    ['main { console.log("hi"); }\n', 'using console from std:Console'],
+    ['lib { fn run() F64 { return Time.now(); } }\n', 'using time from std:time (the module is time)'],
+    ['using Time from std:time;\nlib { fn run() F64 { return time.now(); } }\n', 'using time from std:time (the module is time)'],
+    ['main { console.log("hi"); }\n', 'using console from std:console'],
   ]) {
     const { diagnostics } = await compileFile(utu, await write(source), { optimize: 'size' });
     assert.ok(diagnostics[0]?.notes?.includes(note), `${source}\n  notes: ${diagnostics[0]?.notes}`);
@@ -3188,7 +3188,7 @@ lib { fn run() F64 => {
   for (const source of [
     'using Browser\nfrom std:Browser;\nstruct S:\n    | x: I32\nmain {\n    @stored/\\ S "s" S { x: 0 } \\/;\n}\n',
     'using Browser from std:Browser;\nstruct S:\nmain {\n    @stored/\\ S "s" S {} \\/;\n}\n',
-    'using Browser from std:Browser;\nmain {\n    @wutu/\\ p { = `;`; } \\/;\n}\n',
+    'using Browser from std:Browser;\nmain {\n    @wutu/\\ p { |> `;`; } \\/;\n}\n',
     'using  Browser   |b|  from std:Browser;\nstruct S:\n    | x: I32\nmain {\n    @stored/\\ S "s" S { x: 0 } \\/;\n}\n',
   ]) {
     const built = await compileFile(utu, await write(source));

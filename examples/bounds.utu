@@ -1,7 +1,7 @@
 // Bounded module parameters: `mod Ranking[T[Ord, Named]]` takes only types
 // that implement both protocols, and calls their methods and getters
 // directly. Each instance calls its own type's: no dispatch, no boxing.
-using console from std:Console
+using console from std:console
 using Ord from std:Ord
 using Order from std:Ord
 

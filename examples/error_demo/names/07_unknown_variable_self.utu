@@ -11,4 +11,4 @@ fn Rect.area |r| () I32 {
 main {
     console.log(Rect { w: 2, h: 3 }.area());
 }
-using console from std:Console
+using console from std:console

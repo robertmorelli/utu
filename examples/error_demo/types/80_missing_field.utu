@@ -8,4 +8,4 @@ main {
     let r = Rect { w: 2.0 };
     console.log(r.w.i32());
 }
-using console from std:Console
+using console from std:console

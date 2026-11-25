@@ -3,4 +3,4 @@ using Boxes |Box| from "./_boxes.utu"
 main {
     console.log(Box.score(Box.new(20)))
 }
-using console from std:Console
+using console from std:console

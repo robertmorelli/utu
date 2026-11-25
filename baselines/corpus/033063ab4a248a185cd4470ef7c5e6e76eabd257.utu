@@ -1,2 +1,2 @@
 main { console.log(@json/\ match "{}" { ~> 0, }\/); }
-using console from std:Console
+using console from std:console

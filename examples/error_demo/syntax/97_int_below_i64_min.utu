@@ -4,4 +4,4 @@ main {
     let least: I64 = -9223372036854775809;
     console.log(least);
 }
-using console from std:Console
+using console from std:console

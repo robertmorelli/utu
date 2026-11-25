@@ -5,4 +5,4 @@ fn odd(a: I32) Bool => @ir/\ <ir-i32-add><ir-ident name="a"/><ir-lit kind="int" 
 main {
     console.log(odd(3));
 }
-using console from std:Console
+using console from std:console

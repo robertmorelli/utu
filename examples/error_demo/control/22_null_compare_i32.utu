@@ -7,4 +7,4 @@ fn missing(count: I32) Bool {
 main {
     console.log(if missing(3) { 1; } else { 0; });
 }
-using console from std:Console
+using console from std:console

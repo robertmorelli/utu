@@ -11,4 +11,4 @@ const mem squares: I32 = @comptime/\ make_tabel(16) \/;
 main {
     console.log(squares[3]);
 }
-using console from std:Console
+using console from std:console

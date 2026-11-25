@@ -5,4 +5,4 @@ main {
     let b = [10, 20, 30];
     console.log(a zip(b) |x| { x; } sum);
 }
-using console from std:Console
+using console from std:console

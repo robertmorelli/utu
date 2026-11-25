@@ -1,6 +1,6 @@
 // What: continues a loop from inside a defer.
 // Expect: continue cannot appear inside deferred code
-using console from std:Console;
+using console from std:console;
 
 main {
     let n = 0;

@@ -5,4 +5,4 @@ fn wait(ms: I32) I32 { return ms; }
 main {
     console.log(wait(5000000000));
 }
-using console from std:Console
+using console from std:console

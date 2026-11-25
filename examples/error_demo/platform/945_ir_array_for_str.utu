@@ -5,4 +5,4 @@ fn name(a: Array[I32]) Str => @ir/\ <ir-ident name="a"/> \/;
 main {
     console.log(name([1, 2]));
 }
-using console from std:Console
+using console from std:console

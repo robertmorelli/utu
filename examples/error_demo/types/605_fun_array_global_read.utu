@@ -6,4 +6,4 @@ let greeters: Array[fun() Str] = [hi];
 main {
     console.log(greeters[0]());
 }
-using console from std:Console
+using console from std:console

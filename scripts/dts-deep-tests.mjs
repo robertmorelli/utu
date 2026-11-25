@@ -98,10 +98,10 @@ await test('readonly members and incorrect arguments produce diagnostics', async
   for (const [body, pattern] of [
     ['let c = Fixture.Counter(); c.id = "bad";', /readonly/],
     ['Fixture.optional("bad");', /Expected F64, got Str/],
-    ['let c = Fixture.Counter(); c.label = 7.0;', /Expected Str, got F64/],
+    ['let c = Fixture.Counter(); c.label = 7.0;', /Expected Str, got F32/],
     ['Fixture.optional();', /overload/],
     ['Fixture.noSuchAPI();', /No member Fixture\.noSuchAPI/],
-    ['Fixture.make(&{label: 4.0, count: 2.0});', /Expected Str, got F64/],
+    ['Fixture.make(&{label: 4.0, count: 2.0});', /Expected Str, got F32/],
     ['Fixture.make(&{label: "missing count"});', /Missing property count/],
     ['let c = Fixture.Counter(); c.missing();', /No member Fixture\.Counter\.missing/],
   ]) {
@@ -410,7 +410,7 @@ await test('a Rust crate links through its wasm-bindgen declarations', async () 
       let p = new Geom.Polygon(4.0, 2.5);
       p.label = "square";
       let grown = p.scale(2.0);
-      let square = if p.kind() == Geom.Shape.Square { 100.0; } else { 0.0; };
+      let square: F64 = if p.kind() == Geom.Shape.Square { 100.0; } else { 0.0; };
       let result = grown + p.perimeter + p.vertices().length + square;
       p.free();
       return result;

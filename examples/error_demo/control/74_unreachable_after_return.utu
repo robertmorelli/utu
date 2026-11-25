@@ -1,6 +1,6 @@
 // What: code after an unconditional return, which can never run.
 // Expect: warning: unreachable code after return (or accepted silently)
-using console from std:Console;
+using console from std:console;
 
 fn answer() I32 {
     return 42;

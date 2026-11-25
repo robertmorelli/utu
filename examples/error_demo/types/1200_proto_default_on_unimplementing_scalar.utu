@@ -5,4 +5,4 @@ proto P:
 fn P[I32].step |s| () I32 { return s; }
 fn P.tick |s| () I32 { return s.step(); }
 main { console.log(P.tick(7.5)); }
-using console from std:Console
+using console from std:console

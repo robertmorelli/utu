@@ -49,4 +49,4 @@ test "formatters compose without extra bindings" {
     assert bold(red("e")).len() == red("e").len() + 9;
     assert dim("y").len() == 10;
 }
-using console from std:Console
+using console from std:console

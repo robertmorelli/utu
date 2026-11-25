@@ -52,4 +52,4 @@ main {
     ]
     console.log(perimeter_sum(my_ps))
 }
-using console from std:Console
+using console from std:console

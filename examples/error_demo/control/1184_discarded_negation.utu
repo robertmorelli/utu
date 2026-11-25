@@ -5,4 +5,4 @@ main {
     (-(if true { p0; } else { 8; }));
     console.log(p0);
 }
-using console from std:Console
+using console from std:console

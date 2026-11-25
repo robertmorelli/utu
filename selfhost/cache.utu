@@ -345,7 +345,7 @@ fn cg_for_end(i: I32) Void {
     w_node(Op.Block, vt_none, done, 0, m)
 }
 
-/// h = (h ^ the i32 since m) * 0x9E3779B1.
+/// `h = (h ^ the i32 since m) * 0x9E3779B1`.
 fn cg_mix(h: I32, m: I32) Void {
     cg_get(h)
     w_i32_op(i32_xor, m)
@@ -973,7 +973,7 @@ fn slot_taken(c: Cache) Void {
     w_i32_op(i32_eqz, mn)
 }
 
-/// i += 1 (and `& mask` for #cache(0)), the value left when `tee`.
+/// `i += 1` (and `& mask` for `#cache(0)`), the value left when `tee`.
 fn step(c: Cache, tee: Bool) Void {
     let mi = w_mark()
     cg_get(c.i)

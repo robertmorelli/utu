@@ -125,5 +125,5 @@ mod wutu {
     }
 }
 `;
- await fs.writeFile(new URL('../std/Wutu.utu',import.meta.url),source);
+ await fs.writeFile(new URL('../std/wutu.utu',import.meta.url),source);
 }

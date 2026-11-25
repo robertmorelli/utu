@@ -15,4 +15,4 @@ main {
     let shapes: Array[Shape] = [Circle { r: 1.0 }, Label { text: "x" }];
     console.log(shapes.len());
 }
-using console from std:Console
+using console from std:console

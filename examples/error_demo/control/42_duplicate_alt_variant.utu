@@ -15,4 +15,4 @@ fn area(shape: Shape) F64 {
 main {
     console.log(area(Dot {}));
 }
-using console from std:Console
+using console from std:console

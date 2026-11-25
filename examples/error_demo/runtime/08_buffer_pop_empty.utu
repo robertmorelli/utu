@@ -6,4 +6,4 @@ main {
     let b = Buffer[I32].new();
     console.log(b.pop());
 }
-using console from std:Console
+using console from std:console

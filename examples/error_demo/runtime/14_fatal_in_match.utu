@@ -7,4 +7,4 @@ fn step(state: I32) I32 {
 main {
     console.log(step(step(step(0))));
 }
-using console from std:Console
+using console from std:console

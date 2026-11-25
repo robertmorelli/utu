@@ -8,4 +8,4 @@ fn size(p: Pt) I32 => @ir/\ <ir-string-measure-utf16><ir-ident name="p"/></ir-st
 main {
     console.log(size(Pt { x: 1 }));
 }
-using console from std:Console
+using console from std:console

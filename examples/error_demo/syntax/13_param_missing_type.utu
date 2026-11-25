@@ -5,4 +5,4 @@ fn add(a, b: I32) I32 {
 }
 
 main { console.log(add(1, 2)); }
-using console from std:Console
+using console from std:console

@@ -5,4 +5,4 @@ fn pick(c: I32, a: I32, b: I32) I32 => @wat/\ local.get $a local.get $b local.ge
 main {
     console.log(pick(1, 2, 3));
 }
-using console from std:Console
+using console from std:console

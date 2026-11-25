@@ -5,4 +5,4 @@ fn answer() I32 => @ir/\ <ir-lit kind="int" type-name="Str" value="42"/> \/;
 main {
     console.log(answer());
 }
-using console from std:Console
+using console from std:console

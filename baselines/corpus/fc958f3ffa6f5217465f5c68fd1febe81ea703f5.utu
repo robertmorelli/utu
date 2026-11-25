@@ -6,4 +6,4 @@
       fn accept(value: P) I32 { return 1; }
       main { console.log(accept(Line { x: 3 })); }
     
-using console from std:Console
+using console from std:console

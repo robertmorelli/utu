@@ -14,4 +14,4 @@ main {
     for (depths(root, 0)) |d| { total += d; };
     console.log(total);
 }
-using console from std:Console
+using console from std:console

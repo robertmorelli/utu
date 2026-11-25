@@ -5,4 +5,4 @@ let log: fun(I32) Void = @es/\ (n) => console.log(n) \/;
 main {
     console.log([1, 2, 3] each |n| { log(n); } sum);
 }
-using console from std:Console
+using console from std:console

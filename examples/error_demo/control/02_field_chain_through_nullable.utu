@@ -8,4 +8,4 @@ main {
     let head = Node { name: "a", next: Node { name: "b", next: null } };
     console.log(head.next.name);
 }
-using console from std:Console
+using console from std:console

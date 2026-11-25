@@ -211,7 +211,7 @@ mod code {
                 for parts.kinds |kind, index| {
                     span {
                         class = kind
-                        = parts.texts[index.i32()]
+                        |> parts.texts[index.i32()]
                     }
                 }
             }
@@ -231,7 +231,7 @@ mod code {
             for parts.kinds |kind, index| {
                 span {
                     class = kind
-                    = parts.texts[index.i32()]
+                    |> parts.texts[index.i32()]
                 }
             }
         }
@@ -241,7 +241,7 @@ mod code {
         return @wutu/\
         pre.code.shell {
             code {
-                = source
+                | source
             }
         }
         \/

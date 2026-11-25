@@ -6,4 +6,4 @@ main {
     let r: I32 = log_it(3);
     console.log(r);
 }
-using console from std:Console
+using console from std:console

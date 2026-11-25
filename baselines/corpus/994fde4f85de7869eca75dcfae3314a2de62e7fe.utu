@@ -1,2 +1,2 @@
 main { console.log([1] map |x,y,z| {x;} sum); }
-using console from std:Console
+using console from std:console

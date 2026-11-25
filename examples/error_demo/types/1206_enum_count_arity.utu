@@ -3,4 +3,4 @@
 enum(U8) E:
     | A
 main { console.log(E.count(1)); }
-using console from std:Console
+using console from std:console

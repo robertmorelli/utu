@@ -9,4 +9,4 @@ struct Square[Shape]:
 fn total(s: Shape) F64 { return s.area(); }
 
 main { console.log(total(Square { side: 2.0 }).i32()); }
-using console from std:Console
+using console from std:console

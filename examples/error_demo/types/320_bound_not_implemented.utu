@@ -11,4 +11,4 @@ main {
     let far = Order[Point].max(Point { x: 1, y: 2 }, Point { x: 5, y: 0 });
     console.log(far.x);
 }
-using console from std:Console
+using console from std:console

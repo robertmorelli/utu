@@ -6,4 +6,4 @@ main {
     let counts = StrMap[Str, I32].new();
     console.log(counts.get("a", 0));
 }
-using console from std:Console
+using console from std:console

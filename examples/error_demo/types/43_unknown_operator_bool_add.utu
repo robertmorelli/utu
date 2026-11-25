@@ -6,4 +6,4 @@ main {
     let n = a + b;
     console.log(0);
 }
-using console from std:Console
+using console from std:console
