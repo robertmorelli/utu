@@ -335,6 +335,7 @@ fn diag_name_for_kind(k: Diag) Str {
     if k == Diag.AmbiguousMethod { return "unknown-method" }
     if k == Diag.ImplNothing or k == Diag.ProtoNoMember { return "unknown-method" }
     if k == Diag.InvalidDirective { return "invalid-directive" }
+    if k == Diag.GpuError { return "gpu-error" }
     if k == Diag.InvalidCache { return "invalid-cache" }
     return "type-mismatch"
 }
@@ -953,6 +954,7 @@ fn diag_text_src(k: Diag) Array[Str] {
             "#cache cannot apply to @es function {w}", "#cache {w} is not pure: it uses {node}, which can change between calls",
             "#cache {w} is not pure: it calls the host ({node})", "#cache {w} is not pure: it calls {node}, which is not pure",
             "#cache {w} is not pure: it writes into its argument ({node})"],
+        Diag.GpuError => ["{w}"],
         ~> ["{kind}"],
     }
 }
@@ -1102,6 +1104,7 @@ fn diag_label_src(k: Diag) Array[Str] {
         Diag.TestInGeneric => ["runs in no instance"],
         Diag.InvalidDirective => ["unknown", "no argument", "not a power of 2", "contradicts", "given already"],
         Diag.InvalidCache => ["not a key", "not cacheable", "returns nothing", "a generator", "@wat", "@es", "can change", "the host", "not pure", "writes its argument"],
+        Diag.GpuError => ["gpu error"],
         ~> ["here"],
     }
 }

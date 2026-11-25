@@ -34,4 +34,5 @@ stored.utu
 wutu_parse.utu
 wutu.utu
 blame.utu
+gpu.utu
 lib.utu

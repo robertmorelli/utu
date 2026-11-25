@@ -1,4 +1,5 @@
 import { syncWutuRuntime } from './sync-wutu-runtime.mjs';
+import { syncGpuRuntime } from './sync-gpu-runtime.mjs';
 // scripts/build.mjs — Utu build script
 //
 // Usage:
@@ -37,6 +38,7 @@ const buildDocs    = args.has('--docs');
 async function main() {
   if (buildGrammar) await generateParser();
   await syncWutuRuntime();
+  await syncGpuRuntime();
   await generatePlatformSources();
   buildCompiler();
   await bundleSelfhost();

@@ -1355,15 +1355,20 @@ fn write_mems_json() Void {
     for (0 ..< decl_kind.len()) |d| {
         if decl_is(d, Decl.Mem) and mem_memory[d] >= 0 and mem_hosted[d] == 1 { any = true }
     }
-    if not any { return }
-    json_text(sms(Sml.Mems))
-    let first = true
-    for (0 ..< decl_kind.len()) |d| {
-        if decl_is(d, Decl.Mem) and mem_memory[d] >= 0 and mem_hosted[d] == 1 {
-            if not first { json_byte(44) }
-            first = false
-            json_text(sms2(Sml.NameKindHostTrue, word_text(decl_name[d]), storage_name(mem_storage(d))))
+    if not any and gpu_mem_id < 0 { return }
+    let started = false
+    if any {
+        json_text(sms(Sml.Mems))
+        started = true
+        let first = true
+        for (0 ..< decl_kind.len()) |d| {
+            if decl_is(d, Decl.Mem) and mem_memory[d] >= 0 and mem_hosted[d] == 1 {
+                if not first { json_byte(44) }
+                first = false
+                json_text(sms2(Sml.NameKindHostTrue, word_text(decl_name[d]), storage_name(mem_storage(d))))
+            }
         }
     }
+    write_gpu_mem_json(started)
     json_byte(93)
 }

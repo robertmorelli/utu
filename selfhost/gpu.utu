@@ -1,0 +1,2180 @@
+//! = WebGPU compute (`gp` functions & `pipeline` constructs)
+//!
+//! `gp` functions compile to WGSL compute kernels (with `|i|`, `|x, y|`, or
+//! `|x, y, z|`) and WGSL helper functions (without `|...|`).
+//! `pipeline` constructs compile to Wasm functions returning `Promise[Void]`
+//! that linearize `ro`/`rw` `Array[T]` buffers into a hosted linear memory
+//! (`__gpu`), dispatch kernels via `std:Gpu`, and delinearize `rw`/`out`
+//! buffers back into the caller's `Array[T]`s in-place.
+
+enum(U8) GpuAccess:
+    | None
+    | Ro
+    | Rw
+    | Out
+    | Uniform
+
+/// By declaration: cached GPU check state (0 unchecked, 1 checking, 2 done)
+vec gp_state: U8
+/// By declaration: emitted WGSL for a `gp` kernel or helper body (interned word, or -1)
+vec gp_wgsl: I32
+/// By declaration: workgroup dims (x, y, z) for a `gp` kernel
+vec gp_wg_x: I32
+vec gp_wg_y: I32
+vec gp_wg_z: I32
+/// By declaration: grid arity (1, 2, or 3) for a `gp` kernel, 0 for helper
+vec gp_arity: I32
+/// By declaration: uniform buffer size in 32-bit words for a `gp` kernel
+vec gp_uni_words: I32
+
+/// Active `gp` function's local/param types & access kinds (indexed by decl id)
+vec gp_decl_ty: I32
+vec gp_decl_acc: U8
+/// Temp var counter for hoisting `if`/`match` expressions in WGSL
+let gp_temp_id: I32 = 0
+/// Prefix statements hoisted before the current WGSL expression
+let gp_hoist: Str = ""
+/// Current `gp` function's return type (for `return` validation)
+let gp_cur_ret: I32 = -1
+/// Current `gp` function's declaration
+let gp_cur_decl: I32 = -1
+/// Current `gp` function's referenced structs & helper decls (reset per kernel emission)
+vec gp_ref_structs: I32
+vec gp_ref_helpers: I32
+
+/// Hosted linear memory for GPU staging (`utu.mem___gpu`, U32), or -1 if unused
+let gpu_mem_id: I32 = -1
+/// `utu.mem_view___gpu(start, end) -> externref` import, or -1
+let gpu_mem_view_fn: I32 = -1
+/// Helper `gpu_ensure_words(words: i32) -> void`, or -1
+let gpu_ensure_fn: I32 = -1
+/// Cached linearize helpers: pairs (elem_ty, wasm_fn)
+vec gpu_lin_fns: I32
+/// Cached delinearize helpers: pairs (elem_ty, wasm_fn)
+vec gpu_delin_fns: I32
+
+/// Active `pipeline` compilation state
+let pipe_active: I32 = 0
+let pipe_session_local: I32 = -1
+/// Active pipeline's GPU buffers (both params and `Buffer[T]` scratch locals)
+vec pipe_buf_decl: I32
+vec pipe_buf_id_local: I32
+vec pipe_buf_len_local: I32
+vec pipe_buf_access: U8
+vec pipe_buf_elem_ty: I32
+vec pipe_buf_is_param: U8
+
+fn reset_gpu() Void {
+    let n = decl_kind.len()
+    gp_state.resize(n)
+    gp_wgsl.resize(n)
+    gp_wg_x.resize(n)
+    gp_wg_y.resize(n)
+    gp_wg_z.resize(n)
+    gp_arity.resize(n)
+    gp_uni_words.resize(n)
+    gp_decl_ty.resize(n)
+    gp_decl_acc.resize(n)
+    for (0 ..< n) |d| {
+        gp_state[d] = 0
+        gp_wgsl[d] = -1
+        gp_wg_x[d] = 0
+        gp_wg_y[d] = 0
+        gp_wg_z[d] = 0
+        gp_arity[d] = 0
+        gp_uni_words[d] = 0
+        gp_decl_ty[d] = -1
+        gp_decl_acc[d] = 0
+    }
+    gp_temp_id = 0
+    gp_hoist = ""
+    gp_cur_ret = -1
+    gp_cur_decl = -1
+    gp_ref_structs.clear()
+    gp_ref_helpers.clear()
+    gpu_mem_id = -1
+    gpu_mem_view_fn = -1
+    gpu_ensure_fn = -1
+    gpu_lin_fns.clear()
+    gpu_delin_fns.clear()
+    pipe_active = 0
+    pipe_session_local = -1
+    pipe_buf_decl.clear()
+    pipe_buf_id_local.clear()
+    pipe_buf_len_local.clear()
+    pipe_buf_access.clear()
+    pipe_buf_elem_ty.clear()
+    pipe_buf_is_param.clear()
+}
+
+fn gpu_err(node: I32, msg: Str) Void {
+    report(Diag.GpuError, node, intern_text(msg))
+}
+
+fn gpu_param_access(param_node: I32) GpuAccess {
+    let name = first_child(param_node)
+    if name < 0 or node_first[param_node] >= node_first[name] { return GpuAccess.None }
+    let w = word_text(tok_word[node_first[param_node]])
+    if w == "ro" { return GpuAccess.Ro }
+    if w == "rw" { return GpuAccess.Rw }
+    if w == "out" { return GpuAccess.Out }
+    if w == "uniform" { return GpuAccess.Uniform }
+    return GpuAccess.None
+}
+
+fn gp_is_kernel(gp_node: I32) Bool => is_kind(gp_node, Node.Gp_decl) and child_of_kind(gp_node, Node.Capture) >= 0
+
+fn gp_grid_arity(gp_node: I32) I32 {
+    let cap = child_of_kind(gp_node, Node.Capture)
+    if cap < 0 { return 0 }
+    return child_count(cap)
+}
+
+//! = GPU type validation & WGSL std430 layout
+
+fn gpu_is_f32(t: I32) Bool => t == prelude(Prelude.F32)
+fn gpu_is_i32(t: I32) Bool => t == prelude(Prelude.I32)
+fn gpu_is_u32(t: I32) Bool => t == prelude(Prelude.U32)
+fn gpu_is_bool(t: I32) Bool => t == prelude(Prelude.Bool)
+
+fn gpu_is_scalar(t: I32) Bool => gpu_is_f32(t) or gpu_is_i32(t) or gpu_is_u32(t) or gpu_is_bool(t)
+
+fn gpu_is_int_enum(t: I32) Bool => ty_is(t, Ty.Named) and decl_is(ty_a[t], Decl.IntEnum)
+
+fn gpu_is_struct(t: I32) Bool => ty_is(t, Ty.Named) and decl_is(ty_a[t], Decl.Struct)
+
+fn gpu_is_array(t: I32) Bool {
+    if not ty_is(t, Ty.Named) { return false }
+    let m = module_of(ty_a[t])
+    return m >= 0 and word_text(decl_name[m]) == "Array" and decl_a[m] == ty_a[t] and ty_b[t] > 0
+}
+
+fn gpu_array_elem(t: I32) I32 => vl_item(inst_args[ty_b[t]], 0)
+
+fn gpu_is_promise_void(t: I32) Bool {
+    if not ty_is(t, Ty.Named) { return false }
+    let m = module_of(ty_a[t])
+    if m < 0 or word_text(decl_name[m]) != "Promise" or decl_a[m] != ty_a[t] or ty_b[t] <= 0 { return false }
+    return ty_is(vl_item(inst_args[ty_b[t]], 0), Ty.Void)
+}
+
+fn gpu_validate_value_type(t: I32, site: I32, depth: I32) Bool {
+    if ty_is(t, Ty.Error) { return false }
+    if depth > 32 {
+        gpu_err(site, "Recursive struct type '" + type_text(t) + "' is not allowed on the GPU")
+        return false
+    }
+    if gpu_is_scalar(t) { return true }
+    if gpu_is_int_enum(t) { return true }
+    if gpu_is_struct(t) {
+        let sd = ty_a[t]
+        let inst = ty_b[t]
+        let ok = true
+        let f = first_child(decl_node[sd])
+        while (f >= 0) {
+            if is_kind(f, Node.Field) {
+                let ft = type_of(next_sibling(first_child(f)), inst)
+                if not gpu_validate_value_type(ft, site, depth + 1) { ok = false }
+            }
+            f = next_sibling(f)
+        }
+        return ok
+    }
+    gpu_err(site, "Type '" + type_text(t) + "' is not allowed on the GPU (allowed: F32, I32, U32, Bool, fieldless int enums, and plain non-recursive structs)")
+    return false
+}
+
+fn gpu_align_up(offset: I32, align: I32) I32 {
+    if align <= 1 { return offset }
+    return (offset + align - 1) & (0 - align)
+}
+
+fn gpu_std430_align(t: I32) I32 {
+    if gpu_is_scalar(t) or gpu_is_int_enum(t) { return 4 }
+    if gpu_is_struct(t) {
+        let sd = ty_a[t]
+        let inst = ty_b[t]
+        let max_a = 4
+        let f = first_child(decl_node[sd])
+        while (f >= 0) {
+            if is_kind(f, Node.Field) {
+                let fa = gpu_std430_align(type_of(next_sibling(first_child(f)), inst))
+                if fa > max_a { max_a = fa }
+            }
+            f = next_sibling(f)
+        }
+        return max_a
+    }
+    return 4
+}
+
+fn gpu_std430_size(t: I32) I32 {
+    if gpu_is_scalar(t) or gpu_is_int_enum(t) { return 4 }
+    if gpu_is_struct(t) {
+        let sd = ty_a[t]
+        let inst = ty_b[t]
+        let off = 0
+        let max_a = 4
+        let f = first_child(decl_node[sd])
+        while (f >= 0) {
+            if is_kind(f, Node.Field) {
+                let ft = type_of(next_sibling(first_child(f)), inst)
+                let fa = gpu_std430_align(ft)
+                let fs = gpu_std430_size(ft)
+                if fa > max_a { max_a = fa }
+                off = gpu_align_up(off, fa)
+                off += fs
+            }
+            f = next_sibling(f)
+        }
+        let sz = gpu_align_up(off, max_a)
+        return if sz == 0 { 4 } else { sz }
+    }
+    return 4
+}
+
+fn gpu_field_offset(struct_t: I32, target_idx: I32) I32 {
+    let sd = ty_a[struct_t]
+    let inst = ty_b[struct_t]
+    let off = 0
+    let idx = 0
+    let f = first_child(decl_node[sd])
+    while (f >= 0) {
+        if is_kind(f, Node.Field) {
+            let ft = type_of(next_sibling(first_child(f)), inst)
+            let fa = gpu_std430_align(ft)
+            off = gpu_align_up(off, fa)
+            if idx == target_idx { return off }
+            off += gpu_std430_size(ft)
+            idx += 1
+        }
+        f = next_sibling(f)
+    }
+    return off
+}
+
+fn gpu_wgsl_type(t: I32, in_storage: Bool) Str {
+    if gpu_is_f32(t) { return "f32" }
+    if gpu_is_i32(t) { return "i32" }
+    if gpu_is_u32(t) { return "u32" }
+    if gpu_is_bool(t) { return if in_storage { "u32" } else { "bool" } }
+    if gpu_is_int_enum(t) { return "u32" }
+    if gpu_is_struct(t) { return word_text(decl_name[ty_a[t]]) }
+    return "u32"
+}
+
+fn gpu_add_ref_struct(t: I32) Void {
+    if not gpu_is_struct(t) { return }
+    for (0 ..< gp_ref_structs.len()) |i| { if gp_ref_structs[i] == t { return } }
+    // Add field structs first so WGSL struct declarations appear in dependency order.
+    let sd = ty_a[t]
+    let inst = ty_b[t]
+    let f = first_child(decl_node[sd])
+    while (f >= 0) {
+        if is_kind(f, Node.Field) {
+            gpu_add_ref_struct(type_of(next_sibling(first_child(f)), inst))
+        }
+        f = next_sibling(f)
+    }
+    gp_ref_structs.push(t)
+}
+
+fn gpu_add_ref_helper(decl: I32) Void {
+    for (0 ..< gp_ref_helpers.len()) |i| { if gp_ref_helpers[i] == decl { return } }
+    gp_ref_helpers.push(decl)
+}
+
+//! = `gp` function typechecking & WGSL codegen
+
+fn gp_read_workgroup(gp_node: I32, arity: I32) Void {
+    let decl = node_decl[last_child(first_child(gp_node))]
+    let wx = if arity == 1 { 64 } else if arity == 2 { 8 } else { 4 }
+    let wy = if arity == 1 { 1 } else if arity == 2 { 8 } else { 4 }
+    let wz = if arity == 3 { 4 } else { 1 }
+    for (0 ..< dir_node.len()) |k| {
+        if dir_fn[k] == gp_node and directive_kind(dir_node[k]) == 5 {
+            let a1 = next_sibling(first_child(dir_node[k]))
+            if a1 >= 0 {
+                wx = int_value(a1).i32()
+                let a2 = next_sibling(a1)
+                if a2 >= 0 {
+                    wy = int_value(a2).i32()
+                    let a3 = next_sibling(a2)
+                    wz = if a3 >= 0 { int_value(a3).i32() } else { 1 }
+                } else {
+                    wy = 1
+                    wz = 1
+                }
+            }
+        }
+    }
+    gp_wg_x[decl] = wx
+    gp_wg_y[decl] = wy
+    gp_wg_z[decl] = wz
+}
+
+/// Check a `gp` function (kernel or helper) and generate its WGSL code.
+fn check_gp_decl(decl: I32) Void {
+    if decl < 0 or not is_kind(decl_node[decl], Node.Gp_decl) { return }
+    if gp_state[decl] == 2 { return }
+    if gp_state[decl] == 1 {
+        gpu_err(decl_node[decl], "Recursion is not allowed in gp function '" + word_text(decl_name[decl]) + "'")
+        return
+    }
+    gp_state[decl] = 1
+    let node = decl_node[decl]
+    let is_kernel = gp_is_kernel(node)
+    let saved_cur_decl = gp_cur_decl
+    let saved_cur_ret = gp_cur_ret
+    let saved_temp = gp_temp_id
+    let saved_hoist = gp_hoist
+    gp_cur_decl = decl
+    gp_temp_id = 0
+    gp_hoist = ""
+
+    let cap = child_of_kind(node, Node.Capture)
+    let arity = 0
+    if is_kernel {
+        arity = child_count(cap)
+        gp_arity[decl] = arity
+        if arity < 1 or arity > 3 {
+            gpu_err(cap, "gp kernel grid capture must have 1, 2, or 3 index variables")
+            arity = 1
+        }
+        gp_read_workgroup(node, arity)
+        let c = first_child(cap)
+        while (c >= 0) {
+            let cd = node_decl[c]
+            if cd >= 0 {
+                gp_decl_ty[cd] = prelude(Prelude.U32)
+                gp_decl_acc[cd] = 5 // grid index (immutable)
+            }
+            c = next_sibling(c)
+        }
+    } else {
+        gp_arity[decl] = 0
+    }
+
+    // Return type
+    let ret_node = child_of_kind(node, Node.Return_type)
+    let ret_ty = if ret_node >= 0 { type_of(first_child(ret_node), 0) } else { ty_void() }
+    if is_kernel {
+        if not ty_is(ret_ty, Ty.Void) {
+            gpu_err(ret_node, "gp compute kernels cannot return a value")
+        }
+        ret_ty = ty_void()
+    } else {
+        if not ty_is(ret_ty, Ty.Void) {
+            gpu_validate_value_type(ret_ty, ret_node, 0)
+            gpu_add_ref_struct(ret_ty)
+        }
+    }
+    gp_cur_ret = ret_ty
+
+    // Parameters
+    let plist = child_of_kind(node, Node.Param_list)
+    let storage_bindings = ""
+    let uni_fields = ""
+    let uni_offset = 16 // _grid: vec3<u32> (12) + _pad0: u32 (4)
+    let bind_idx = 0
+    let helper_sig_params = ""
+    let helper_param_copies = ""
+    let first_hp = true
+    if plist >= 0 {
+        let p = first_child(plist)
+        while (p >= 0) {
+            let pname = first_child(p)
+            let pdecl = node_decl[pname]
+            let ptype_node = next_sibling(pname)
+            let pt = type_of(ptype_node, 0)
+            let acc = gpu_param_access(p)
+            if is_kernel {
+                if acc == GpuAccess.None {
+                    gpu_err(p, "gp kernel parameter '" + word_text(word_of(pname)) + "' requires an explicit access modifier (ro, rw, out, or uniform)")
+                } else if acc == GpuAccess.Uniform {
+                    if gpu_validate_value_type(pt, ptype_node, 0) {
+                        gpu_add_ref_struct(pt)
+                        let fa = gpu_std430_align(pt)
+                        let fs = gpu_std430_size(pt)
+                        uni_offset = gpu_align_up(uni_offset, fa)
+                        uni_fields = uni_fields + "    " + word_text(word_of(pname)) + ": " + gpu_wgsl_type(pt, true) + ",\n"
+                        uni_offset += fs
+                    }
+                    if pdecl >= 0 {
+                        gp_decl_ty[pdecl] = pt
+                        gp_decl_acc[pdecl] = GpuAccess.Uniform.i32()
+                    }
+                } else {
+                    if not gpu_is_array(pt) {
+                        gpu_err(ptype_node, "gp storage parameter '" + word_text(word_of(pname)) + "' must have type Array[T]")
+                    } else {
+                        let elem = gpu_array_elem(pt)
+                        if gpu_validate_value_type(elem, ptype_node, 0) {
+                            gpu_add_ref_struct(elem)
+                            let rw_str = if acc == GpuAccess.Ro { "read" } else { "read_write" }
+                            storage_bindings = storage_bindings + "@group(0) @binding(" + bind_idx.str() + ") var<storage, " + rw_str + "> "
+                                + word_text(word_of(pname)) + ": array<" + gpu_wgsl_type(elem, true) + ">;\n"
+                            bind_idx += 1
+                        }
+                    }
+                    if pdecl >= 0 {
+                        gp_decl_ty[pdecl] = pt
+                        gp_decl_acc[pdecl] = acc.i32()
+                    }
+                }
+            } else {
+                if acc != GpuAccess.None {
+                    gpu_err(p, "gp helper function parameter '" + word_text(word_of(pname)) + "' cannot have a storage/uniform modifier")
+                }
+                if gpu_validate_value_type(pt, ptype_node, 0) {
+                    gpu_add_ref_struct(pt)
+                }
+                if pdecl >= 0 {
+                    gp_decl_ty[pdecl] = pt
+                    gp_decl_acc[pdecl] = 6 // helper param
+                }
+                let pn = word_text(word_of(pname))
+                if not first_hp { helper_sig_params = helper_sig_params + ", " }
+                first_hp = false
+                helper_sig_params = helper_sig_params + "_p_" + pn + ": " + gpu_wgsl_type(pt, false)
+                helper_param_copies = helper_param_copies + "    var " + pn + ": " + gpu_wgsl_type(pt, false) + " = _p_" + pn + ";\n"
+            }
+            p = next_sibling(p)
+        }
+    }
+    let uni_bytes = gpu_align_up(uni_offset, 16)
+    gp_uni_words[decl] = uni_bytes / 4
+
+    // Only clear ref lists at top-level kernel emission (helpers accumulate into caller's lists too)
+    let saved_structs_len = gp_ref_structs.len()
+    let saved_helpers_len = gp_ref_helpers.len()
+    if is_kernel {
+        gp_ref_structs.clear()
+        gp_ref_helpers.clear()
+        // Re-register param structs for this kernel
+        if plist >= 0 {
+            let p = first_child(plist)
+            while (p >= 0) {
+                let pt = type_of(next_sibling(first_child(p)), 0)
+                if gpu_is_array(pt) { gpu_add_ref_struct(gpu_array_elem(pt)) }
+                else if gpu_is_struct(pt) { gpu_add_ref_struct(pt) }
+                p = next_sibling(p)
+            }
+        }
+    }
+
+    // Check & emit body
+    let body = last_child(node)
+    let body_wgsl = gp_emit_block(body, ret_ty, "    ", not is_kernel and not ty_is(ret_ty, Ty.Void))
+
+    let name_str = word_text(decl_name[decl])
+    if is_kernel {
+        let out = ""
+        // 1. Struct declarations
+        for (0 ..< gp_ref_structs.len()) |si| {
+            let st = gp_ref_structs[si]
+            let sd = ty_a[st]
+            let inst = ty_b[st]
+            out = out + "struct " + word_text(decl_name[sd]) + " {\n"
+            let f = first_child(decl_node[sd])
+            while (f >= 0) {
+                if is_kind(f, Node.Field) {
+                    let fn_name = word_text(word_of(first_child(f)))
+                    let ft = type_of(next_sibling(first_child(f)), inst)
+                    out = out + "    " + fn_name + ": " + gpu_wgsl_type(ft, true) + ",\n"
+                }
+                f = next_sibling(f)
+            }
+            out = out + "};\n"
+        }
+        // 2. Helper functions
+        for (0 ..< gp_ref_helpers.len()) |hi| {
+            let hd = gp_ref_helpers[hi]
+            if gp_wgsl[hd] >= 0 { out = out + word_text(gp_wgsl[hd]) + "\n" }
+        }
+        // 3. Storage bindings
+        out = out + storage_bindings
+        // 4. Uniform struct + binding
+        out = out + "struct _Uni {\n"
+        out = out + "    _grid: vec3<u32>,\n"
+        out = out + "    _pad0: u32,\n"
+        out = out + uni_fields
+        out = out + "};\n"
+        out = out + "@group(0) @binding(" + bind_idx.str() + ") var<uniform> _uni: _Uni;\n"
+        // 5. Kernel entry point + grid capture bindings + auto bounds check
+        out = out + "@compute @workgroup_size(" + gp_wg_x[decl].str() + ", " + gp_wg_y[decl].str() + ", " + gp_wg_z[decl].str() + ")\n"
+        out = out + "fn " + name_str + "(@builtin(global_invocation_id) _gid: vec3<u32>) {\n"
+        let c0 = first_child(cap)
+        let n0 = word_text(word_of(c0))
+        out = out + "    let " + n0 + ": u32 = _gid.x;\n"
+        if arity == 1 {
+            out = out + "    if (" + n0 + " >= _uni._grid.x) { return; }\n"
+        } else if arity == 2 {
+            let c1 = next_sibling(c0)
+            let n1 = word_text(word_of(c1))
+            out = out + "    let " + n1 + ": u32 = _gid.y;\n"
+            out = out + "    if (" + n0 + " >= _uni._grid.x || " + n1 + " >= _uni._grid.y) { return; }\n"
+        } else {
+            let c1 = next_sibling(c0)
+            let c2 = next_sibling(c1)
+            let n1 = word_text(word_of(c1))
+            let n2 = word_text(word_of(c2))
+            out = out + "    let " + n1 + ": u32 = _gid.y;\n"
+            out = out + "    let " + n2 + ": u32 = _gid.z;\n"
+            out = out + "    if (" + n0 + " >= _uni._grid.x || " + n1 + " >= _uni._grid.y || " + n2 + " >= _uni._grid.z) { return; }\n"
+        }
+        out = out + body_wgsl
+        out = out + "}\n"
+        gp_wgsl[decl] = intern_text(out)
+    } else {
+        let ret_part = if ty_is(ret_ty, Ty.Void) { "" } else { " -> " + gpu_wgsl_type(ret_ty, false) }
+        let out = "fn " + name_str + "(" + helper_sig_params + ")" + ret_part + " {\n" + helper_param_copies + body_wgsl + "}\n"
+        gp_wgsl[decl] = intern_text(out)
+    }
+
+    gp_cur_decl = saved_cur_decl
+    gp_cur_ret = saved_cur_ret
+    gp_temp_id = saved_temp
+    gp_hoist = saved_hoist
+    gp_state[decl] = 2
+}
+
+struct GpExpr:
+    | code: Str
+    | ty: I32
+
+fn gp_fresh_temp() Str {
+    gp_temp_id += 1
+    return "_t" + gp_temp_id.str()
+}
+
+fn gp_take_hoist() Str {
+    let h = gp_hoist
+    gp_hoist = ""
+    return h
+}
+
+/// Emit statements of a block. If `implicit_return` is true (e.g. `=> expr`), return the last expression.
+fn gp_emit_block(block: I32, expect: I32, indent: Str, implicit_return: Bool) Str {
+    let out = ""
+    let s = first_child(block)
+    while (s >= 0) {
+        let is_last = next_sibling(s) < 0
+        if is_last and implicit_return and not is_kind(s, Node.Return_expr) and not is_kind(s, Node.Bind_expr)
+            and not is_kind(s, Node.Assign_expr) and not is_kind(s, Node.While_expr) and not is_kind(s, Node.For_expr) {
+            let e = gp_emit_expr(s, expect, indent)
+            out = out + gp_take_hoist() + indent + "return " + e.code + ";\n"
+        } else {
+            out = out + gp_emit_stmt(s, indent)
+        }
+        s = next_sibling(s)
+    }
+    return out
+}
+
+/// Emit a block that produces a value assigned to `dest_var`.
+fn gp_emit_value_block(node: I32, expect: I32, dest_var: Str, indent: Str) Str {
+    if not is_kind(node, Node.Block) and not is_kind(node, Node.Block_expr) {
+        let e = gp_emit_expr(node, expect, indent)
+        return gp_take_hoist() + indent + dest_var + " = " + e.code + ";\n"
+    }
+    let blk = if is_kind(node, Node.Block_expr) { first_child(node) } else { node }
+    let out = ""
+    let s = first_child(blk)
+    while (s >= 0) {
+        if next_sibling(s) < 0 {
+            let e = gp_emit_expr(s, expect, indent)
+            out = out + gp_take_hoist() + indent + dest_var + " = " + e.code + ";\n"
+        } else {
+            out = out + gp_emit_stmt(s, indent)
+        }
+        s = next_sibling(s)
+    }
+    return out
+}
+
+fn gp_emit_stmt(node: I32, indent: Str) Str {
+    let k = Node(node_kind[node])
+    if k == Node.Bind_expr {
+        let name_node = first_child(node)
+        let d = node_decl[name_node]
+        let mid = next_sibling(name_node)
+        let init_node = last_child(node)
+        let ann_ty = if mid != init_node { type_of(mid, 0) } else { -1 }
+        if ann_ty >= 0 { gpu_validate_value_type(ann_ty, mid, 0) }
+        let e = gp_emit_expr(init_node, ann_ty, indent)
+        let h = gp_take_hoist()
+        let vt = if ann_ty >= 0 { ann_ty } else { e.ty }
+        if not ty_is(vt, Ty.Error) and gpu_validate_value_type(vt, node, 0) {
+            gpu_add_ref_struct(vt)
+        }
+        if d >= 0 {
+            gp_decl_ty[d] = vt
+            gp_decl_acc[d] = 7 // local
+        }
+        return h + indent + "var " + word_text(word_of(name_node)) + ": " + gpu_wgsl_type(vt, false) + " = " + e.code + ";\n"
+    }
+    if k == Node.Assign_expr {
+        return gp_emit_assign(node, indent)
+    }
+    if k == Node.Return_expr {
+        let val = first_child(node)
+        if val < 0 {
+            return indent + "return;\n"
+        }
+        let e = gp_emit_expr(val, gp_cur_ret, indent)
+        let h = gp_take_hoist()
+        return h + indent + "return " + e.code + ";\n"
+    }
+    if k == Node.Break_expr { return indent + "break;\n" }
+    if k == Node.Continue_expr { return indent + "continue;\n" }
+    if k == Node.If_expr {
+        return gp_emit_if_stmt(node, indent)
+    }
+    if k == Node.While_expr {
+        let cond = first_child(node)
+        let body = next_sibling(cond)
+        let ce = gp_emit_expr(cond, prelude(Prelude.Bool), indent)
+        let h = gp_take_hoist()
+        let b = gp_emit_block(body, ty_void(), indent + "    ", false)
+        return h + indent + "while (" + ce.code + ") {\n" + b + indent + "}\n"
+    }
+    if k == Node.For_expr {
+        return gp_emit_for_stmt(node, indent)
+    }
+    if k == Node.Match_expr {
+        return gp_emit_match_stmt(node, indent)
+    }
+    if k == Node.Block or k == Node.Block_expr {
+        let blk = if k == Node.Block_expr { first_child(node) } else { node }
+        return indent + "{\n" + gp_emit_block(blk, ty_void(), indent + "    ", false) + indent + "}\n"
+    }
+    // Expression statement (e.g. void helper call)
+    let e = gp_emit_expr(node, ty_void(), indent)
+    let h = gp_take_hoist()
+    if e.code == "" { return h }
+    return h + indent + e.code + ";\n"
+}
+
+fn gp_lhs_root(node: I32) I32 {
+    let cur = node
+    while (is_kind(cur, Node.Field_expr) or is_kind(cur, Node.Index_expr)) {
+        cur = first_child(cur)
+    }
+    return cur
+}
+
+fn gp_emit_lhs(node: I32, indent: Str) GpExpr {
+    if is_kind(node, Node.Identifier) {
+        let d = node_decl[node]
+        let t = if d >= 0 { gp_decl_ty[d] } else { ty_error() }
+        return GpExpr { code: word_text(word_of(node)), ty: t }
+    }
+    if is_kind(node, Node.Index_expr) {
+        let arr = first_child(node)
+        let idx = next_sibling(arr)
+        let ae = gp_emit_lhs(arr, indent)
+        let ie = gp_emit_expr(idx, prelude(Prelude.U32), indent)
+        let elem = if gpu_is_array(ae.ty) { gpu_array_elem(ae.ty) } else { ty_error() }
+        return GpExpr { code: ae.code + "[" + ie.code + "]", ty: elem }
+    }
+    if is_kind(node, Node.Field_expr) {
+        let base = first_child(node)
+        let fld = next_sibling(base)
+        let be = gp_emit_lhs(base, indent)
+        let ft = ty_error()
+        if gpu_is_struct(be.ty) {
+            let fdecl = member(ty_a[be.ty], word_of(fld), Space.Member)
+            if fdecl >= 0 { ft = field_type(fdecl, ty_b[be.ty]) }
+        }
+        return GpExpr { code: be.code + "." + word_text(word_of(fld)), ty: ft }
+    }
+    gpu_err(node, "Invalid assignment target in gp function")
+    return GpExpr { code: "_", ty: ty_error() }
+}
+
+fn gp_emit_assign(node: I32, indent: Str) Str {
+    let lhs = first_child(node)
+    let rhs = next_sibling(lhs)
+    let root = gp_lhs_root(lhs)
+    if is_kind(root, Node.Identifier) {
+        let d = node_decl[root]
+        if d >= 0 {
+            let acc = gp_decl_acc[d]
+            if acc == GpuAccess.Ro.i32() {
+                gpu_err(node, "Cannot assign to read-only (ro) buffer '" + word_text(word_of(root)) + "'")
+                return ""
+            }
+            if acc == GpuAccess.Uniform.i32() {
+                gpu_err(node, "Cannot assign to uniform parameter '" + word_text(word_of(root)) + "'")
+                return ""
+            }
+            if acc == 5 {
+                gpu_err(node, "Cannot assign to grid index '" + word_text(word_of(root)) + "'")
+                return ""
+            }
+        }
+    }
+    let le = gp_emit_lhs(lhs, indent)
+    let re = gp_emit_expr(rhs, le.ty, indent)
+    let h = gp_take_hoist()
+    // Determine operator token between lhs and rhs
+    let op_tok = node_last[lhs]
+    let op_str = "="
+    let tk = Tok(tok_kind[op_tok])
+    if tk == Tok.PlusEq { op_str = "+=" }
+    else if tk == Tok.MinusEq { op_str = "-=" }
+    else if tk == Tok.StarEq { op_str = "*=" }
+    else if tk == Tok.SlashEq { op_str = "/=" }
+    else if tk == Tok.PercentEq { op_str = "%=" }
+    else if tk == Tok.AmpEq { op_str = "&=" }
+    else if tk == Tok.PipeEq { op_str = "|=" }
+    else if tk == Tok.CaretEq { op_str = "^=" }
+    else if tk == Tok.ShlEq { op_str = "<<=" }
+    else if tk == Tok.ShrEq or tk == Tok.Shr3Eq { op_str = ">>=" }
+    let rhs_code = re.code
+    // Bool stored in storage array/struct is u32 in WGSL
+    if gpu_is_bool(le.ty) and (is_kind(lhs, Node.Index_expr) or is_kind(lhs, Node.Field_expr)) {
+        rhs_code = "select(0u, 1u, " + rhs_code + ")"
+    }
+    return h + indent + le.code + " " + op_str + " " + rhs_code + ";\n"
+}
+
+fn gp_emit_if_stmt(node: I32, indent: Str) Str {
+    let cond = first_child(node)
+    let then_b = next_sibling(cond)
+    let else_b = next_sibling(then_b)
+    let ce = gp_emit_expr(cond, prelude(Prelude.Bool), indent)
+    let h = gp_take_hoist()
+    let out = h + indent + "if (" + ce.code + ") {\n"
+    out = out + gp_emit_block(then_b, ty_void(), indent + "    ", false)
+    if else_b >= 0 {
+        if is_kind(else_b, Node.If_expr) {
+            let elif_code = gp_emit_if_stmt(else_b, indent)
+            out = out + indent + "} else {\n" + elif_code + indent + "}\n"
+        } else {
+            out = out + indent + "} else {\n" + gp_emit_block(else_b, ty_void(), indent + "    ", false) + indent + "}\n"
+        }
+    } else {
+        out = out + indent + "}\n"
+    }
+    return out
+}
+
+fn gp_emit_for_stmt(node: I32, indent: Str) Str {
+    let sources = first_child(node)
+    let cap = next_sibling(sources)
+    let body = next_sibling(cap)
+    if child_count(sources) != 1 {
+        gpu_err(sources, "gp for-loop only supports a single integer range source (a ..< b)")
+        return ""
+    }
+    let fsrc = first_child(sources)
+    let lo_node = first_child(fsrc)
+    let hi_node = if lo_node >= 0 { next_sibling(lo_node) } else { -1 }
+    if hi_node < 0 {
+        gpu_err(fsrc, "gp for-loop requires a range expression (a ..< b)")
+        return ""
+    }
+    let inclusive = tok_kind[node_last[lo_node]] == Tok.DotDotDot.i32()
+    // Check hi first if lo is an integer literal so we pick U32 vs I32 accurately
+    let hi_e = gp_emit_expr(hi_node, -1, indent)
+    let h1 = gp_take_hoist()
+    let loop_ty = if gpu_is_u32(hi_e.ty) or gpu_is_i32(hi_e.ty) { hi_e.ty } else { prelude(Prelude.I32) }
+    let lo_e = gp_emit_expr(lo_node, loop_ty, indent)
+    let h2 = gp_take_hoist()
+    let cap_id = first_child(cap)
+    let var_name = word_text(word_of(cap_id))
+    let cdecl = node_decl[cap_id]
+    if var_name == "_" {
+        var_name = gp_fresh_temp()
+    } else if cdecl >= 0 {
+        gp_decl_ty[cdecl] = loop_ty
+        gp_decl_acc[cdecl] = 7
+    }
+    let one = if gpu_is_u32(loop_ty) { "1u" } else { "1i" }
+    let cmp = if inclusive { " <= " } else { " < " }
+    let b = gp_emit_block(body, ty_void(), indent + "    ", false)
+    return h1 + h2 + indent + "for (var " + var_name + ": " + gpu_wgsl_type(loop_ty, false) + " = " + lo_e.code + "; "
+        + var_name + cmp + hi_e.code + "; " + var_name + " = " + var_name + " + " + one + ") {\n"
+        + b + indent + "}\n"
+}
+
+fn gp_match_case_value(pat: I32, scrut_ty: I32) Str {
+    if is_kind(pat, Node.Match_lit) {
+        let last = last_child(pat)
+        if last >= 0 and last != first_child(pat) {
+            let vdecl = node_decl[last]
+            if decl_is(vdecl, Decl.Variant) { return variant_value[vdecl].str() + "u" }
+        }
+        pat = first_child(pat)
+    }
+    if is_kind(pat, Node.Int_lit) {
+        let v = int_value(pat).str()
+        return if gpu_is_u32(scrut_ty) or gpu_is_int_enum(scrut_ty) { v + "u" } else { v + "i" }
+    }
+    if is_kind(pat, Node.Type_member_expr) {
+        let vdecl = node_decl[next_sibling(first_child(pat))]
+        if decl_is(vdecl, Decl.Variant) {
+            return variant_value[vdecl].str() + "u"
+        }
+    }
+    if is_kind(pat, Node.Identifier) or is_kind(pat, Node.Type_ident) {
+        let vdecl = node_decl[pat]
+        if decl_is(vdecl, Decl.Variant) {
+            return variant_value[vdecl].str() + "u"
+        }
+    }
+    gpu_err(pat, "Unsupported match pattern in gp function (allowed: integer literals and fieldless enum variants)")
+    return "0u"
+}
+
+fn gp_emit_match_stmt(node: I32, indent: Str) Str {
+    let scrut = first_child(node)
+    let se = gp_emit_expr(scrut, -1, indent)
+    let h = gp_take_hoist()
+    if not gpu_is_i32(se.ty) and not gpu_is_u32(se.ty) and not gpu_is_int_enum(se.ty) {
+        gpu_err(scrut, "gp match scrutinee must be I32, U32, or a fieldless integer enum")
+        return ""
+    }
+    let out = h + indent + "switch (" + se.code + ") {\n"
+    let has_default = false
+    let arm = next_sibling(scrut)
+    while (arm >= 0) {
+        if is_kind(arm, Node.Match_default) {
+            has_default = true
+            let body = first_child(arm)
+            out = out + indent + "    default: {\n" + gp_emit_stmt(body, indent + "        ") + indent + "    }\n"
+        } else if is_kind(arm, Node.Match_arm) {
+            let body = last_child(arm)
+            let p = first_child(arm)
+            let cases = ""
+            let first_p = true
+            while (p != body) {
+                if not first_p { cases = cases + ", " }
+                first_p = false
+                cases = cases + gp_match_case_value(p, se.ty)
+                p = next_sibling(p)
+            }
+            out = out + indent + "    case " + cases + ": {\n" + gp_emit_stmt(body, indent + "        ") + indent + "    }\n"
+        }
+        arm = next_sibling(arm)
+    }
+    if not has_default { out = out + indent + "    default: {}\n" }
+    return out + indent + "}\n"
+}
+
+fn gp_infer_expr_ty(node: I32, expect: I32) I32 {
+    if expect >= 0 and not ty_is(expect, Ty.Void) and not ty_is(expect, Ty.Error) { return expect }
+    let k = Node(node_kind[node])
+    if k == Node.Float_lit { return prelude(Prelude.F32) }
+    if k == Node.Int_lit { return prelude(Prelude.I32) }
+    if k == Node.Bool_lit { return prelude(Prelude.Bool) }
+    if k == Node.Identifier {
+        let d = node_decl[node]
+        if d >= 0 and gp_decl_ty[d] >= 0 { return gp_decl_ty[d] }
+    }
+    if k == Node.Block or k == Node.Block_expr {
+        let blk = if k == Node.Block_expr { first_child(node) } else { node }
+        let last = last_child(blk)
+        if last >= 0 { return gp_infer_expr_ty(last, expect) }
+    }
+    if k == Node.If_expr {
+        return gp_infer_expr_ty(next_sibling(first_child(node)), expect)
+    }
+    return prelude(Prelude.F32)
+}
+
+fn gp_emit_expr(node: I32, expect: I32, indent: Str) GpExpr {
+    let k = Node(node_kind[node])
+    if k == Node.Literal { return gp_emit_expr(first_child(node), expect, indent) }
+    if k == Node.Paren_expr {
+        let inner = gp_emit_expr(first_child(node), expect, indent)
+        return GpExpr { code: "(" + inner.code + ")", ty: inner.ty }
+    }
+    if k == Node.Int_lit {
+        let raw = node_text(node)
+        let t = if expect >= 0 and (gpu_is_u32(expect) or gpu_is_i32(expect) or gpu_is_f32(expect)) { expect } else { prelude(Prelude.I32) }
+        if gpu_is_f32(t) { return GpExpr { code: raw + ".0f", ty: t } }
+        if gpu_is_u32(t) { return GpExpr { code: raw + "u", ty: t } }
+        return GpExpr { code: raw + "i", ty: t }
+    }
+    if k == Node.Float_lit {
+        let raw = node_text(node)
+        return GpExpr { code: raw + "f", ty: prelude(Prelude.F32) }
+    }
+    if k == Node.Bool_lit {
+        return GpExpr { code: node_text(node), ty: prelude(Prelude.Bool) }
+    }
+    if k == Node.Identifier {
+        let d = node_decl[node]
+        if d < 0 {
+            return GpExpr { code: word_text(word_of(node)), ty: ty_error() }
+        }
+        if decl_is(d, Decl.Variant) {
+            return GpExpr { code: variant_value[d].str() + "u", ty: decl_type(decl_owner[d], 0) }
+        }
+        let t = gp_decl_ty[d]
+        if t < 0 {
+            gpu_err(node, "Variable '" + word_text(word_of(node)) + "' is not available on the GPU")
+            return GpExpr { code: "0", ty: ty_error() }
+        }
+        if gp_decl_acc[d] == GpuAccess.Uniform.i32() {
+            let code = "_uni." + word_text(word_of(node))
+            if gpu_is_bool(t) { return GpExpr { code: "(" + code + " != 0u)", ty: t } }
+            return GpExpr { code: code, ty: t }
+        }
+        return GpExpr { code: word_text(word_of(node)), ty: t }
+    }
+    if k == Node.Type_member_expr {
+        let base = first_child(node)
+        let mem_node = next_sibling(base)
+        let md = node_decl[mem_node]
+        if decl_is(md, Decl.Variant) {
+            let ed = decl_owner[md]
+            if not decl_is(ed, Decl.IntEnum) {
+                gpu_err(node, "Tagged union enum variants are not allowed on the GPU; use fieldless enum(U32) or enum(U8)")
+                return GpExpr { code: "0u", ty: ty_error() }
+            }
+            return GpExpr { code: variant_value[md].str() + "u", ty: decl_type(ed, 0) }
+        }
+        gpu_err(node, "Unsupported type member '" + node_text(node) + "' in gp function")
+        return GpExpr { code: "0", ty: ty_error() }
+    }
+    if k == Node.Unary_expr {
+        let op_node = first_child(node)
+        let operand = next_sibling(op_node)
+        let op_text = node_text(op_node)
+        let oe = gp_emit_expr(operand, expect, indent)
+        if op_text == "-" { return GpExpr { code: "(-" + oe.code + ")", ty: oe.ty } }
+        if op_text == "not" { return GpExpr { code: "(!" + oe.code + ")", ty: prelude(Prelude.Bool) } }
+        if op_text == "~" { return GpExpr { code: "(~" + oe.code + ")", ty: oe.ty } }
+        gpu_err(node, "Unsupported unary operator '" + op_text + "' in gp function")
+        return GpExpr { code: "0", ty: ty_error() }
+    }
+    if k == Node.Binary_expr {
+        return gp_emit_binary(node, expect, indent)
+    }
+    if k == Node.Index_expr {
+        let arr = first_child(node)
+        let idx = next_sibling(arr)
+        let ae = gp_emit_expr(arr, -1, indent)
+        if not gpu_is_array(ae.ty) {
+            gpu_err(arr, "Indexing in gp function requires a storage Array[T] parameter")
+            return GpExpr { code: "0", ty: ty_error() }
+        }
+        let ie = gp_emit_expr(idx, prelude(Prelude.U32), indent)
+        let elem = gpu_array_elem(ae.ty)
+        let code = ae.code + "[" + ie.code + "]"
+        if gpu_is_bool(elem) { return GpExpr { code: "(" + code + " != 0u)", ty: elem } }
+        return GpExpr { code: code, ty: elem }
+    }
+    if k == Node.Field_expr {
+        let base = first_child(node)
+        let fld = next_sibling(base)
+        let be = gp_emit_expr(base, -1, indent)
+        if not gpu_is_struct(be.ty) {
+            gpu_err(node, "Field access '." + word_text(word_of(fld)) + "' requires a struct value on the GPU")
+            return GpExpr { code: "0", ty: ty_error() }
+        }
+        let fdecl = member(ty_a[be.ty], word_of(fld), Space.Member)
+        if fdecl < 0 {
+            gpu_err(fld, "Unknown field '" + word_text(word_of(fld)) + "' on struct '" + type_text(be.ty) + "'")
+            return GpExpr { code: "0", ty: ty_error() }
+        }
+        let ft = field_type(fdecl, ty_b[be.ty])
+        let code = be.code + "." + word_text(word_of(fld))
+        if gpu_is_bool(ft) { return GpExpr { code: "(" + code + " != 0u)", ty: ft } }
+        return GpExpr { code: code, ty: ft }
+    }
+    if k == Node.Struct_init {
+        let tnode = first_child(node)
+        let st = type_path(tnode, 0)
+        if not gpu_is_struct(st) or not gpu_validate_value_type(st, tnode, 0) {
+            return GpExpr { code: "0", ty: ty_error() }
+        }
+        gpu_add_ref_struct(st)
+        let sd = ty_a[st]
+        let inst = ty_b[st]
+        // Collect fields in struct declaration order
+        let args_str = ""
+        let first_f = true
+        let f = first_child(decl_node[sd])
+        while (f >= 0) {
+            if is_kind(f, Node.Field) {
+                let fw = word_of(first_child(f))
+                let ft = type_of(next_sibling(first_child(f)), inst)
+                // Find matching Field_init in node
+                let init = next_sibling(tnode)
+                let val_code = "0"
+                while (init >= 0) {
+                    if is_kind(init, Node.Field_init) and word_of(first_child(init)) == fw {
+                        let ve = gp_emit_expr(next_sibling(first_child(init)), ft, indent)
+                        val_code = if gpu_is_bool(ft) { "select(0u, 1u, " + ve.code + ")" } else { ve.code }
+                    }
+                    init = next_sibling(init)
+                }
+                if not first_f { args_str = args_str + ", " }
+                first_f = false
+                args_str = args_str + val_code
+            }
+            f = next_sibling(f)
+        }
+        return GpExpr { code: word_text(decl_name[sd]) + "(" + args_str + ")", ty: st }
+    }
+    if k == Node.Call_expr {
+        return gp_emit_call(node, indent)
+    }
+    if k == Node.If_expr {
+        let cond = first_child(node)
+        let then_b = next_sibling(cond)
+        let else_b = next_sibling(then_b)
+        if else_b < 0 {
+            gpu_err(node, "if-expression in gp function requires an else branch")
+            return GpExpr { code: "0", ty: ty_error() }
+        }
+        let res_ty = gp_infer_expr_ty(node, expect)
+        let tmp = gp_fresh_temp()
+        let ce = gp_emit_expr(cond, prelude(Prelude.Bool), indent)
+        let h_cond = gp_take_hoist()
+        let then_code = gp_emit_value_block(then_b, res_ty, tmp, indent + "    ")
+        let else_code = if is_kind(else_b, Node.If_expr) {
+            gp_emit_value_if_into(else_b, res_ty, tmp, indent + "    ")
+        } else {
+            gp_emit_value_block(else_b, res_ty, tmp, indent + "    ")
+        }
+        gp_hoist = h_cond + indent + "var " + tmp + ": " + gpu_wgsl_type(res_ty, false) + ";\n"
+            + indent + "if (" + ce.code + ") {\n" + then_code + indent + "} else {\n" + else_code + indent + "}\n"
+        return GpExpr { code: tmp, ty: res_ty }
+    }
+    if k == Node.Match_expr {
+        let scrut = first_child(node)
+        let se = gp_emit_expr(scrut, -1, indent)
+        let h_s = gp_take_hoist()
+        if not gpu_is_i32(se.ty) and not gpu_is_u32(se.ty) and not gpu_is_int_enum(se.ty) {
+            gpu_err(scrut, "gp match scrutinee must be I32, U32, or a fieldless integer enum")
+            return GpExpr { code: "0", ty: ty_error() }
+        }
+        let res_ty = if expect >= 0 and not ty_is(expect, Ty.Void) { expect } else { prelude(Prelude.I32) }
+        let tmp = gp_fresh_temp()
+        let sw = h_s + indent + "var " + tmp + ": " + gpu_wgsl_type(res_ty, false) + ";\n"
+            + indent + "switch (" + se.code + ") {\n"
+        let has_default = false
+        let arm = next_sibling(scrut)
+        while (arm >= 0) {
+            if is_kind(arm, Node.Match_default) {
+                has_default = true
+                sw = sw + indent + "    default: {\n" + gp_emit_value_block(first_child(arm), res_ty, tmp, indent + "        ") + indent + "    }\n"
+            } else if is_kind(arm, Node.Match_arm) {
+                let body = last_child(arm)
+                let p = first_child(arm)
+                let cases = ""
+                let first_p = true
+                while (p != body) {
+                    if not first_p { cases = cases + ", " }
+                    first_p = false
+                    cases = cases + gp_match_case_value(p, se.ty)
+                    p = next_sibling(p)
+                }
+                sw = sw + indent + "    case " + cases + ": {\n" + gp_emit_value_block(body, res_ty, tmp, indent + "        ") + indent + "    }\n"
+            }
+            arm = next_sibling(arm)
+        }
+        if not has_default { sw = sw + indent + "    default: {}\n" }
+        sw = sw + indent + "}\n"
+        gp_hoist = sw
+        return GpExpr { code: tmp, ty: res_ty }
+    }
+    if k == Node.Block or k == Node.Block_expr {
+        let res_ty = gp_infer_expr_ty(node, expect)
+        let tmp = gp_fresh_temp()
+        let code = gp_emit_value_block(node, res_ty, tmp, indent)
+        gp_hoist = gp_hoist + indent + "var " + tmp + ": " + gpu_wgsl_type(res_ty, false) + ";\n" + code
+        return GpExpr { code: tmp, ty: res_ty }
+    }
+    // Reject all non-GPU constructs with a clear message
+    if k == Node.String_lit or k == Node.Multiline_string_lit or k == Node.Template_string {
+        gpu_err(node, "Strings are not allowed in gp functions")
+    } else if k == Node.Array_expr {
+        gpu_err(node, "GC array allocations are not allowed in gp functions")
+    } else if k == Node.Closure_expr {
+        gpu_err(node, "Closures are not allowed in gp functions")
+    } else if k == Node.Try_expr or k == Node.Try_result_expr {
+        gpu_err(node, "try/catch is not allowed in gp functions")
+    } else if k == Node.Await_expr {
+        gpu_err(node, "await is not allowed in gp functions")
+    } else if k == Node.Dsl_expr {
+        gpu_err(node, "DSLs are not allowed in gp functions")
+    } else {
+        gpu_err(node, "Construct '" + node_text(node) + "' is not allowed in gp functions")
+    }
+    return GpExpr { code: "0", ty: ty_error() }
+}
+
+fn gp_emit_value_if_into(node: I32, res_ty: I32, tmp: Str, indent: Str) Str {
+    let cond = first_child(node)
+    let then_b = next_sibling(cond)
+    let else_b = next_sibling(then_b)
+    let ce = gp_emit_expr(cond, prelude(Prelude.Bool), indent)
+    let h = gp_take_hoist()
+    let tc = gp_emit_value_block(then_b, res_ty, tmp, indent + "    ")
+    let ec = if else_b >= 0 and is_kind(else_b, Node.If_expr) {
+        gp_emit_value_if_into(else_b, res_ty, tmp, indent + "    ")
+    } else if else_b >= 0 {
+        gp_emit_value_block(else_b, res_ty, tmp, indent + "    ")
+    } else { "" }
+    return h + indent + "if (" + ce.code + ") {\n" + tc + indent + "} else {\n" + ec + indent + "}\n"
+}
+
+fn gp_emit_binary(node: I32, expect: I32, indent: Str) GpExpr {
+    let lhs = first_child(node)
+    let rhs = next_sibling(lhs)
+    let op_tok = node_last[lhs]
+    let tk = Tok(tok_kind[op_tok])
+    let w = tok_word[op_tok]
+
+    let is_cmp = tk == Tok.EqEq or tk == Tok.BangEq or tk == Tok.Lt or tk == Tok.LtEq or tk == Tok.Gt or tk == Tok.GtEq
+    let is_logic = tk == Tok.Word and (w == Kw.And.i32() or w == Kw.Or.i32() or w == Kw.Xor.i32())
+
+    let hint = if is_logic { prelude(Prelude.Bool) } else if is_cmp { -1 } else { expect }
+    // If lhs is an int literal and rhs is not, emit rhs first to infer U32/F32
+    let le = GpExpr { code: "", ty: -1 }
+    let re = GpExpr { code: "", ty: -1 }
+    if is_kind(lhs, Node.Literal) and is_kind(first_child(lhs), Node.Int_lit) and not (is_kind(rhs, Node.Literal) and is_kind(first_child(rhs), Node.Int_lit)) {
+        re = gp_emit_expr(rhs, hint, indent)
+        le = gp_emit_expr(lhs, re.ty, indent)
+    } else {
+        le = gp_emit_expr(lhs, hint, indent)
+        re = gp_emit_expr(rhs, if is_logic { prelude(Prelude.Bool) } else { le.ty }, indent)
+    }
+
+    let op_str = "+"
+    if tk == Tok.Plus { op_str = "+" }
+    else if tk == Tok.Minus { op_str = "-" }
+    else if tk == Tok.Star { op_str = "*" }
+    else if tk == Tok.Slash { op_str = "/" }
+    else if tk == Tok.Percent { op_str = "%" }
+    else if tk == Tok.Amp { op_str = "&" }
+    else if tk == Tok.Pipe { op_str = "|" }
+    else if tk == Tok.Caret { op_str = "^" }
+    else if tk == Tok.Shl { op_str = "<<" }
+    else if tk == Tok.Shr or tk == Tok.Shr3 { op_str = ">>" }
+    else if tk == Tok.EqEq { op_str = "==" }
+    else if tk == Tok.BangEq { op_str = "!=" }
+    else if tk == Tok.Lt { op_str = "<" }
+    else if tk == Tok.LtEq { op_str = "<=" }
+    else if tk == Tok.Gt { op_str = ">" }
+    else if tk == Tok.GtEq { op_str = ">=" }
+    else if is_logic and w == Kw.And.i32() { op_str = "&&" }
+    else if is_logic and w == Kw.Or.i32() { op_str = "||" }
+    else if is_logic and w == Kw.Xor.i32() { op_str = "!=" }
+    else {
+        gpu_err(node, "Unsupported binary operator in gp function")
+        return GpExpr { code: "0", ty: ty_error() }
+    }
+    let rty = if is_cmp or is_logic { prelude(Prelude.Bool) } else { le.ty }
+    return GpExpr { code: "(" + le.code + " " + op_str + " " + re.code + ")", ty: rty }
+}
+
+fn gp_emit_call(node: I32, indent: Str) GpExpr {
+    let callee = first_child(node)
+    let args = next_sibling(callee)
+    // Method calls: x.f32(), x.i32(), x.u32(), arr.len()
+    if is_kind(callee, Node.Field_expr) {
+        let recv = first_child(callee)
+        let mname = word_text(word_of(next_sibling(recv)))
+        let re = gp_emit_expr(recv, -1, indent)
+        if mname == "f32" { return GpExpr { code: "f32(" + re.code + ")", ty: prelude(Prelude.F32) } }
+        if mname == "i32" { return GpExpr { code: "i32(" + re.code + ")", ty: prelude(Prelude.I32) } }
+        if mname == "u32" { return GpExpr { code: "u32(" + re.code + ")", ty: prelude(Prelude.U32) } }
+        if mname == "len" and gpu_is_array(re.ty) {
+            return GpExpr { code: "i32(arrayLength(&" + re.code + "))", ty: prelude(Prelude.I32) }
+        }
+        gpu_err(callee, "Method '." + mname + "()' is not supported in gp functions")
+        return GpExpr { code: "0", ty: ty_error() }
+    }
+    // Type member math calls: F32.sqrt(x), F32.abs(x), F32.min(a, b), F32.max(a, b), F32.floor(x), F32.ceil(x), F32.trunc(x), I32.abs(x), ...
+    if is_kind(callee, Node.Type_member_expr) {
+        let base = first_child(callee)
+        let mname = word_text(word_of(next_sibling(base)))
+        let bname = word_text(word_of(base))
+        let res_t = if bname == "F32" { prelude(Prelude.F32) } else if bname == "I32" { prelude(Prelude.I32) } else if bname == "U32" { prelude(Prelude.U32) } else { -1 }
+        if res_t >= 0 and (mname == "abs" or mname == "sqrt" or mname == "floor" or mname == "ceil" or mname == "trunc" or mname == "min" or mname == "max") {
+            let astr = ""
+            let a = if args >= 0 { first_child(args) } else { -1 }
+            let first_a = true
+            while (a >= 0) {
+                if not first_a { astr = astr + ", " }
+                first_a = false
+                let ae = gp_emit_expr(a, res_t, indent)
+                astr = astr + ae.code
+                a = next_sibling(a)
+            }
+            return GpExpr { code: mname + "(" + astr + ")", ty: res_t }
+        }
+        gpu_err(callee, "Type member call '" + node_text(callee) + "' is not allowed in gp functions")
+        return GpExpr { code: "0", ty: ty_error() }
+    }
+    // Direct function call: must be a gp helper (non-recursive)
+    if is_kind(callee, Node.Identifier) {
+        let d = node_decl[callee]
+        if d < 0 or not is_kind(decl_node[d], Node.Gp_decl) {
+            gpu_err(callee, "Cannot call non-gp function '" + word_text(word_of(callee)) + "' from gp code")
+            return GpExpr { code: "0", ty: ty_error() }
+        }
+        if gp_is_kernel(decl_node[d]) {
+            gpu_err(callee, "Cannot call gp compute kernel '" + word_text(decl_name[d]) + "' from gp code; only gp helpers can be called")
+            return GpExpr { code: "0", ty: ty_error() }
+        }
+        if gp_state[d] == 1 {
+            gpu_err(node, "Recursion is not allowed in gp function '" + word_text(decl_name[d]) + "'")
+            return GpExpr { code: "0", ty: ty_error() }
+        }
+        check_gp_decl(d)
+        gpu_add_ref_helper(d)
+        let plist = child_of_kind(decl_node[d], Node.Param_list)
+        let want_n = if plist >= 0 { child_count(plist) } else { 0 }
+        let got_n = if args >= 0 { child_count(args) } else { 0 }
+        if want_n != got_n {
+            gpu_err(node, "gp helper '" + word_text(decl_name[d]) + "' expects " + want_n.str() + " arguments, got " + got_n.str())
+        }
+        let astr = ""
+        let a = if args >= 0 { first_child(args) } else { -1 }
+        let p = if plist >= 0 { first_child(plist) } else { -1 }
+        let first_a = true
+        while (a >= 0) {
+            let pt = if p >= 0 { type_of(next_sibling(first_child(p)), 0) } else { -1 }
+            let ae = gp_emit_expr(a, pt, indent)
+            if not first_a { astr = astr + ", " }
+            first_a = false
+            astr = astr + ae.code
+            a = next_sibling(a)
+            if p >= 0 { p = next_sibling(p) }
+        }
+        let rn = child_of_kind(decl_node[d], Node.Return_type)
+        let rt = if rn >= 0 { type_of(first_child(rn), 0) } else { ty_void() }
+        return GpExpr { code: word_text(decl_name[d]) + "(" + astr + ")", ty: rt }
+    }
+    gpu_err(callee, "Unsupported call in gp function")
+    return GpExpr { code: "0", ty: ty_error() }
+}
+
+//! = Hosted linear memory & Wasm linearize / delinearize helpers
+
+fn gpu_std_fn(name: Str) I32 {
+    // Look up `mod gpu` in the prelude and instantiate `gpu.<name>` on demand.
+    let gw = intern_text("gpu")
+    let mod_d = -1
+    for (0 ..< decl_kind.len()) |d| {
+        if decl_is(d, Decl.Module) and decl_name[d] == gw {
+            mod_d = d
+            break
+        }
+    }
+    let m = member(mod_d, intern_text(name), Space.Member)
+    return function_of(fn_instance(m, 0))
+}
+
+fn gpu_mem_of() I32 {
+    if gpu_mem_id >= 0 { return gpu_mem_id }
+    let m = memory_kind.len()
+    memory_kind.push(FuncKind.Import.i32())
+    memory_pages.push(1)
+    memory_module_name.push(name_add("utu"))
+    memory_field_name.push(name_add("mem___gpu"))
+    gpu_mem_id = m
+    let mp = vl_begin()
+    vl_add(vt_i32)
+    vl_add(vt_i32)
+    gpu_mem_view_fn = add_import_func(name_add("utu"), name_add("mem_view___gpu"), func_type(vl_end(mp), vl_one(vt_externref)))
+    return m
+}
+
+fn write_gpu_mem_json(has_prev: Bool) Bool {
+    if gpu_mem_id < 0 { return has_prev }
+    if not has_prev { json_text(sms(Sml.Mems)) } else { json_byte(44) }
+    json_text(sms2(Sml.NameKindHostTrue, "__gpu", "U32"))
+    return true
+}
+
+/// Helper `(words: i32) -> Void`: ensures `gpu_mem` has at least `words * 4` bytes.
+fn gpu_ensure_words_fn() I32 {
+    if gpu_ensure_fn >= 0 { return gpu_ensure_fn }
+    let mem_id = gpu_mem_of()
+    let fl = vl_begin()
+    vl_add(vt_i32) // local 1: needed_pages
+    let f = helper(vl_one(vt_i32), vl_empty(), vl_end(fl), "__gpu_ensure")
+    let m = w_mark()
+    // needed_pages = ((words * 4) + 65535) >>> 16
+    let mp = w_mark()
+    let mb = w_mark()
+    w_get(vt_i32, 0)
+    w_i32(2)
+    w_i32_op(i32_shl, mb)
+    w_i32(65535)
+    w_i32_op(i32_add, mb)
+    w_i32(16)
+    w_i32_op(i32_shr_u, mb)
+    w_node(Op.LocalTee, vt_i32, 1, 0, mp)
+    w_leaf(Op.MemorySize, vt_i32, mem_id, 0)
+    w_i32_op(i32_gt_u, mp)
+    let mt = w_mark()
+    let md = w_mark()
+    w_get(vt_i32, 1)
+    w_leaf(Op.MemorySize, vt_i32, mem_id, 0)
+    w_i32_op(i32_sub, md)
+    w_node(Op.MemoryGrow, vt_i32, mem_id, 0, md)
+    w_node(Op.Drop, vt_none, 0, 0, mt)
+    w_node(Op.If, vt_none, -1, 0, m)
+    func_body[f] = w_pop()
+    gpu_ensure_fn = f
+    return f
+}
+
+/// Emit IR writing value in local `val_loc` of GPU type `t` into `gpu_mem` at `base_loc + byte_off`.
+fn gpu_emit_store_val(t: I32, val_loc: I32, base_loc: I32, byte_off: I32, mem_id: I32) Void {
+    if gpu_is_f32(t) {
+        let m = w_mark()
+        let ma = w_mark()
+        w_get(vt_i32, base_loc)
+        if byte_off > 0 { w_i32(byte_off); w_i32_op(i32_add, ma) }
+        w_get(vt_f32, val_loc)
+        w_node(Op.Store, vt_none, mem_id, 56, m) // f32.store
+        return
+    }
+    if gpu_is_i32(t) or gpu_is_u32(t) or gpu_is_bool(t) or gpu_is_int_enum(t) {
+        let m = w_mark()
+        let ma = w_mark()
+        w_get(vt_i32, base_loc)
+        if byte_off > 0 { w_i32(byte_off); w_i32_op(i32_add, ma) }
+        w_get(vt_i32, val_loc)
+        w_node(Op.Store, vt_none, mem_id, 54, m) // i32.store
+        return
+    }
+    if gpu_is_struct(t) {
+        let sd = ty_a[t]
+        let inst = ty_b[t]
+        let sh = struct_heap_of(sd, inst)
+        let idx = 0
+        let f = first_child(decl_node[sd])
+        while (f >= 0) {
+            if is_kind(f, Node.Field) {
+                let ft = type_of(next_sibling(first_child(f)), inst)
+                let foff = byte_off + gpu_field_offset(t, idx)
+                let fv_loc = new_local(repr(ft))
+                let mg = w_mark()
+                w_get(repr(t), val_loc)
+                w_node(Op.StructGet, repr(ft), sh, idx, mg)
+                w_node(Op.LocalSet, vt_none, fv_loc, 0, mg)
+                gpu_emit_store_val(ft, fv_loc, base_loc, foff, mem_id)
+                idx += 1
+            }
+            f = next_sibling(f)
+        }
+    }
+}
+
+/// Emit IR reading a value of GPU type `t` from `gpu_mem` at `base_loc + byte_off` onto the stack.
+fn gpu_emit_load_val(t: I32, base_loc: I32, byte_off: I32, mem_id: I32) Void {
+    if gpu_is_f32(t) {
+        let m = w_mark()
+        w_get(vt_i32, base_loc)
+        if byte_off > 0 { w_i32(byte_off); w_i32_op(i32_add, m) }
+        w_node(Op.Load, vt_f32, mem_id, 42, m) // f32.load
+        return
+    }
+    if gpu_is_i32(t) or gpu_is_u32(t) or gpu_is_int_enum(t) {
+        let m = w_mark()
+        w_get(vt_i32, base_loc)
+        if byte_off > 0 { w_i32(byte_off); w_i32_op(i32_add, m) }
+        w_node(Op.Load, vt_i32, mem_id, 40, m) // i32.load
+        return
+    }
+    if gpu_is_bool(t) {
+        let m = w_mark()
+        let ml = w_mark()
+        w_get(vt_i32, base_loc)
+        if byte_off > 0 { w_i32(byte_off); w_i32_op(i32_add, ml) }
+        w_node(Op.Load, vt_i32, mem_id, 40, ml)
+        w_i32(0)
+        w_i32_op(i32_ne, m)
+        return
+    }
+    if gpu_is_struct(t) {
+        let sd = ty_a[t]
+        let inst = ty_b[t]
+        let sh = struct_heap_of(sd, inst)
+        let m = w_mark()
+        let idx = 0
+        let f = first_child(decl_node[sd])
+        while (f >= 0) {
+            if is_kind(f, Node.Field) {
+                let ft = type_of(next_sibling(first_child(f)), inst)
+                gpu_emit_load_val(ft, base_loc, byte_off + gpu_field_offset(t, idx), mem_id)
+                idx += 1
+            }
+            f = next_sibling(f)
+        }
+        w_node(Op.StructNew, vt_ref(sh, false), sh, 0, m)
+    }
+}
+
+/// Emit IR updating struct in local `obj_loc` in-place from `gpu_mem` at `base_loc + byte_off`.
+fn gpu_emit_delin_struct_inplace(t: I32, obj_loc: I32, base_loc: I32, byte_off: I32, mem_id: I32) Void {
+    let sd = ty_a[t]
+    let inst = ty_b[t]
+    let sh = struct_heap_of(sd, inst)
+    let idx = 0
+    let f = first_child(decl_node[sd])
+    while (f >= 0) {
+        if is_kind(f, Node.Field) {
+            let ft = type_of(next_sibling(first_child(f)), inst)
+            let foff = byte_off + gpu_field_offset(t, idx)
+            if gpu_is_struct(ft) {
+                let sub_loc = new_local(repr(ft))
+                let mg = w_mark()
+                w_get(repr(t), obj_loc)
+                w_node(Op.StructGet, repr(ft), sh, idx, mg)
+                w_node(Op.LocalSet, vt_none, sub_loc, 0, mg)
+                gpu_emit_delin_struct_inplace(ft, sub_loc, base_loc, foff, mem_id)
+            } else {
+                let ms = w_mark()
+                w_get(repr(t), obj_loc)
+                gpu_emit_load_val(ft, base_loc, foff, mem_id)
+                w_node(Op.StructSet, vt_none, sh, idx, ms)
+            }
+            idx += 1
+        }
+        f = next_sibling(f)
+    }
+}
+
+/// Cached Wasm linearize helper `(arr: Array[T]) -> I32 (total_words)`.
+fn gpu_linearize_fn(elem_t: I32) I32 {
+    let i = 0
+    while (i < gpu_lin_fns.len()) {
+        if gpu_lin_fns[i] == elem_t { return gpu_lin_fns[i + 1] }
+        i += 2
+    }
+    let mem_id = gpu_mem_of()
+    let ensure = gpu_ensure_words_fn()
+    let ah = array_type(repr(elem_t), true)
+    let arr_vt = vt_ref(ah, true)
+    let stride_bytes = gpu_std430_size(elem_t)
+    let stride_words = stride_bytes / 4
+
+    // Save current function builder state
+    let saved_locals = Array[I32].new(cur_locals.len(), 0)
+    for (0 ..< cur_locals.len()) |k| { saved_locals[k] = cur_locals[k] }
+    let saved_params = cur_params
+
+    cur_locals.clear()
+    let p_arr = new_local(arr_vt)        // 0: arr
+    cur_params = 1
+    let l_n = new_local(vt_i32)          // 1: n
+    let l_words = new_local(vt_i32)      // 2: total_words
+    let l_i = new_local(vt_i32)          // 3: i
+    let l_base = new_local(vt_i32)       // 4: base_byte
+    let l_elem = new_local(repr(elem_t)) // 5: elem
+
+    let f = new_func(FuncKind.Defined, func_type(vl_one(arr_vt), vl_one(vt_i32)))
+    func_debug_name[f] = name_add("__gpu_lin")
+
+    let m = w_mark()
+    // n = arr.len()
+    let mn = w_mark()
+    w_get(arr_vt, p_arr)
+    w_node(Op.ArrayLen, vt_i32, 0, 0, mn)
+    w_node(Op.LocalTee, vt_i32, l_n, 0, mn)
+    w_i32(stride_words)
+    w_i32_op(i32_mul, mn)
+    w_node(Op.LocalTee, vt_i32, l_words, 0, mn)
+    w_node(Op.Call, vt_none, ensure, 0, mn)
+
+    // i = 0; base = 0
+    let m0 = w_mark()
+    w_i32(0)
+    w_node(Op.LocalSet, vt_none, l_i, 0, m0)
+    let m1 = w_mark()
+    w_i32(0)
+    w_node(Op.LocalSet, vt_none, l_base, 0, m1)
+
+    // loop while i < n
+    let blk_lbl = new_label()
+    let lp_lbl = new_label()
+    let m_blk = w_mark()
+    let m_lp = w_mark()
+    let m_cond = w_mark()
+    w_get(vt_i32, l_i)
+    w_get(vt_i32, l_n)
+    w_i32_op(i32_ge_s, m_cond)
+    w_node(Op.BrIf, vt_none, blk_lbl, 0, m_cond)
+
+    // elem = arr[i]
+    let m_get = w_mark()
+    w_get(arr_vt, p_arr)
+    w_get(vt_i32, l_i)
+    w_node(Op.ArrayGet, repr(elem_t), ah, 0, m_get)
+    w_node(Op.LocalSet, vt_none, l_elem, 0, m_get)
+
+    // store elem at base
+    gpu_emit_store_val(elem_t, l_elem, l_base, 0, mem_id)
+
+    // i += 1; base += stride_bytes; br lp_lbl
+    let m_inc = w_mark()
+    w_get(vt_i32, l_i)
+    w_i32(1)
+    w_i32_op(i32_add, m_inc)
+    w_node(Op.LocalSet, vt_none, l_i, 0, m_inc)
+    let m_binc = w_mark()
+    w_get(vt_i32, l_base)
+    w_i32(stride_bytes)
+    w_i32_op(i32_add, m_binc)
+    w_node(Op.LocalSet, vt_none, l_base, 0, m_binc)
+    w_leaf(Op.Br, vt_unreachable, lp_lbl, 0)
+
+    w_node(Op.Seq, vt_none, 0, 0, m_lp)
+    w_node(Op.Loop, vt_none, lp_lbl, 0, m_lp)
+    w_node(Op.Block, vt_none, blk_lbl, 0, m_blk)
+
+    // return total_words
+    w_get(vt_i32, l_words)
+    w_node(Op.Seq, vt_i32, 0, 0, m)
+    func_body[f] = w_pop()
+    record_locals(f, cur_params)
+
+    // Restore caller locals
+    cur_locals.clear()
+    for (0 ..< saved_locals.len()) |k| { cur_locals.push(saved_locals[k]) }
+    cur_params = saved_params
+
+    gpu_lin_fns.push(elem_t)
+    gpu_lin_fns.push(f)
+    return f
+}
+
+/// Cached Wasm delinearize helper `(arr: Array[T]) -> Void` (updates `arr` in-place!).
+fn gpu_delinearize_fn(elem_t: I32) I32 {
+    let i = 0
+    while (i < gpu_delin_fns.len()) {
+        if gpu_delin_fns[i] == elem_t { return gpu_delin_fns[i + 1] }
+        i += 2
+    }
+    let mem_id = gpu_mem_of()
+    let ah = array_type(repr(elem_t), true)
+    let arr_vt = vt_ref(ah, true)
+    let stride_bytes = gpu_std430_size(elem_t)
+
+    let saved_locals = Array[I32].new(cur_locals.len(), 0)
+    for (0 ..< cur_locals.len()) |k| { saved_locals[k] = cur_locals[k] }
+    let saved_params = cur_params
+
+    cur_locals.clear()
+    let p_arr = new_local(arr_vt)        // 0: arr
+    cur_params = 1
+    let l_n = new_local(vt_i32)          // 1: n
+    let l_i = new_local(vt_i32)          // 2: i
+    let l_base = new_local(vt_i32)       // 3: base_byte
+    let l_elem = new_local(repr(elem_t)) // 4: elem
+
+    let f = new_func(FuncKind.Defined, func_type(vl_one(arr_vt), vl_empty()))
+    func_debug_name[f] = name_add("__gpu_delin")
+
+    let m = w_mark()
+    let mn = w_mark()
+    w_get(arr_vt, p_arr)
+    w_node(Op.ArrayLen, vt_i32, 0, 0, mn)
+    w_node(Op.LocalSet, vt_none, l_n, 0, mn)
+    let m0 = w_mark()
+    w_i32(0)
+    w_node(Op.LocalSet, vt_none, l_i, 0, m0)
+    let m1 = w_mark()
+    w_i32(0)
+    w_node(Op.LocalSet, vt_none, l_base, 0, m1)
+
+    let blk_lbl = new_label()
+    let lp_lbl = new_label()
+    let m_blk = w_mark()
+    let m_lp = w_mark()
+    let m_cond = w_mark()
+    w_get(vt_i32, l_i)
+    w_get(vt_i32, l_n)
+    w_i32_op(i32_ge_s, m_cond)
+    w_node(Op.BrIf, vt_none, blk_lbl, 0, m_cond)
+
+    if gpu_is_struct(elem_t) {
+        let mg = w_mark()
+        w_get(arr_vt, p_arr)
+        w_get(vt_i32, l_i)
+        w_node(Op.ArrayGet, repr(elem_t), ah, 0, mg)
+        w_node(Op.LocalSet, vt_none, l_elem, 0, mg)
+        gpu_emit_delin_struct_inplace(elem_t, l_elem, l_base, 0, mem_id)
+    } else {
+        let ms = w_mark()
+        w_get(arr_vt, p_arr)
+        w_get(vt_i32, l_i)
+        gpu_emit_load_val(elem_t, l_base, 0, mem_id)
+        w_node(Op.ArraySet, vt_none, ah, 0, ms)
+    }
+
+    let m_inc = w_mark()
+    w_get(vt_i32, l_i)
+    w_i32(1)
+    w_i32_op(i32_add, m_inc)
+    w_node(Op.LocalSet, vt_none, l_i, 0, m_inc)
+    let m_binc = w_mark()
+    w_get(vt_i32, l_base)
+    w_i32(stride_bytes)
+    w_i32_op(i32_add, m_binc)
+    w_node(Op.LocalSet, vt_none, l_base, 0, m_binc)
+    w_leaf(Op.Br, vt_unreachable, lp_lbl, 0)
+
+    w_node(Op.Seq, vt_none, 0, 0, m_lp)
+    w_node(Op.Loop, vt_none, lp_lbl, 0, m_lp)
+    w_node(Op.Block, vt_none, blk_lbl, 0, m_blk)
+
+    w_node(Op.Seq, vt_none, 0, 0, m)
+    func_body[f] = w_pop()
+    record_locals(f, cur_params)
+
+    cur_locals.clear()
+    for (0 ..< saved_locals.len()) |k| { cur_locals.push(saved_locals[k]) }
+    cur_params = saved_params
+
+    gpu_delin_fns.push(elem_t)
+    gpu_delin_fns.push(f)
+    return f
+}
+
+//! = `pipeline` checking & Wasm IR lowering
+
+fn pipe_find_buf(decl: I32) I32 {
+    for (0 ..< pipe_buf_decl.len()) |i| {
+        if pipe_buf_decl[i] == decl { return i }
+    }
+    return -1
+}
+
+/// Build the `cl() Void` readback callback for a `pipeline`: copies each `rw`/`out`
+/// buffer from WebGPU staging back into `__gpu` linear memory and delinearizes in-place.
+fn gpu_make_readback_closure(session_loc: I32) Void {
+    let mem_id = gpu_mem_of()
+    let ensure = gpu_ensure_words_fn()
+    let copy_rb = gpu_std_fn("copy_readback")
+
+    // Collect rw/out parameter indices
+    let rb_idx = Array[I32].new(pipe_buf_decl.len(), 0)
+    let rb_count = 0
+    for (0 ..< pipe_buf_decl.len()) |i| {
+        let acc = pipe_buf_access[i]
+        if pipe_buf_is_param[i] == 1 and (acc == GpuAccess.Rw.i32() or acc == GpuAccess.Out.i32()) {
+            rb_idx[rb_count] = i
+            rb_count += 1
+        }
+    }
+
+    // Env struct: field 0 = session (externref), then per readback buffer: (arr_ref, buf_id_i32)
+    let env_ht = struct_type(-1, false)
+    struct_field(env_ht, vt_externref, false)
+    for (0 ..< rb_count) |k| {
+        let bi = rb_idx[k]
+        let ah = array_type(repr(pipe_buf_elem_ty[bi]), true)
+        struct_field(env_ht, vt_ref(ah, true), false)
+        struct_field(env_ht, vt_i32, false)
+    }
+
+    // Save caller locals
+    let saved_locals = Array[I32].new(cur_locals.len(), 0)
+    for (0 ..< cur_locals.len()) |k| { saved_locals[k] = cur_locals[k] }
+    let saved_params = cur_params
+
+    // Build readback body function: (env: anyref) -> Void
+    cur_locals.clear()
+    let p_env = new_local(vt_anyref)            // 0: env (anyref)
+    cur_params = 1
+    let l_env = new_local(vt_ref(env_ht, false)) // 1: typed env
+    let l_sess = new_local(vt_externref)         // 2: session
+    let l_words = new_local(vt_i32)              // 3: words
+
+    let rb_fn = new_func(FuncKind.Defined, func_type(vl_one(vt_anyref), vl_empty()))
+    func_debug_name[rb_fn] = name_add("__gpu_readback")
+
+    let mb = w_mark()
+    // l_env = ref.cast (ref env_ht) p_env
+    let mc = w_mark()
+    w_get(vt_anyref, p_env)
+    w_node(Op.RefCast, vt_ref(env_ht, false), vt_ref(env_ht, false), 0, mc)
+    w_node(Op.LocalTee, vt_ref(env_ht, false), l_env, 0, mc)
+    w_node(Op.StructGet, vt_externref, env_ht, 0, mc)
+    w_node(Op.LocalSet, vt_none, l_sess, 0, mc)
+
+    for (0 ..< rb_count) |k| {
+        let bi = rb_idx[k]
+        let elem_t = pipe_buf_elem_ty[bi]
+        let ah = array_type(repr(elem_t), true)
+        let arr_vt = vt_ref(ah, true)
+        let stride_words = gpu_std430_size(elem_t) / 4
+        let l_arr = new_local(arr_vt)
+        let delin = gpu_delinearize_fn(elem_t)
+
+        // l_arr = l_env.field(1 + 2*k)
+        let ma = w_mark()
+        w_get(vt_ref(env_ht, false), l_env)
+        w_node(Op.StructGet, arr_vt, env_ht, 1 + 2 * k, ma)
+        w_node(Op.LocalTee, arr_vt, l_arr, 0, ma)
+        // words = arr.len() * stride_words
+        w_node(Op.ArrayLen, vt_i32, 0, 0, ma)
+        w_i32(stride_words)
+        w_i32_op(i32_mul, ma)
+        w_node(Op.LocalTee, vt_i32, l_words, 0, ma)
+        w_node(Op.Call, vt_none, ensure, 0, ma)
+
+        // gpu.copy_readback(l_sess, buf_id, mem_view___gpu(0, l_words))
+        let mr = w_mark()
+        w_get(vt_externref, l_sess)
+        let mid = w_mark()
+        w_get(vt_ref(env_ht, false), l_env)
+        w_node(Op.StructGet, vt_i32, env_ht, 2 + 2 * k, mid)
+        let mv = w_mark()
+        w_i32(0)
+        w_get(vt_i32, l_words)
+        w_node(Op.Call, vt_externref, gpu_mem_view_fn, 0, mv)
+        w_node(Op.Call, vt_none, copy_rb, 0, mr)
+
+        // delinearize_T(l_arr)
+        let md = w_mark()
+        w_get(arr_vt, l_arr)
+        w_node(Op.Call, vt_none, delin, 0, md)
+    }
+
+    w_node(Op.Seq, vt_none, 0, 0, mb)
+    func_body[rb_fn] = w_pop()
+    record_locals(rb_fn, cur_params)
+
+    // Restore pipeline locals
+    cur_locals.clear()
+    for (0 ..< saved_locals.len()) |k| { cur_locals.push(saved_locals[k]) }
+    cur_params = saved_params
+
+    // Construct closure in pipeline function: closure_new(ref.func rb_fn, struct.new env_ht (...), 0)
+    let m_cl = w_mark()
+    w_leaf(Op.RefFunc, vt_funcref, rb_fn, 0)
+    let m_env = w_mark()
+    w_get(vt_externref, session_loc)
+    for (0 ..< rb_count) |k| {
+        let bi = rb_idx[k]
+        let pdecl = pipe_buf_decl[bi]
+        w_get(repr(decl_ty[pdecl]), decl_local[pdecl])
+        w_get(vt_i32, pipe_buf_id_local[bi])
+    }
+    w_node(Op.StructNew, vt_ref(env_ht, false), env_ht, 0, m_env)
+    w_i32(0)
+    w_node(Op.Call, vt_externref, closure_new(), 0, m_cl)
+}
+
+/// Check and lower a `pipeline` function instance into Wasm IR.
+fn check_gpu_pipeline(fi: I32) Void {
+    let decl = fi_decl[fi]
+    let node = decl_node[decl]
+    let body = last_child(node)
+    begin_function()
+    cur_fn = fi
+    let params = fi_params[fi]
+    let decls = param_decls(decl)
+    for (0 ..< vl_len[decls]) |i| {
+        let d = vl_item(decls, i)
+        let t = vl_item(params, i)
+        decl_local[d] = new_local(repr(t))
+        decl_ty[d] = t
+    }
+    cur_params = cur_locals.len()
+
+    let cx = Cx { inst: fi_inst[fi], fi: fi, result: fi_result[fi] }
+    let outer = cur_inst
+    cur_inst = cx.inst
+    enter_instance(fi_inst[fi], fi_site[fi])
+
+    // Validate return type is Promise[Void]
+    if not gpu_is_promise_void(fi_result[fi]) and not ty_is(fi_result[fi], Ty.Error) {
+        let rn = child_of_kind(node, Node.Return_type)
+        gpu_err(if rn >= 0 { rn } else { node }, "pipeline '" + word_text(decl_name[decl]) + "' must return Promise[Void]")
+    }
+
+    gpu_mem_of()
+    let fn_begin = gpu_std_fn("begin")
+    let fn_upload = gpu_std_fn("upload")
+    let fn_alloc_out = gpu_std_fn("alloc_out")
+    let fn_submit = gpu_std_fn("submit")
+
+    pipe_active = 1
+    pipe_buf_decl.clear()
+    pipe_buf_id_local.clear()
+    pipe_buf_len_local.clear()
+    pipe_buf_access.clear()
+    pipe_buf_elem_ty.clear()
+    pipe_buf_is_param.clear()
+
+    let f = fi_func[fi]
+    let outer_src = cur_src
+    cur_src = body
+    func_src[f] = body
+    let m = w_mark()
+
+    // session = gpu.begin()
+    let session_loc = new_local(vt_externref)
+    pipe_session_local = session_loc
+    let ms = w_mark()
+    w_node(Op.Call, vt_externref, fn_begin, 0, ms)
+    w_node(Op.LocalSet, vt_none, session_loc, 0, ms)
+
+    // Process pipeline parameters: upload ro/rw, alloc out, validate uniform
+    let plist = child_of_kind(node, Node.Param_list)
+    if plist >= 0 {
+        let p = first_child(plist)
+        let pi = 0
+        while (p >= 0) {
+            let pdecl = vl_item(decls, pi)
+            let pt = vl_item(params, pi)
+            let acc = gpu_param_access(p)
+            if acc == GpuAccess.Ro or acc == GpuAccess.Rw or acc == GpuAccess.Out {
+                if not gpu_is_array(pt) {
+                    gpu_err(p, "pipeline buffer parameter '" + word_text(decl_name[pdecl]) + "' must have type Array[T]")
+                } else {
+                    let elem_t = gpu_array_elem(pt)
+                    if gpu_validate_value_type(elem_t, p, 0) {
+                        let ah = array_type(repr(elem_t), true)
+                        let arr_vt = vt_ref(ah, true)
+                        let id_loc = new_local(vt_i32)
+                        let len_loc = new_local(vt_i32)
+                        // len_loc = arr.len()
+                        let ml = w_mark()
+                        w_get(arr_vt, decl_local[pdecl])
+                        w_node(Op.ArrayLen, vt_i32, 0, 0, ml)
+                        w_node(Op.LocalSet, vt_none, len_loc, 0, ml)
+
+                        if acc == GpuAccess.Out {
+                            // gpu.alloc_out(session, len * stride_bytes)
+                            let mo = w_mark()
+                            w_get(vt_externref, session_loc)
+                            let mb = w_mark()
+                            w_get(vt_i32, len_loc)
+                            w_i32(gpu_std430_size(elem_t))
+                            w_i32_op(i32_mul, mb)
+                            w_node(Op.Call, vt_i32, fn_alloc_out, 0, mo)
+                            w_node(Op.LocalSet, vt_none, id_loc, 0, mo)
+                        } else {
+                            // words = linearize_T(arr); id = gpu.upload(session, mem_view(0, words), acc == Rw)
+                            let lin = gpu_linearize_fn(elem_t)
+                            let l_words = new_local(vt_i32)
+                            let mu = w_mark()
+                            w_get(arr_vt, decl_local[pdecl])
+                            w_node(Op.Call, vt_i32, lin, 0, mu)
+                            w_node(Op.LocalSet, vt_none, l_words, 0, mu)
+
+                            let mup = w_mark()
+                            w_get(vt_externref, session_loc)
+                            let mv = w_mark()
+                            w_i32(0)
+                            w_get(vt_i32, l_words)
+                            w_node(Op.Call, vt_externref, gpu_mem_view_fn, 0, mv)
+                            w_i32(if acc == GpuAccess.Rw { 1 } else { 0 })
+                            w_node(Op.Call, vt_i32, fn_upload, 0, mup)
+                            w_node(Op.LocalSet, vt_none, id_loc, 0, mup)
+                        }
+
+                        pipe_buf_decl.push(pdecl)
+                        pipe_buf_id_local.push(id_loc)
+                        pipe_buf_len_local.push(len_loc)
+                        pipe_buf_access.push(acc.i32())
+                        pipe_buf_elem_ty.push(elem_t)
+                        pipe_buf_is_param.push(1)
+                    }
+                }
+            } else if acc == GpuAccess.Uniform {
+                gpu_validate_value_type(pt, p, 0)
+            }
+            p = next_sibling(p)
+            pi += 1
+        }
+    }
+
+    // Check pipeline body statements (CPU control flow + scratch buffers + gp dispatches)
+    body_block = body
+    let bt = check_block(body, ty_void(), cx)
+    drop_value(bt)
+
+    // Submit batch + readback closure -> returns Promise[Void]
+    let msub = w_mark()
+    w_get(vt_externref, session_loc)
+    gpu_make_readback_closure(session_loc)
+    w_node(Op.Call, vt_externref, fn_submit, 0, msub)
+
+    w_node(Op.Seq, vt_externref, 0, 0, m)
+    func_body[f] = w_pop()
+    record_locals(f, cur_params)
+
+    pipe_active = 0
+    pipe_session_local = -1
+    cur_src = outer_src
+    leave_instance()
+    cur_inst = outer
+}
+
+/// Check `let x = Buffer[T](len_expr)` inside a `pipeline`: allocates a GPU-only scratch buffer.
+fn is_pipeline_buffer_call(node: I32) Bool {
+    return pipe_active == 1 and is_kind(node, Node.Promoted_module_call_expr)
+        and word_text(word_of(first_child(node))) == "Buffer" and module_call_name(node) < 0
+}
+
+fn check_pipeline_buffer_let(let_node: I32, cx: Cx) I32 {
+    let name_node = first_child(let_node)
+    let decl = node_decl[name_node]
+    let call = last_child(let_node)
+    let targs = next_sibling(first_child(call))
+    let args = module_call_args(call)
+    if not is_kind(targs, Node.Module_type_arg_list) or child_count(targs) != 1 {
+        gpu_err(call, "Buffer[T](len) requires exactly one element type argument")
+        return ty_void()
+    }
+    let elem_t = type_of(first_child(targs), cx.inst)
+    if not gpu_validate_value_type(elem_t, first_child(targs), 0) {
+        return ty_void()
+    }
+    let len_arg = if args >= 0 { first_child(args) } else { -1 }
+    if len_arg < 0 or next_sibling(len_arg) >= 0 {
+        gpu_err(call, "Buffer[T](len) requires exactly one length argument")
+        return ty_void()
+    }
+
+    let len_loc = new_local(vt_i32)
+    let id_loc = new_local(vt_i32)
+    let ms = w_mark()
+    w_get(vt_externref, pipe_session_local)
+    let ml = w_mark()
+    let lt = check_expr(len_arg, prelude(Prelude.I32), cx)
+    if not gpu_is_i32(lt) and not gpu_is_u32(lt) and not ty_is(lt, Ty.Error) {
+        gpu_err(len_arg, "Buffer length must be I32 or U32")
+    }
+    w_node(Op.LocalTee, vt_i32, len_loc, 0, ml)
+    w_i32(gpu_std430_size(elem_t))
+    w_i32_op(i32_mul, ml)
+    w_node(Op.Call, vt_i32, gpu_std_fn("alloc_scratch"), 0, ms)
+    w_node(Op.LocalSet, vt_none, id_loc, 0, ms)
+
+    decl_local[decl] = id_loc
+    decl_ty[decl] = prelude(Prelude.I32)
+
+    pipe_buf_decl.push(decl)
+    pipe_buf_id_local.push(id_loc)
+    pipe_buf_len_local.push(len_loc)
+    pipe_buf_access.push(GpuAccess.Rw.i32())
+    pipe_buf_elem_ty.push(elem_t)
+    pipe_buf_is_param.push(0)
+    return ty_void()
+}
+
+/// Check `kernel(...) over (gx, ...)` expression.
+fn check_over_expr(node: I32, cx: Cx) I32 {
+    if pipe_active != 1 {
+        gpu_err(node, "'over (...)' dispatch syntax is only allowed inside a pipeline")
+        return error_value()
+    }
+    let call = first_child(node)
+    let grid_args = next_sibling(call)
+    return check_pipeline_dispatch(call, grid_args, cx)
+}
+
+/// Check and lower a `gp` kernel dispatch inside a `pipeline` (with optional `over (...)` grid args).
+fn check_pipeline_dispatch(call_node: I32, grid_args: I32, cx: Cx) I32 {
+    let callee = first_child(call_node)
+    let args = next_sibling(callee)
+    if not is_kind(callee, Node.Identifier) {
+        gpu_err(callee, "Dispatch target in pipeline must be a gp compute kernel")
+        return ty_void()
+    }
+    let kdecl = node_decl[callee]
+    if kdecl < 0 or not is_kind(decl_node[kdecl], Node.Gp_decl) or not gp_is_kernel(decl_node[kdecl]) {
+        gpu_err(callee, "Dispatch target '" + word_text(word_of(callee)) + "' must be a gp compute kernel (with |...|)")
+        return ty_void()
+    }
+    // Ensure kernel has been checked and its WGSL emitted
+    check_gp_decl(kdecl)
+
+    let knode = decl_node[kdecl]
+    let k_arity = gp_arity[kdecl]
+    let got_grid = if grid_args >= 0 { child_count(grid_args) } else { 1 }
+    if got_grid != k_arity {
+        gpu_err(if grid_args >= 0 { grid_args } else { call_node },
+            "Grid arity mismatch: kernel '" + word_text(decl_name[kdecl]) + "' expects " + k_arity.str()
+            + "D grid, got " + got_grid.str() + "D")
+        return ty_void()
+    }
+
+    let plist = child_of_kind(knode, Node.Param_list)
+    let want_n = if plist >= 0 { child_count(plist) } else { 0 }
+    let got_n = if args >= 0 { child_count(args) } else { 0 }
+    if want_n != got_n {
+        gpu_err(call_node, "Kernel '" + word_text(decl_name[kdecl]) + "' expects " + want_n.str() + " arguments, got " + got_n.str())
+        return ty_void()
+    }
+
+    let mem_id = gpu_mem_of()
+    let ensure = gpu_ensure_words_fn()
+    let fn_bind = gpu_std_fn("bind")
+    let fn_dispatch = gpu_std_fn("dispatch")
+
+    // Track buffer decls used in this dispatch for aliasing check
+    let used_bufs = Array[I32].new(want_n + 1, -1)
+    let used_writable = Array[I32].new(want_n + 1, 0)
+    let used_count = 0
+    let first_buf_idx = -1
+
+    // 1. Validate arguments & emit `gpu.bind(session, buf_id)` for storage buffers
+    let uni_args = Array[I32].new(want_n + 1, -1)
+    let uni_tys = Array[I32].new(want_n + 1, -1)
+    let uni_count = 0
+
+    let m = w_mark()
+    let p = if plist >= 0 { first_child(plist) } else { -1 }
+    let a = if args >= 0 { first_child(args) } else { -1 }
+    while (p >= 0 and a >= 0) {
+        let pacc = gpu_param_access(p)
+        let pname = word_text(word_of(first_child(p)))
+        let pt = type_of(next_sibling(first_child(p)), 0)
+        if pacc == GpuAccess.Uniform {
+            uni_args[uni_count] = a
+            uni_tys[uni_count] = pt
+            uni_count += 1
+        } else {
+            // Storage buffer argument must be an identifier naming a pipeline buffer or scratch Buffer
+            if not is_kind(a, Node.Identifier) {
+                gpu_err(a, "Storage buffer argument for '" + pname + "' must be a pipeline buffer or Buffer[T] local")
+                return ty_void()
+            }
+            let adecl = node_decl[a]
+            let bi = pipe_find_buf(adecl)
+            if bi < 0 {
+                gpu_err(a, "'" + word_text(word_of(a)) + "' is not a GPU buffer in this pipeline")
+                return ty_void()
+            }
+            if first_buf_idx < 0 { first_buf_idx = bi }
+            let k_elem = if gpu_is_array(pt) { gpu_array_elem(pt) } else { ty_error() }
+            if pipe_buf_elem_ty[bi] != k_elem and not ty_is(k_elem, Ty.Error) {
+                gpu_err(a, "Buffer element type mismatch for '" + pname + "': expected Array[" + type_text(k_elem)
+                    + "], got Array[" + type_text(pipe_buf_elem_ty[bi]) + "]")
+            }
+            let want_write = pacc == GpuAccess.Rw or pacc == GpuAccess.Out
+            if want_write and pipe_buf_access[bi] == GpuAccess.Ro.i32() {
+                gpu_err(a, "Cannot pass read-only (ro) buffer '" + word_text(word_of(a)) + "' to writable parameter '" + pname + "'")
+            }
+            // Aliasing check: same buffer passed twice where either position is rw/out
+            for (0 ..< used_count) |u| {
+                if used_bufs[u] == adecl and (want_write or used_writable[u] == 1) {
+                    gpu_err(a, "Buffer '" + word_text(word_of(a)) + "' cannot be aliased with a writable (rw/out) parameter in one dispatch")
+                }
+            }
+            used_bufs[used_count] = adecl
+            used_writable[used_count] = if want_write { 1 } else { 0 }
+            used_count += 1
+
+            let mb = w_mark()
+            w_get(vt_externref, pipe_session_local)
+            w_get(vt_i32, pipe_buf_id_local[bi])
+            w_node(Op.Call, vt_none, fn_bind, 0, mb)
+        }
+        p = next_sibling(p)
+        a = next_sibling(a)
+    }
+
+    // 2. Compute grid dimensions (gx, gy, gz) into locals
+    let l_gx = new_local(vt_i32)
+    let l_gy = new_local(vt_i32)
+    let l_gz = new_local(vt_i32)
+    if grid_args < 0 {
+        if first_buf_idx < 0 {
+            gpu_err(call_node, "Cannot infer 1D grid size without a storage buffer argument; use 'over (...)'")
+            return ty_void()
+        }
+        let mg0 = w_mark()
+        w_get(vt_i32, pipe_buf_len_local[first_buf_idx])
+        w_node(Op.LocalSet, vt_none, l_gx, 0, mg0)
+        let mg1 = w_mark()
+        w_i32(1)
+        w_node(Op.LocalSet, vt_none, l_gy, 0, mg1)
+        let mg2 = w_mark()
+        w_i32(1)
+        w_node(Op.LocalSet, vt_none, l_gz, 0, mg2)
+    } else {
+        let g0 = first_child(grid_args)
+        let mg0 = w_mark()
+        let t0 = check_expr(g0, prelude(Prelude.U32), cx)
+        if not gpu_is_u32(t0) and not gpu_is_i32(t0) and not ty_is(t0, Ty.Error) { gpu_err(g0, "Grid dimension must be U32 or I32") }
+        w_node(Op.LocalSet, vt_none, l_gx, 0, mg0)
+        let g1 = next_sibling(g0)
+        if g1 >= 0 {
+            let mg1 = w_mark()
+            let t1 = check_expr(g1, prelude(Prelude.U32), cx)
+            if not gpu_is_u32(t1) and not gpu_is_i32(t1) and not ty_is(t1, Ty.Error) { gpu_err(g1, "Grid dimension must be U32 or I32") }
+            w_node(Op.LocalSet, vt_none, l_gy, 0, mg1)
+            let g2 = next_sibling(g1)
+            if g2 >= 0 {
+                let mg2 = w_mark()
+                let t2 = check_expr(g2, prelude(Prelude.U32), cx)
+                if not gpu_is_u32(t2) and not gpu_is_i32(t2) and not ty_is(t2, Ty.Error) { gpu_err(g2, "Grid dimension must be U32 or I32") }
+                w_node(Op.LocalSet, vt_none, l_gz, 0, mg2)
+            } else {
+                let mg2 = w_mark(); w_i32(1); w_node(Op.LocalSet, vt_none, l_gz, 0, mg2)
+            }
+        } else {
+            let mg1 = w_mark(); w_i32(1); w_node(Op.LocalSet, vt_none, l_gy, 0, mg1)
+            let mg2 = w_mark(); w_i32(1); w_node(Op.LocalSet, vt_none, l_gz, 0, mg2)
+        }
+    }
+
+    // 3. Write uniform buffer into `__gpu` memory at offset 0: [_grid.x, _grid.y, _grid.z, 0, uni_0, ...]
+    let uni_words = gp_uni_words[kdecl]
+    let me = w_mark()
+    w_i32(uni_words)
+    w_node(Op.Call, vt_none, ensure, 0, me)
+
+    let l_zero = new_local(vt_i32)
+    let mz = w_mark(); w_i32(0); w_node(Op.LocalSet, vt_none, l_zero, 0, mz)
+    let ms0 = w_mark(); w_i32(0); w_get(vt_i32, l_gx); w_node(Op.Store, vt_none, mem_id, 54, ms0)
+    let ms1 = w_mark(); w_i32(4); w_get(vt_i32, l_gy); w_node(Op.Store, vt_none, mem_id, 54, ms1)
+    let ms2 = w_mark(); w_i32(8); w_get(vt_i32, l_gz); w_node(Op.Store, vt_none, mem_id, 54, ms2)
+    let ms3 = w_mark(); w_i32(12); w_i32(0); w_node(Op.Store, vt_none, mem_id, 54, ms3)
+
+    let uoff = 16
+    for (0 ..< uni_count) |ui| {
+        let ut = uni_tys[ui]
+        let fa = gpu_std430_align(ut)
+        uoff = gpu_align_up(uoff, fa)
+        let uloc = new_local(repr(ut))
+        let mu = w_mark()
+        let at = check_expr(uni_args[ui], ut, cx)
+        coerce(at, ut, uni_args[ui])
+        w_node(Op.LocalSet, vt_none, uloc, 0, mu)
+        gpu_emit_store_val(ut, uloc, l_zero, uoff, mem_id)
+        uoff += gpu_std430_size(ut)
+    }
+
+    // 4. Call gpu.dispatch(session, wgsl, entry, wx, wy, wz, gx, gy, gz, mem_view(0, uni_words))
+    let md = w_mark()
+    w_get(vt_externref, pipe_session_local)
+    w_leaf(Op.GlobalGet, vt_extern, string_global(gp_wgsl[kdecl]), 0)
+    w_leaf(Op.GlobalGet, vt_extern, string_global(decl_name[kdecl]), 0)
+    w_i32(gp_wg_x[kdecl])
+    w_i32(gp_wg_y[kdecl])
+    w_i32(gp_wg_z[kdecl])
+    w_get(vt_i32, l_gx)
+    w_get(vt_i32, l_gy)
+    w_get(vt_i32, l_gz)
+    let mv = w_mark()
+    w_i32(0)
+    w_i32(uni_words)
+    w_node(Op.Call, vt_externref, gpu_mem_view_fn, 0, mv)
+    w_node(Op.Call, vt_none, fn_dispatch, 0, md)
+
+    w_node(Op.Seq, vt_none, 0, 0, m)
+    return ty_void()
+}

@@ -318,7 +318,8 @@ fn type_of(node: I32, inst: I32) I32 {
             if is_kind(c, Node.Type_list) {
                 let t = first_child(c)
                 while (t >= 0) {
-                    vl_add(type_of(t, inst))
+                    let pt = type_of(t, inst)
+                    if not (kind == Node.Closure_type.i32() and ty_is(pt, Ty.Void)) { vl_add(pt) }
                     t = next_sibling(t)
                 }
             } else {

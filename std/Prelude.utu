@@ -47,3 +47,4 @@ using Group from std:Group
 using Result from std:Result
 using wutu from std:Wutu
 using Component from std:Wutu
+using gpu from std:Gpu

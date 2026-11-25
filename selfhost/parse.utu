@@ -155,6 +155,9 @@ enum(U8) Node:
     | Errdefer_expr
     | Type_binder      // `$T` in a parameter's type: T, bound by the argument
     | Directive        // `#inline`, `#cache(64)`: before a `fn`, kept out of the tree (see @dir_node)
+    | Gp_decl          // `gp` compute kernel or helper
+    | Pipeline_decl    // `pipeline` GPU compute pipeline
+    | Over_expr        // `kernel(...) over (w, h)` dispatch grid
 
 /// Every keyword of the grammar, as interned word ids: each is its variant's
 /// name with the first letter lowercased (`Flat_map` is `flat_map`). Where a
@@ -669,6 +672,8 @@ fn item(p: Parser) Void {
     if w == Kw.Proto.i32() { proto_decl(p); return }
     if w == Kw.Fn.i32() or w == Kw.Gn.i32() { fn_or_op_decl(p); return }
     if w == Kw.Wn.i32() { wn_decl(p); return }
+    if is(p, Tok.Word) and token_is(p.pos, "gp") { gp_decl(p); return }
+    if is(p, Tok.Word) and token_is(p.pos, "pipeline") { pipeline_decl(p); return }
     if w == Kw.Let.i32() {
         let previous = begin_statement(p)
         global_decl(p)
@@ -718,6 +723,8 @@ fn module_item(p: Parser) Void {
     if w == Kw.Proto.i32() { proto_decl(p); return }
     if w == Kw.Fn.i32() or w == Kw.Gn.i32() { fn_or_op_decl(p); return }
     if w == Kw.Wn.i32() { wn_decl(p); return }
+    if is(p, Tok.Word) and token_is(p.pos, "gp") { gp_decl(p); return }
+    if is(p, Tok.Word) and token_is(p.pos, "pipeline") { pipeline_decl(p); return }
     if w == Kw.Let.i32() {
         let previous = begin_statement(p)
         global_decl(p)
@@ -998,12 +1005,18 @@ fn fn_or_op_decl(p: Parser) I32 {
 vec dir_node: I32
 vec dir_fn: I32
 
-/// `#inline fn …`: directives, then the function they are for.
+/// `#inline fn …` or `#workgroup(64) gp …`: directives, then the function they are for.
 fn directed_fn(p: Parser) Void {
     let from = dir_node.len()
     while (is(p, Tok.Hash)) { directive(p) }
-    if not (is_kw(p, Kw.Fn) or is_kw(p, Kw.Gn)) { fail_wanting(p, kw_wanted + Kw.Fn.i32()) }
-    let f = fn_or_op_decl(p)
+    let f = -1
+    if is(p, Tok.Word) and token_is(p.pos, "gp") {
+        f = gp_decl(p)
+    } else if is_kw(p, Kw.Fn) or is_kw(p, Kw.Gn) {
+        f = fn_or_op_decl(p)
+    } else {
+        fail_wanting(p, kw_wanted + Kw.Fn.i32())
+    }
     for (from ..< dir_node.len()) |k| {
         dir_fn[k] = f
         node_parent[dir_node[k]] = f
@@ -1035,7 +1048,7 @@ fn directed_loop(p: Parser) I32 {
     return lp
 }
 
-/// `#name` or `#name(N)`, `#` and the name written together.
+/// `#name` or `#name(N, ...)`, `#` and the name written together.
 fn directive(p: Parser) Void {
     let at = mark()
     let first = p.pos
@@ -1047,6 +1060,12 @@ fn directive(p: Parser) Void {
         if is(p, Tok.Minus) { advance(p) }
         if not is(p, Tok.Int) { fail_wanting(p, Tok.Int.i32()) }
         int_lit(p)
+        while (is(p, Tok.Comma)) {
+            advance(p)
+            if is(p, Tok.Minus) { advance(p) }
+            if not is(p, Tok.Int) { fail_wanting(p, Tok.Int.i32()) }
+            int_lit(p)
+        }
         expect(p, Tok.RParen)
     }
     let d = node(p, Node.Directive, at, first)
@@ -1063,6 +1082,61 @@ fn forget_directives(nodes: I32) Void {
     while (k > 0 and dir_node[k - 1] >= nodes) { k -= 1 }
     dir_node.resize(k)
     dir_fn.resize(k)
+}
+
+/// A `gp` compute kernel (`gp name |i| (rw x: Array[F32]) { ... }`) or helper (`gp f(v: F32) F32 { ... }`).
+fn gp_decl(p: Parser) I32 {
+    let at = mark()
+    let first = p.pos
+    advance(p)
+    fn_name(p)
+    let has_grid = is(p, Tok.Pipe)
+    if has_grid { capture(p) }
+    expect(p, Tok.LParen)
+    if not is(p, Tok.RParen) { gp_param_list(p) }
+    expect(p, Tok.RParen)
+    if not has_grid or (not is(p, Tok.LBrace) and not is(p, Tok.FatArrow)) { return_type(p) }
+    function_body(p)
+    return node(p, Node.Gp_decl, at, first)
+}
+
+/// A `pipeline` compute pipeline (`pipeline step(rw ps: Array[Particle], ...) Promise[Void] { ... }`).
+fn pipeline_decl(p: Parser) I32 {
+    let at = mark()
+    let first = p.pos
+    advance(p)
+    fn_name(p)
+    expect(p, Tok.LParen)
+    if not is(p, Tok.RParen) { gp_param_list(p) }
+    expect(p, Tok.RParen)
+    return_type(p)
+    block(p)
+    return node(p, Node.Pipeline_decl, at, first)
+}
+
+fn gp_param_list(p: Parser) I32 {
+    let at = mark()
+    let first = p.pos
+    gp_param(p)
+    while (is(p, Tok.Comma)) {
+        advance(p)
+        if is(p, Tok.RParen) { break }
+        gp_param(p)
+    }
+    return node(p, Node.Param_list, at, first)
+}
+
+fn gp_param(p: Parser) I32 {
+    let at = mark()
+    let first = p.pos
+    if is(p, Tok.Word) and is_at(p, 1, Tok.Word)
+        and (token_is(p.pos, "ro") or token_is(p.pos, "rw") or is_kw(p, Kw.Out) or token_is(p.pos, "uniform")) {
+        advance(p)
+    }
+    identifier(p)
+    expect(p, Tok.Colon)
+    type_(p)
+    return node(p, Node.Param, at, first)
 }
 
 /// A Wutu function's body is opaque until the Wutu expansion runs.
@@ -1288,8 +1362,11 @@ fn lib_decl(p: Parser) I32 {
     let first = p.pos
     advance(p)
     expect(p, Tok.LBrace)
-    while (is_kw(p, Kw.Fn) or is_kw(p, Kw.Gn) or is_kw(p, Kw.Wn) or is(p, Tok.Hash)) {
-        if is(p, Tok.Hash) { directed_fn(p) } else if is_kw(p, Kw.Wn) { wn_decl(p) } else { fn_or_op_decl(p) }
+    while (is_kw(p, Kw.Fn) or is_kw(p, Kw.Gn) or is_kw(p, Kw.Wn) or is(p, Tok.Hash) or (is(p, Tok.Word) and token_is(p.pos, "pipeline"))) {
+        if is(p, Tok.Hash) { directed_fn(p) }
+        else if is_kw(p, Kw.Wn) { wn_decl(p) }
+        else if is(p, Tok.Word) and token_is(p.pos, "pipeline") { pipeline_decl(p) }
+        else { fn_or_op_decl(p) }
     }
     expect(p, Tok.RBrace)
     return node(p, Node.Export_lib_decl, at, first)
@@ -1583,14 +1660,19 @@ fn using_ahead(i: I32) Bool {
     return tok_word[ptok[j]] == Kw.Using.i32()
 }
 
+fn capture_name(p: Parser) I32 {
+    if is(p, Tok.Word) and token_is(p.pos, "_") { return leaf(p, Node.Identifier) }
+    return identifier(p)
+}
+
 fn capture(p: Parser) I32 {
     let at = mark()
     let first = p.pos
     expect(p, Tok.Pipe)
-    identifier(p)
+    capture_name(p)
     while (is(p, Tok.Comma)) {
         advance(p)
-        identifier(p)
+        capture_name(p)
     }
     expect(p, Tok.Pipe)
     return node(p, Node.Capture, at, first)
@@ -1678,7 +1760,16 @@ fn infix(p: Parser, left: I32, min: I32, or_equal: Bool) I32 {
             advance(p)
             arg_list_or_none(p)
             expect(p, Tok.RParen)
-            return extend_node(p, Node.Call_expr, at, left)
+            let call = extend_node(p, Node.Call_expr, at, left)
+            if is(p, Tok.Word) and is_at(p, 1, Tok.LParen) and token_is(p.pos, "over") {
+                let oat = mark_below(call)
+                advance(p)
+                advance(p)
+                arg_list_or_none(p)
+                expect(p, Tok.RParen)
+                return extend_node(p, Node.Over_expr, oat, call)
+            }
+            return call
         }
         if k == Tok.Dot.i32() or k == Tok.QuestionDot.i32() {
             let at = mark_below(left)

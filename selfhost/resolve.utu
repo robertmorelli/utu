@@ -271,6 +271,7 @@ enum(U8) Diag:
     | PromotedFn      // `fn &(…)` (a: 0 outside a mod, 1 in a mod with a type &) or `M[A](…)` (a: 2, M has no fn &)
     | InvalidDirective    // a: @DirectiveRule broken (word: the directive's name; b: #cache's argument)
     | InvalidCache        // a: @CacheRule broken (word: the function's name; b: the type, for a type's rule)
+    | GpuError            // GPU (`gp` / `pipeline`) compile-time error; word holds the message
 
 /// A diagnostic: its kind, the node it is about, a word, and up to three
 /// more arguments (types, counts, declarations) its message is made from
@@ -743,10 +744,12 @@ fn names_promoted(item: I32) Bool {
     return is_kind(name_at, Node.Promoted_type)
 }
 
+fn is_fn_like(item: I32) Bool => is_kind(item, Node.Fn_decl) or is_kind(item, Node.Gp_decl) or is_kind(item, Node.Pipeline_decl)
+
 /// A free function's name, or -1 for a method or operator. A mod's
 /// promoted function (`fn &(…)`) is named `&`, a word no identifier is.
 fn free_fn_word(item: I32) I32 {
-    if not is_kind(item, Node.Fn_decl) { return -1 }
+    if not is_fn_like(item) { return -1 }
     let name = first_child(first_child(item))
     if next_sibling(name) >= 0 { return -1 }
     return if is_kind(name, Node.Identifier) { word_of(name) } else if is_kind(name, Node.Promoted_type) { known_word(Known.PromotedFn) } else { -1 }
@@ -759,7 +762,7 @@ fn is_promoted_fn(item: I32) Bool => is_kind(item, Node.Fn_decl) and is_kind(fir
 /// A function: named when free; a method or operator is found as its type's member.
 fn declare_fn(item: I32, owner: I32) I32 {
     let decl = declare(Decl.Fn, free_fn_word(item), item, owner)
-    if is_kind(item, Node.Fn_decl) {
+    if is_fn_like(item) {
         // The name node of a free function, or of a method (its last word).
         node_decl[last_child(first_child(item))] = decl
     } else {
@@ -797,7 +800,7 @@ fn declare_module(item: I32) I32 {
                     if decl_owner[v] == t { add_variant_member(decl, v) }
                 }
             }
-        } else if kind == Node.Fn_decl.i32() or kind == Node.Op_decl.i32() {
+        } else if kind == Node.Fn_decl.i32() or kind == Node.Gp_decl.i32() or kind == Node.Pipeline_decl.i32() or kind == Node.Op_decl.i32() {
             member_once(decl, declare_fn(c, decl))
             if is_promoted_fn(c) and promoted_fn < 0 { promoted_fn = c }
         } else if kind == Node.Global_decl.i32() {
@@ -1018,7 +1021,7 @@ fn item_name_node(item: I32) I32 {
     let kind = node_kind[item]
     if kind == Node.Struct_decl.i32() { return name_node(after_qualifier(item)) }
     if kind == Node.Enum_decl.i32() { return name_node(enum_name(item)) }
-    if kind == Node.Fn_decl.i32() { return last_child(first_child(item)) }
+    if kind == Node.Fn_decl.i32() or kind == Node.Gp_decl.i32() or kind == Node.Pipeline_decl.i32() { return last_child(first_child(item)) }
     if kind == Node.Op_decl.i32() { return -1 }
     return name_node(first_child(item))
 }
@@ -1275,7 +1278,7 @@ fn is_module_item(item: I32) Bool => is_kind(item, Node.Using_decl) or is_kind(i
 /// Whether a file's `mod` and another of its items (not a method) share a name.
 fn mod_clash(m: I32, item: I32) Bool {
     return is_kind(m, Node.Module_decl) and not is_kind(item, Node.Module_decl) and not is_kind(item, Node.Using_decl)
-        and (not is_kind(item, Node.Fn_decl) or free_fn_word(item) >= 0)
+        and (not is_fn_like(item) or free_fn_word(item) >= 0)
 }
 
 /// `item`'s name node, kept when it has one (a `using`'s: its alias, or the
@@ -1309,7 +1312,7 @@ fn same_import(a: I32, b: I32) Bool {
 /// Whether an item is a type, function, global, or mem.
 fn names_in_file(item: I32) Bool {
     let k = node_kind[item]
-    return k == Node.Fn_decl.i32() or k == Node.Struct_decl.i32() or k == Node.Enum_decl.i32() or k == Node.Proto_decl.i32()
+    return k == Node.Fn_decl.i32() or k == Node.Gp_decl.i32() or k == Node.Pipeline_decl.i32() or k == Node.Struct_decl.i32() or k == Node.Enum_decl.i32() or k == Node.Proto_decl.i32()
         or k == Node.Type_decl.i32() or k == Node.Distinct_decl.i32() or k == Node.Global_decl.i32() or k == Node.Mem_decl.i32()
 }
 
@@ -1402,7 +1405,7 @@ fn declare_entry_item(item: I32, first_entry: I32) Void {
     let decl = declare_type_item(item, -1)
     if decl < 0 {
         if is_promoted_fn(item) { report2(Diag.PromotedFn, first_child(first_child(item)), -1, 0, -1) }
-        if kind == Node.Fn_decl.i32() or kind == Node.Op_decl.i32() {
+        if kind == Node.Fn_decl.i32() or kind == Node.Gp_decl.i32() or kind == Node.Pipeline_decl.i32() or kind == Node.Op_decl.i32() {
             decl = declare_fn(item, -1)
         } else if kind == Node.Global_decl.i32() {
             decl = declare_named(Decl.Global, first_child(item), item, -1)
@@ -1726,7 +1729,7 @@ fn walk_item(item: I32, w: Walk) Void {
         if w.headers { walk_using(item, w) }
         return
     }
-    if kind == Node.Fn_decl.i32() {
+    if kind == Node.Fn_decl.i32() or kind == Node.Gp_decl.i32() or kind == Node.Pipeline_decl.i32() {
         if w.headers { register_method(item, w) } else { walk_fn(item, w) }
         return
     }
@@ -2242,10 +2245,14 @@ fn walk_params(list: I32, owner: I32, w: Walk) Void {
     }
 }
 
+let resolving_pipeline: I32 = 0
+
 fn walk_fn(item: I32, w: Walk) Void {
     let name = first_child(item)
     let decl = node_decl[last_child(name)]
     let mark = scope_mark()
+    let prev_pipe = resolving_pipeline
+    if is_kind(item, Node.Pipeline_decl) { resolving_pipeline = 1 }
     let c = next_sibling(name)
     let params = c
     while (params >= 0 and not is_kind(params, Node.Param_list)) { params = next_sibling(params) }
@@ -2254,6 +2261,12 @@ fn walk_fn(item: I32, w: Walk) Void {
         let kind = node_kind[c]
         if kind == Node.Self_param.i32() {
             declare_in_scope(Decl.SelfParam, first_child(c), c, decl)
+        } else if kind == Node.Capture.i32() {
+            let cap = first_child(c)
+            while (cap >= 0) {
+                declare_in_scope(Decl.Capture, cap, cap, decl)
+                cap = next_sibling(cap)
+            }
         } else if kind == Node.Param_list.i32() {
             walk_params(c, decl, w)
         } else if kind == Node.Return_type.i32() {
@@ -2263,6 +2276,7 @@ fn walk_fn(item: I32, w: Walk) Void {
         }
         c = next_sibling(c)
     }
+    resolving_pipeline = prev_pipe
     scope_pop(mark)
 }
 
@@ -2351,13 +2365,18 @@ fn walk_compound(node: I32, kind: I32, w: Walk) Void {
         },
         Node.Promoted_module_call_expr => {
             let name_at = first_child(node)
-            let module = walk_module_name(name_at)
-            walk_types(next_sibling(name_at), w)
-            // `M[A](…)`: M's `fn &`, recorded on the call.
-            let name = module_call_name(node)
-            if name >= 0 { node_decl[name] = static_member(module, word_of(name)) }
-            else { node_decl[node] = if decl_is(module, Decl.Module) { member(module, known_word(Known.PromotedFn), Space.Member) } else { -1 } }
-            walk_expr(module_call_args(node), w)
+            if resolving_pipeline == 1 and word_text(word_of(name_at)) == "Buffer" and module_call_name(node) < 0 {
+                walk_types(next_sibling(name_at), w)
+                walk_expr(module_call_args(node), w)
+            } else {
+                let module = walk_module_name(name_at)
+                walk_types(next_sibling(name_at), w)
+                // `M[A](…)`: M's `fn &`, recorded on the call.
+                let name = module_call_name(node)
+                if name >= 0 { node_decl[name] = static_member(module, word_of(name)) }
+                else { node_decl[node] = if decl_is(module, Decl.Module) { member(module, known_word(Known.PromotedFn), Space.Member) } else { -1 } }
+                walk_expr(module_call_args(node), w)
+            }
         },
         Node.Null_expr => { as_type(first_child(node), walk_type_name(first_child(node), w)) },
         Node.Struct_init => {

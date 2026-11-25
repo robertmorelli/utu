@@ -1,0 +1,10 @@
+import fs from 'node:fs';
+import path from 'node:path';
+const DIR = 'editors/tree-sitter-utu';
+const { Parser, Language } = await import('web-tree-sitter');
+await Parser.init({ locateFile: name => path.resolve(DIR, name) });
+const parser = new Parser();
+parser.setLanguage(await Language.load(path.resolve(DIR, 'tree-sitter-utu.wasm')));
+const t = parser.parse(fs.readFileSync(process.argv[2], 'utf8'));
+const walk = (n, d) => { if (n.type === 'ERROR' || n.isMissing) console.log(n.type, n.startPosition, JSON.stringify(n.text.slice(0, 80))); for (const c of n.children) walk(c, d + 1); };
+walk(t.rootNode, 0);

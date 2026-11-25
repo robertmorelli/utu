@@ -140,13 +140,14 @@ fn validate_program() Void {
 //! when it is #cache's (0, no bound, or a power of 2), and is given once; a
 //! function is not both #inline and #noinline.
 
-/// What a directive's name says: 0 unknown, 1 `#inline`, 2 `#noinline`, 3 `#cache`, 4 `#luge`.
+/// What a directive's name says: 0 unknown, 1 `#inline`, 2 `#noinline`, 3 `#cache`, 4 `#luge`, 5 `#workgroup`.
 fn directive_kind(d: I32) I32 {
     let w = word_text(word_of(first_child(d)))
     if w == "inline" { return 1 }
     if w == "noinline" { return 2 }
     if w == "cache" { return 3 }
     if w == "luge" { return 4 }
+    if w == "workgroup" { return 5 }
     return 0
 }
 
@@ -179,6 +180,44 @@ fn validate_directive(k: I32) Void {
     let w = word_of(first_child(d))
     let kind = directive_kind(d)
     let on_loop = is_loop_node(dir_fn[k])
+    let on_gp = dir_fn[k] >= 0 and is_kind(dir_fn[k], Node.Gp_decl)
+    if on_gp {
+        if kind != 5 {
+            report(Diag.GpuError, d, intern_text("Only #workgroup(...) is allowed on gp functions"))
+            return
+        }
+        if child_of_kind(dir_fn[k], Node.Capture) < 0 {
+            report(Diag.GpuError, d, intern_text("#workgroup(...) is only allowed on gp compute kernels (with |...|), not gp helpers"))
+            return
+        }
+        let arg = next_sibling(first_child(d))
+        let count = 0
+        while (arg >= 0) {
+            if tok_kind[node_first[arg] - 1] == Tok.Minus.i32() or int_value(arg) <= 0 {
+                report(Diag.GpuError, arg, intern_text("#workgroup dimensions must be positive integers"))
+                return
+            }
+            count += 1
+            arg = next_sibling(arg)
+        }
+        if count < 1 or count > 3 {
+            report(Diag.GpuError, d, intern_text("#workgroup requires 1 to 3 positive integer dimensions"))
+            return
+        }
+        let j = k - 1
+        while (j >= 0 and dir_fn[j] == dir_fn[k]) {
+            if directive_kind(dir_node[j]) == 5 {
+                report(Diag.GpuError, d, intern_text("Duplicate #workgroup directive"))
+                return
+            }
+            j -= 1
+        }
+        return
+    }
+    if kind == 5 {
+        report(Diag.GpuError, d, intern_text("#workgroup(...) is only allowed on gp compute kernels"))
+        return
+    }
     if kind == 0 or (on_loop and kind != 4) or (not on_loop and kind == 4) {
         report2(Diag.InvalidDirective, d, w, DirectiveRule.Unknown.i32(), -1)
         if on_loop {

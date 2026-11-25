@@ -1,0 +1,239 @@
+// Generated from src/runtime/gpu.js by the build. No runtime ships unless used.
+mod gpu {
+    fn init() Void {
+        let install: fun() Void = @es/\ () => { globalThis.__utuGpu ??= (function createGpuRuntime() {
+  const MAP_READ = typeof GPUMapMode !== 'undefined' ? GPUMapMode.READ : 0x0001;
+  const U_MAP_READ = typeof GPUBufferUsage !== 'undefined' ? GPUBufferUsage.MAP_READ : 0x0001;
+  const U_COPY_SRC = typeof GPUBufferUsage !== 'undefined' ? GPUBufferUsage.COPY_SRC : 0x0004;
+  const U_COPY_DST = typeof GPUBufferUsage !== 'undefined' ? GPUBufferUsage.COPY_DST : 0x0008;
+  const U_UNIFORM = typeof GPUBufferUsage !== 'undefined' ? GPUBufferUsage.UNIFORM : 0x0040;
+  const U_STORAGE = typeof GPUBufferUsage !== 'undefined' ? GPUBufferUsage.STORAGE : 0x0080;
+
+  let cachedGpu = null;
+  let cachedDevicePromise = null;
+  let pipelineCache = new Map();
+
+  async function getDevice() {
+    const gpu = globalThis.navigator?.gpu;
+    if (!gpu) throw new Error('WebGPU is not available (navigator.gpu is undefined)');
+    if (gpu !== cachedGpu) {
+      cachedGpu = gpu;
+      cachedDevicePromise = null;
+      pipelineCache = new Map();
+    }
+    if (!cachedDevicePromise) {
+      cachedDevicePromise = (async () => {
+        const adapter = await gpu.requestAdapter();
+        if (!adapter) throw new Error('WebGPU adapter unavailable');
+        return await adapter.requestDevice();
+      })();
+    }
+    return await cachedDevicePromise;
+  }
+
+  function getPipeline(device, wgsl, entry) {
+    const key = wgsl + '\0' + entry;
+    let p = pipelineCache.get(key);
+    if (!p) {
+      const module = device.createShaderModule({ code: wgsl });
+      p = device.createComputePipeline({
+        layout: 'auto',
+        compute: { module, entryPoint: entry },
+      });
+      pipelineCache.set(key, p);
+    }
+    return p;
+  }
+
+  return {
+    begin() {
+      return {
+        buffers: [],
+        dispatches: [],
+        pendingBinds: [],
+        readbackBytes: new Map(),
+      };
+    },
+    upload(session, view, readback) {
+      const id = session.buffers.length;
+      const copy = new Uint32Array(view.length);
+      copy.set(view);
+      session.buffers.push({
+        kind: 'upload',
+        data: copy,
+        byteLength: copy.byteLength,
+        readback: !!readback,
+      });
+      return id;
+    },
+    allocOut(session, byteLength) {
+      const id = session.buffers.length;
+      session.buffers.push({
+        kind: 'out',
+        data: null,
+        byteLength: byteLength | 0,
+        readback: true,
+      });
+      return id;
+    },
+    allocScratch(session, byteLength) {
+      const id = session.buffers.length;
+      session.buffers.push({
+        kind: 'scratch',
+        data: null,
+        byteLength: byteLength | 0,
+        readback: false,
+      });
+      return id;
+    },
+    bind(session, bufId) {
+      session.pendingBinds.push(bufId | 0);
+    },
+    dispatch(session, wgsl, entry, wgX, wgY, wgZ, gx, gy, gz, uniView) {
+      const binds = session.pendingBinds;
+      session.pendingBinds = [];
+      const uniform = new Uint32Array(uniView.length);
+      uniform.set(uniView);
+      session.dispatches.push({
+        wgsl,
+        entry,
+        wgX: wgX | 0,
+        wgY: wgY | 0,
+        wgZ: wgZ | 0,
+        gx: gx >>> 0,
+        gy: gy >>> 0,
+        gz: gz >>> 0,
+        binds,
+        uniform,
+      });
+    },
+    copyReadback(session, bufId, view) {
+      const bytes = session.readbackBytes.get(bufId | 0);
+      if (!bytes) return;
+      const dst = new Uint8Array(view.buffer, view.byteOffset, Math.min(view.byteLength, bytes.byteLength));
+      dst.set(bytes.subarray(0, dst.byteLength));
+    },
+    async submit(session, onReadback) {
+      const device = await getDevice();
+      const gpuBuffers = [];
+      const toDestroy = [];
+      try {
+        for (let i = 0; i < session.buffers.length; i++) {
+          const b = session.buffers[i];
+          const size = Math.max(4, (b.byteLength + 3) & ~3);
+          let usage = U_STORAGE;
+          if (b.kind === 'upload') {
+            usage |= U_COPY_DST;
+            if (b.readback) usage |= U_COPY_SRC;
+          } else if (b.kind === 'out') {
+            usage |= U_COPY_SRC;
+          }
+          const gpuBuf = device.createBuffer({ size, usage });
+          gpuBuffers.push(gpuBuf);
+          toDestroy.push(gpuBuf);
+          if (b.kind === 'upload' && b.byteLength > 0) {
+            device.queue.writeBuffer(gpuBuf, 0, b.data.buffer, b.data.byteOffset, b.data.byteLength);
+          }
+        }
+
+        const encoder = device.createCommandEncoder();
+        for (let i = 0; i < session.dispatches.length; i++) {
+          const d = session.dispatches[i];
+          const pipeline = getPipeline(device, d.wgsl, d.entry);
+          const uniSize = Math.max(16, (d.uniform.byteLength + 15) & ~15);
+          const uniBuf = device.createBuffer({ size: uniSize, usage: U_UNIFORM | U_COPY_DST });
+          toDestroy.push(uniBuf);
+          device.queue.writeBuffer(uniBuf, 0, d.uniform.buffer, d.uniform.byteOffset, d.uniform.byteLength);
+
+          const entries = [];
+          for (let k = 0; k < d.binds.length; k++) {
+            entries.push({ binding: k, resource: { buffer: gpuBuffers[d.binds[k]] } });
+          }
+          entries.push({ binding: d.binds.length, resource: { buffer: uniBuf } });
+          const bindGroup = device.createBindGroup({
+            layout: pipeline.getBindGroupLayout(0),
+            entries,
+          });
+          const pass = encoder.beginComputePass();
+          pass.setPipeline(pipeline);
+          pass.setBindGroup(0, bindGroup);
+          if (d.gx > 0 && d.gy > 0 && d.gz > 0) {
+            pass.dispatchWorkgroups(
+              Math.ceil(d.gx / d.wgX),
+              Math.ceil(d.gy / d.wgY),
+              Math.ceil(d.gz / d.wgZ),
+            );
+          }
+          pass.end();
+        }
+
+        const stagings = [];
+        for (let i = 0; i < session.buffers.length; i++) {
+          const b = session.buffers[i];
+          if (b.readback && b.byteLength > 0) {
+            const size = (b.byteLength + 3) & ~3;
+            const staging = device.createBuffer({ size, usage: U_MAP_READ | U_COPY_DST });
+            encoder.copyBufferToBuffer(gpuBuffers[i], 0, staging, 0, size);
+            stagings.push({ id: i, staging, byteLength: b.byteLength });
+            toDestroy.push(staging);
+          }
+        }
+
+        device.queue.submit([encoder.finish()]);
+
+        if (stagings.length > 0) {
+          await Promise.all(stagings.map(s => s.staging.mapAsync(MAP_READ)));
+          for (const s of stagings) {
+            const mapped = new Uint8Array(s.staging.getMappedRange(), 0, s.byteLength);
+            const copy = new Uint8Array(s.byteLength);
+            copy.set(mapped);
+            session.readbackBytes.set(s.id, copy);
+            s.staging.unmap();
+          }
+        }
+
+        if (onReadback) onReadback();
+      } finally {
+        for (const buf of toDestroy) {
+          try { buf.destroy?.(); } catch {}
+        }
+      }
+    },
+  };
+})(); } \/;
+        install();
+    }
+    fn begin() Externref {
+        init();
+        let f: fun() Externref = @es/\ () => globalThis.__utuGpu.begin() \/;
+        return f();
+    }
+    fn upload(session: Externref, view: Externref, readback: Bool) I32 {
+        let f: fun(Externref, Externref, Bool) I32 = @es/\ (s, v, rb) => globalThis.__utuGpu.upload(s, v, rb) \/;
+        return f(session, view, readback);
+    }
+    fn alloc_out(session: Externref, byte_len: I32) I32 {
+        let f: fun(Externref, I32) I32 = @es/\ (s, n) => globalThis.__utuGpu.allocOut(s, n) \/;
+        return f(session, byte_len);
+    }
+    fn alloc_scratch(session: Externref, byte_len: I32) I32 {
+        let f: fun(Externref, I32) I32 = @es/\ (s, n) => globalThis.__utuGpu.allocScratch(s, n) \/;
+        return f(session, byte_len);
+    }
+    fn bind(session: Externref, buf_id: I32) Void {
+        let f: fun(Externref, I32) Void = @es/\ (s, id) => { globalThis.__utuGpu.bind(s, id); } \/;
+        f(session, buf_id);
+    }
+    fn dispatch(session: Externref, wgsl: Str, entry: Str, wg_x: I32, wg_y: I32, wg_z: I32, gx: U32, gy: U32, gz: U32, uni_view: Externref) Void {
+        let f: fun(Externref, Str, Str, I32, I32, I32, U32, U32, U32, Externref) Void = @es/\ (s, wgsl, entry, wx, wy, wz, gx, gy, gz, u) => { globalThis.__utuGpu.dispatch(s, wgsl, entry, wx, wy, wz, gx, gy, gz, u); } \/;
+        f(session, wgsl, entry, wg_x, wg_y, wg_z, gx, gy, gz, uni_view);
+    }
+    fn copy_readback(session: Externref, buf_id: I32, view: Externref) Void {
+        let f: fun(Externref, I32, Externref) Void = @es/\ (s, id, v) => { globalThis.__utuGpu.copyReadback(s, id, v); } \/;
+        f(session, buf_id, view);
+    }
+    fn submit(session: Externref, on_readback: cl() Void) Promise[Void] {
+        let f: fun(Externref, cl() Void) Promise[Void] = @es/\ (s, cb) => globalThis.__utuGpu.submit(s, cb) \/;
+        return f(session, on_readback);
+    }
+}

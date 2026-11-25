@@ -348,6 +348,10 @@ fn begin_function() Void {
 /// Check a function instance's body into its wasm function.
 fn check_function(fi: I32) Void {
     let decl = fi_decl[fi]
+    if is_kind(decl_node[decl], Node.Pipeline_decl) {
+        check_gpu_pipeline(fi)
+        return
+    }
     let body = fn_body(decl)
     begin_function()
     cur_fn = fi
@@ -718,6 +722,7 @@ fn check_node(node: I32, expect: I32, cx: Cx) I32 {
         Node.Binary_expr => check_binary(node, expect, cx),
         Node.Unary_expr => check_unary(node, expect, cx),
         Node.Call_expr => check_call(node, expect, cx),
+        Node.Over_expr => check_over_expr(node, cx),
         Node.Block => check_block(node, expect, cx),
         Node.Block_expr => check_labeled(node, expect, cx),
         Node.Bind_expr => check_let(node, cx),
@@ -1523,6 +1528,7 @@ fn check_let(node: I32, cx: Cx) I32 {
     if is_kind(name, Node.Tuple_pattern) { return check_let_tuple(node, cx) }
     let decl = node_decl[name]
     let init = last_child(node)
+    if is_pipeline_buffer_call(init) { return check_pipeline_buffer_let(node, cx) }
     let annotated = next_sibling(name) != init
     let t = if annotated { type_of(next_sibling(name), cx.inst) } else { -1 }
     if not annotated and is_empty_array(init) { t = later_array_type(decl, node, cx) }
@@ -2321,7 +2327,15 @@ fn check_call(node: I32, expect: I32, cx: Cx) I32 {
     if is_wutu_show(callee) { return check_wutu_show(node, args, cx) }
     if is_wutu_fn(callee, cks(Ckt.MemoKey)) { return check_memo_key(node, args, cx) }
     if is_wutu_fn(callee, cks(Ckt.KeyText)) { return check_wutu_key(node, args, cx) }
-    if is_kind(callee, Node.Identifier) { return call_name(node, callee, args, m, cx) }
+    if is_kind(callee, Node.Identifier) {
+        let cd = node_decl[callee]
+        if cd >= 0 and is_kind(decl_node[cd], Node.Gp_decl) {
+            if pipe_active == 1 { return check_pipeline_dispatch(node, -1, cx) }
+            gpu_err(node, "Cannot call gp function '" + word_text(word_of(callee)) + "' directly from CPU code; dispatch it inside a pipeline")
+            return error_value()
+        }
+        return call_name(node, callee, args, m, cx)
+    }
     if is_kind(callee, Node.Field_expr) or is_kind(callee, Node.Optional_field_expr) { return call_field(node, callee, args, m, expect, cx) }
     if is_kind(callee, Node.Type_member_expr) { return call_type_member(node, callee, args, m, expect, cx) }
     if is_kind(callee, Node.Type_ident) { return call_scalar_kind(node, callee, args, m, cx) }
@@ -4107,6 +4121,7 @@ enum(U8) Target:
     | Analysis
 
 fn reset_check() Void {
+    reset_gpu()
     memo_state.clear()
     lazy_call_fn.clear()
     export_func.clear()
@@ -4404,6 +4419,14 @@ fn check_item(item: I32) Void {
             check_item(f)
             f = next_sibling(f)
         }
+        return
+    }
+    if is_kind(item, Node.Gp_decl) {
+        check_gp_decl(node_decl[last_child(first_child(item))])
+        return
+    }
+    if is_kind(item, Node.Pipeline_decl) {
+        fn_instance(node_decl[last_child(first_child(item))], 0)
         return
     }
     if is_kind(item, Node.Fn_decl) {

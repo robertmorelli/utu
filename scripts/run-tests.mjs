@@ -32,6 +32,7 @@ import { registerImportDiagnosticTests } from './import-diagnostic-tests.mjs';
 import { registerLanguageRegressionTests } from './language-regression-tests.mjs';
 import { registerIteratorDifferentialTests } from './iterator-differential-tests.mjs';
 import { registerJsonTests } from './json-tests.mjs';
+import { registerGpuTests } from './gpu-tests.mjs';
 
 const ROOT = path.dirname(path.dirname(fileURLToPath(import.meta.url)));
 const flag = name => process.argv.find(arg => arg.startsWith(`--${name}=`))?.slice(name.length + 3);
@@ -74,6 +75,7 @@ registerImportDiagnosticTests(suiteContext);
 registerLanguageRegressionTests(suiteContext);
 registerIteratorDifferentialTests(suiteContext);
 registerJsonTests(suiteContext);
+registerGpuTests(suiteContext);
 
 const RESULT = '\u001eutu-test-result ';
 
