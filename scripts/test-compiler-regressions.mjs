@@ -3289,6 +3289,54 @@ lib {
     + 'fn t(s: Str) Str { return @json/\\ error N s \\/; }\n'
     + 'lib { fn run() Str { return t("{\\"d\\":1e400,\\"e\\":0}") + "|" + t("{\\"d\\":0,\\"e\\":1e39}") + "|" + t("{\\"d\\":1e308,\\"e\\":3.4e38}"); } }\n',
     'number out of range at line 1, column 6|number out of range at line 1, column 12|');
+  // A host callback's result `TResult1 | PromiseLike<TResult1>` (Promise.then's)
+  // is `any` while TResult1 is unbound: a closure's written Void or scalar fits it.
+  const thenResults = await selfhost(await write(`using Browser from std:Browser
+lib {
+    fn none() Browser.Promise { return Browser.Promise.resolve(1.0).then(cl(x) Void { if x > 0.0 { return } }) }
+    fn int() Browser.Promise { return Browser.Promise.resolve(1.0).then(cl(x) I32 { return 7 }) }
+    fn num() Browser.Promise { return Browser.Promise.resolve(1.0).then(cl(x) F64 { return x + 0.5 }) }
+    fn yes() Browser.Promise { return Browser.Promise.resolve(1.0).then(cl(x) Bool { return x > 0.0 }) }
+    fn fetched() Void { Browser.fetch("/x").then(cl(res) Void { if not res.ok { return } }) }
+}
+`));
+  assert.ok(thenResults.exports, thenResults.errors?.join('\n'));
+  assert.equal(await thenResults.exports.none(), undefined);
+  assert.equal(await thenResults.exports.int(), 7);
+  assert.equal(await thenResults.exports.num(), 1.5);
+  assert.equal(await thenResults.exports.yes(), true);
+  checked++;
+
+  // A closure for a union slot (then's callback | undefined | null) is typed
+  // only with its parameters: \`buf\` picks Uint8Array's (buffer) overload, not (length).
+  const thenBuffer = await selfhost(await write(`using Browser from std:Browser
+lib {
+    fn bytes() Browser.Promise {
+        return Browser.Promise.resolve(new Browser.ArrayBuffer(3.0)).then(cl(buf) F64 { return new Browser.Uint8Array(buf).length })
+    }
+    fn blob() Void { new Browser.Blob(["a"]).arrayBuffer().then(cl(buf) { let u = new Browser.Uint8Array(buf) }) }
+}
+`));
+  assert.ok(thenBuffer.exports, thenBuffer.errors?.join('\n'));
+  assert.equal(await thenBuffer.exports.bytes(), 3);
+  checked++;
+
+  // std:Web includes std:JS: typed arrays, Map and JSON need no second import.
+  const webJs = await selfhost(await write(`using Web from std:Web
+fn view(buf: Web.ArrayBuffer) Web.Uint8Array { return new Web.Uint8Array(buf) }
+lib {
+    fn run() Str {
+        let m = new Web.Map()
+        m.set("a", 1.0)
+        return Web.JSON.stringify([view(new Web.ArrayBuffer(4.0)).length, m.size])
+    }
+}
+`));
+  assert.ok(webJs.exports, webJs.errors?.join('\n'));
+  assert.equal(webJs.exports.run(), '[4,1]');
+  assert.deepEqual((await selfhost(await write('using Web from std:Web\nmain { Web.document.title = "x" }\n'))).errors, ['No member Web.document']);
+  checked++;
+
   console.log(`compiler regressions: ${checked} builds as they should be`);
 } finally {
   await fs.rm(dir, { recursive: true, force: true });

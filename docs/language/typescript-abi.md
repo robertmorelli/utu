@@ -28,7 +28,7 @@ hosts import only what they have:
 | Module | Contents | Runs on |
 |---|---|---|
 | `std:JS` | ECMAScript: `Array`, `Map`, `Set`, `JSON`, `Math`, `Promise`, `Date`, `RegExp`, `Intl`, … | any JS host |
-| `std:Web` | the common web APIs (WinterTC): `fetch`, `Request`/`Response`, `URL`, `TextEncoder`, streams, `AbortController`, `Blob`, `crypto`, `console`, timers, `structuredClone`, `WebAssembly`, events | Node, Bun, Deno, browsers, workers |
+| `std:Web` | `std:JS` plus the common web APIs (WinterTC): `fetch`, `Request`/`Response`, `URL`, `TextEncoder`, streams, `AbortController`, `Blob`, `crypto`, `console`, timers, `structuredClone`, `WebAssembly`, events | Node, Bun, Deno, browsers, workers |
 | `std:Browser` | all of the above plus the DOM | browser pages |
 | `std:Worker` | a worker's global scope: `self`, `postMessage`, `importScripts`, service-worker types | web workers |
 

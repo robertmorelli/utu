@@ -20,9 +20,11 @@ const join = (dir, name) => `${slashes(dir).replace(/\/$/, '')}/${name}`;
  * @param {{ readFile(path: string): string | undefined, fileExists(path: string): boolean,
  *           directoryExists?(path: string): boolean, realpath?(path: string): string }} options.fs
  * @param {string} [options.libDir] directory holding TypeScript's `lib.*.d.ts`
+ * @param {string[]} [options.nodeTypeRoots] `@types` directories to find `@types/node` in
+ *   when `root` has none, so a program with no `node_modules` still links `node:*`
  * @returns {(specifier: string, request: { prefix: string }) => { abi: object, files: string[] }}
  */
-export function createPackageResolver({ ts, root, fs, libDir, libraries = ['lib.es2022.full.d.ts'] }) {
+export function createPackageResolver({ ts, root, fs, libDir, nodeTypeRoots = [], libraries = ['lib.es2022.full.d.ts'] }) {
   const options = {
     target: ts.ScriptTarget.ES2022, module: ts.ModuleKind.ESNext,
     moduleResolution: ts.ModuleResolutionKind.Bundler, strict: true, noEmit: true, types: [],
@@ -58,7 +60,10 @@ export function createPackageResolver({ ts, root, fs, libDir, libraries = ['lib.
     let files;
     if (moduleSpecifier.startsWith('node:')) {
       // Node builtins are ambient modules declared by @types/node.
-      const types = ts.resolveTypeReferenceDirective('node', importer, options, host).resolvedTypeReferenceDirective;
+      let types = ts.resolveTypeReferenceDirective('node', importer, options, host).resolvedTypeReferenceDirective;
+      if (!types?.resolvedFileName && nodeTypeRoots.length) {
+        types = ts.resolveTypeReferenceDirective('node', importer, { ...options, typeRoots: nodeTypeRoots }, host).resolvedTypeReferenceDirective;
+      }
       if (!types?.resolvedFileName) throw new Error(`"${specifier}" needs Node's declarations: install @types/node`);
       files = [types.resolvedFileName];
     } else {

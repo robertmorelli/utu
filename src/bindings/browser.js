@@ -60,10 +60,11 @@ export const WEB_COMMON = [
   'queueMicrotask', 'reportError', 'setInterval', 'setTimeout', 'structuredClone',
 ];
 
-/** `std:Web` — the common web platform APIs, for any JavaScript host. */
+/** `std:Web` — `std:JS` and the common web platform APIs, for any JavaScript host. */
 export const webSource = lazy(async () => {
-  const common = new Set(WEB_COMMON);
-  return view('Web', await loadBrowserABI(), name => common.has(name));
+  const abi = await loadBrowserABI();
+  const common = new Set([...(abi.ecmascript ?? []), ...WEB_COMMON]);
+  return view('Web', abi, name => common.has(name));
 });
 
 /** `std:Worker` — a web worker's global scope (`self`, `postMessage`, `importScripts`, …). */

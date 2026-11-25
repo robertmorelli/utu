@@ -1381,7 +1381,10 @@ fn accept_union(s: Ref, d: Ref, union: I32, arg: I32, view: I32, cx: Cx) I32 {
         m = jnext(m)
     }
     if is_null_literal(arg) and nullable_ { return foreign_type(s, view) }
-    let t = if is_null_literal(arg) { ty_null() } else { host_type(arg, cx) }
+    // (A closure is typed once its member gives its parameters theirs: typed
+    // before, its body's types would be kept without them.)
+    let closure = closure_node(arg) >= 0
+    let t = if is_null_literal(arg) { ty_null() } else if closure { ty_error() } else { host_type(arg, cx) }
     // A member the argument's shape picks: an array-like for `[…]`, a
     // callable for a closure, the object `&{…}` fits best (see @record_fit).
     let best = -1
@@ -1403,6 +1406,7 @@ fn accept_union(s: Ref, d: Ref, union: I32, arg: I32, view: I32, cx: Cx) I32 {
         m = jnext(m)
     }
     if best >= 0 { return wrap_nullable(accept(Ref { doc: d.doc, at: best, env: d.env }, arg, view, cx), nullable_, t) }
+    if closure { t = host_type(arg, cx) }
     let int_literal = is_kind(arg, Node.Literal) and is_kind(first_child(arg), Node.Int_lit)
     m = jfirst(union)
     while (m >= 0) {
@@ -1749,8 +1753,10 @@ fn callback_type(d: Ref, arg: I32, view: I32, cx: Cx) I32 {
     }
     let result = Ref { doc: d.doc, at: jget(sig, "result"), env: d.env }
     let x = resolved(result)
-    let loose = ref_is(x, "void") or ref_dynamic(x) or jget(x.at, "parameter") >= 0
-    let ret = if loose { closure_written_result(c, cx) } else { foreign_type(result, view) }
+    let declared = foreign_type(result, view)
+    // (`TResult1 | PromiseLike<TResult1>` of an unbound parameter is `any` too)
+    let loose = ref_is(x, "void") or ref_dynamic(x) or jget(x.at, "parameter") >= 0 or is_dynamic(declared)
+    let ret = if loose { closure_written_result(c, cx) } else { declared }
     // A result that is never absent is one that may be (as TypeScript has it).
     let written = closure_written_result(c, cx)
     if written >= 0 and ret >= 0 and ty_is(ret, Ty.Nullable) and (written == ty_a[ret] or boxed_primitive(ty_a[ret]) == written) { ret = written }

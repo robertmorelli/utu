@@ -2,6 +2,7 @@
 // and size. Language-level behavior lives in dts-deep-tests.mjs.
 import fs from 'node:fs/promises';
 import path from 'node:path';
+import os from 'node:os';
 import { execFileSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import assert from 'node:assert/strict';
@@ -124,6 +125,28 @@ await test('"npm:" and "node:" imports link packages from node_modules and cache
   const unresolved = await buildProgram('using Nano from "npm:nanoid"; main {}', { resolvePackage: null });
   assert.equal(unresolved.wasm, null);
   assert.deepEqual(unresolved.errors, ['No declarations for npm:nanoid; is it installed?']);
+});
+await test('a "node:" import outside any node_modules links from utu\'s own @types/node', async () => {
+  const root = await fs.mkdtemp(path.join(os.tmpdir(), 'utu-standalone-'));
+  try {
+    // Without the fallback this folder reaches no @types/node: what the test stands on.
+    const bare = createPackageResolver({ ts, root, fs: {
+      readFile: file => ts.sys.readFile(file), fileExists: file => ts.sys.fileExists(file), directoryExists: dir => ts.sys.directoryExists(dir),
+    } });
+    assert.throws(() => bare('node:fs', { prefix: 'Fs' }), /install @types\/node/);
+    const resolvePackage = nodePackageResolver({ root, cacheDir: path.join(root, 'cache') });
+    const built = await buildProgram(`using Fs from "node:fs"; using Path from "node:path";
+      lib { fn there(file: Str) Bool { return Fs.existsSync(file); } fn file() Str { return Path.join("a", "b.txt"); } }`, { resolvePackage });
+    assert.deepEqual(built.errors, []);
+    const instance = await instantiateNode(built.wasm, built.spec, { root: ROOT });
+    assert.equal(instance.exports.there(root), true);
+    assert.equal(instance.exports.file(), path.join('a', 'b.txt'));
+    // The fallback is for Node's declarations only: a package is still the program's to install.
+    const missing = await buildProgram('using Nano from "npm:nanoid"; main {}', { resolvePackage });
+    assert.deepEqual(missing.errors, ['No declarations for npm:nanoid; is it installed?']);
+  } finally {
+    await fs.rm(root, { recursive: true, force: true });
+  }
 });
 await test('package resolution runs over an in-memory file system', () => {
   const files = new Map([

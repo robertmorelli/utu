@@ -7,12 +7,15 @@ import { LINK_REVISION } from '../../src/bindings/link.js';
 
 const stat = file => { try { return fs.statSync(file); } catch { return null; } };
 const require = createRequire(import.meta.url);
+// utu's own @types folder: where `node:*` declarations come from when the program's root has none.
+const ownTypeRoots = () => { try { return [path.dirname(path.dirname(require.resolve('@types/node/package.json')))]; } catch { return []; } };
 const fresh = files => files.every(entry => { const s = stat(entry.path); return s && s.mtimeMs === entry.mtimeMs && s.size === entry.size; });
 
 /**
  * `resolvePackage` for Node/Bun hosts: links `npm:` and `node:` imports from
  * `node_modules` and caches each declaration graph in `node_modules/.utu/abi`.
- * TypeScript loads only when a graph is not cached.
+ * TypeScript loads only when a graph is not cached. A root with no
+ * `@types/node` links `node:` imports from utu's own.
  *
  * With `ready`, it gives the declarations as the self-hosted compiler reads
  * them ({ document, view }, as the platform catalog does), cached beside the
@@ -23,7 +26,7 @@ export function nodePackageResolver({ root = process.cwd(), cacheDir = path.join
   const linked = (specifier, request) => {
     if (!resolve) {
       const ts = require('typescript');
-      resolve = createPackageResolver({ ts, root: path.resolve(root), fs: {
+      resolve = createPackageResolver({ ts, root: path.resolve(root), nodeTypeRoots: ownTypeRoots(), fs: {
         readFile: file => { try { return fs.readFileSync(file, 'utf8'); } catch { return undefined; } },
         fileExists: file => !!stat(file)?.isFile(),
         directoryExists: dir => !!stat(dir)?.isDirectory(),
