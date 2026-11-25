@@ -8,7 +8,7 @@
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { createHash } from 'node:crypto';
+import { createHash, randomBytes } from 'node:crypto';
 import { isBuiltin } from 'node:module';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { PLATFORM_SOURCES } from './platform-sources.generated.js';
@@ -136,7 +136,7 @@ function builtFromCurrentSources(record) {
   if (JSON.stringify(now) === JSON.stringify(recorded.stamps)) return true;
   if (currentSources(files) !== recorded.hash) return false;
   try {
-    const partial = `${record}.${process.pid}.tmp`;
+    const partial = `${record}.${process.pid}.${randomBytes(6).toString('hex')}.tmp`;
     fs.writeFileSync(partial, `${JSON.stringify({ hash: recorded.hash, stamps: now })}\n`);
     fs.renameSync(partial, record);
   } catch {}
@@ -234,7 +234,7 @@ async function importGlue(written, root) {
   // node_modules (a worktree's, a linked install's) differently from Node.
   const file = path.join(fs.realpathSync(dir), `glue-${createHash('sha256').update(source).digest('hex').slice(0, 16)}.mjs`);
   if (!fs.existsSync(file)) {
-    const partial = `${file}.${process.pid}.tmp`;
+    const partial = `${file}.${process.pid}.${randomBytes(6).toString('hex')}.tmp`;
     fs.writeFileSync(partial, source);
     fs.renameSync(partial, file);
   }
