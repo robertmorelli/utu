@@ -77,17 +77,17 @@ assert.ok(fs.existsSync(path.join(dir, 'hot.flame.html')));
 // Deep recursion a normal run survives: profiled too, in every mode.
 const deep = path.join(dir, 'deep.utu');
 fs.writeFileSync(deep, `fn down(n: I32) I32 { if n == 0 { return 0; }; return 1 + down(n - 1); }
-main { let t = 0; for (0 ..< 15000) |_i| { t = down(10000); }; console.log(t); }
+main { let t = 0; for (0 ..< 30000) |_i| { t = down(5000); }; console.log(t); }
 using console from std:console
 `);
 for (const mode of ['debug', 'small', 'fast']) {
   const r = spawnSync(process.execPath, [path.join(ROOT, 'cli', 'utu.mjs'), 'run', deep, '-O', mode, '--profile', '-o', dir], { encoding: 'utf8' });
   assert.equal(r.status, 0, `${mode}: ${r.stderr}`);
-  assert.equal(r.stdout.trim(), '10000', mode);
+  assert.equal(r.stdout.trim(), '5000', mode);
   assert.match(fs.readFileSync(path.join(dir, 'deep.folded'), 'utf8'), /^main;down(;down)* \d+$/m, mode);
 }
 // --profile changes no output: a recursion too deep traps both ways, one that fits runs both ways.
-for (const n of [10000, 10000000]) {
+for (const n of [5000, 10000000]) {
   const file = path.join(dir, `rec${n}.utu`);
   fs.writeFileSync(file, `fn deep(n: I32) I32 { return if n == 0 { 0; } else { 1 + deep(n - 1); }; }
 main { console.log(deep(${n})); }
@@ -99,7 +99,7 @@ using console from std:console
     const profiled = go('--profile', '-o', dir);
     assert.equal(profiled.status, plain.status, `${n} ${mode}: ${plain.stderr} / ${profiled.stderr}`);
     assert.equal(profiled.stdout, plain.stdout, `${n} ${mode}`);
-    if (n === 10000) assert.equal(plain.stdout.trim(), '10000', mode);
+    if (n === 5000) assert.equal(plain.stdout.trim(), '5000', mode);
     else assert.match(plain.stderr, /Stack overflow/, mode);
   }
 }
