@@ -1,6 +1,6 @@
 # utu
 
-A programming language that compiles to WasmGC. The self-hosted compiler, standard library, parser, and analyzer ship as a single bundle — the same bytes in Node, Bun, browsers, and editors.
+utu is a programming language that compiles to WasmGC. The compiler is self-hosted and ships with the standard library, parser, and analyzer in one Wasm bundle that runs in Node, Bun, browsers, and editors.
 
 ```utu
 using Browser from std:Browser
@@ -13,14 +13,14 @@ main {
 }
 ```
 
-## Quick Start
+## Build and run
 
 ```sh
 bun install
 bun run build
 ```
 
-Run, check, format, or build a program:
+Then run, check, format, or build a program with the CLI:
 
 ```sh
 ./cli/utu.mjs examples/hello.utu
@@ -35,33 +35,33 @@ Run the test suite:
 bun run test
 ```
 
-## VS Code
+## VS Code extension
 
 ```sh
 bun run package:vscode
 code --install-extension dist/utu-vscode.vsix
 ```
 
-## Layout
+## Repo layout
 
-- `selfhost/` — self-hosted compiler written in utu
-- `std/` — standard library baked into the compiler bundle
-- `src/` — WasmGC runtime, selfhost loader, TypeScript ABI bindings, and VS Code extension
-- `cli/` — `utu` and `wutu` command-line tools
-- `editors/` — VS Code, Helix, Neovim, and Tree-sitter support
-- `examples/` — language, stdlib, and Wutu web examples
-- `docs/` — language specification, guides, and docs site
+- `selfhost/`: the self-hosted compiler, written in utu
+- `std/`: standard library sources embedded into the compiler
+- `src/`: WasmGC runtime, selfhost loader, TypeScript ABI bindings, and VS Code extension
+- `cli/`: `utu` and `wutu` CLI entry points
+- `editors/`: VS Code, Helix, Neovim, and Tree-sitter support
+- `examples/`: language, stdlib, and Wutu web examples
+- `docs/`: language spec, guides, and the docs site
 
-## Documentation
+## Docs
 
-See [docs/](docs/README.md) for the full index, including:
+Full index in [docs/README.md](docs/README.md). Main references:
 
 - [Language specification](docs/language/spec.md)
 - [Type system](docs/language/types.md)
-- [TypeScript ABI & JS interop](docs/language/typescript-abi.md)
+- [TypeScript ABI and JS interop](docs/language/typescript-abi.md)
 - [Wutu (web DSL)](docs/language/wutu.md)
 - [Design principles](docs/compiler/principles.md)
-- [Self-hosting & bootstrap](docs/compiler/self-hosting.md)
+- [Self-hosting and bootstrap](docs/compiler/self-hosting.md)
 
 ## License
 
