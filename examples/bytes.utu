@@ -1,0 +1,73 @@
+// bytes.utu — std:Bytes: a JS Uint8Array (or Browser's, or Node's Buffer)
+// to an Array[I32] and back.
+
+using JS from std:JS
+using Browser from std:Browser
+using Web from std:Web
+using Bytes from std:Bytes
+
+fn sum(bytes: Array[I32]) I32 {
+    let total = 0
+    for (bytes) |b| { total += b }
+    return total
+}
+
+lib {
+    // Every length around the four-byte step: 0 to 9 bytes, 0 to 8 each.
+    fn lengths() I32 {
+        let total = 0
+        for (0 ..< 10) |n| {
+            let src = Array[I32].new(n, 0)
+            for (0 ..< n) |i| { src[i] = 255 - i }
+            let back = Bytes.from_js(Bytes.to_js(src))
+            if back.len() != n { return -1 }
+            for (0 ..< n) |i| { if back[i] != src[i] { return -2 - n } }
+            total += back.len()
+        }
+        return total
+    }
+
+    // to_js keeps each value's low eight bits.
+    fn wrapped() Str => Bytes.to_js([256, -1, 65, 300, 128, -128]).join(",")
+
+    fn from_literal() I32 => sum(Bytes.from_js(new JS.Uint8Array([1, 2, 255, 0, 128, 7, 9])))
+
+    fn from_browser() I32 {
+        let view = new Browser.Uint8Array(6.0)
+        view.fill(9.0)
+        return sum(Bytes.from_js(view))
+    }
+
+    // A view into the middle of a buffer is read from its own offset.
+    fn from_subarray() I32 {
+        let whole = new JS.Uint8Array([10, 20, 30, 40, 50, 60, 70])
+        return sum(Bytes.from_js(whole.subarray(2.0, 7.0)))
+    }
+
+    fn fetched() I32 {
+        let r = await Web.fetch("data:application/octet-stream;base64,AAECAwQF/w==")
+        return sum(Bytes.from_js(new JS.Uint8Array(await r.arrayBuffer())))
+    }
+
+    // From JavaScript (a Buffer is a Uint8Array) and back, reversed.
+    fn reversed(view: JS.Uint8Array) JS.Uint8Array {
+        let bytes = Bytes.from_js(view)
+        let out = Array[I32].new(bytes.len(), 0)
+        for (0 ..< bytes.len()) |i| { out[i] = bytes[bytes.len() - 1 - i] }
+        return Bytes.to_js(out)
+    }
+}
+
+test "round trip at every length" {
+    assert lengths() == 45
+}
+
+test "low eight bits" {
+    assert wrapped() == "0,255,65,44,128,128"
+}
+
+test "from std:JS, std:Browser, and a subarray" {
+    assert from_literal() == 402
+    assert from_browser() == 54
+    assert from_subarray() == 250
+}

@@ -4963,6 +4963,50 @@
  "examples/browser-pantry/main.utu test": {
   "calls": {}
  },
+ "examples/bytes.utu normal": {
+  "calls": {
+   "fetched": {
+    "result": 270,
+    "printed": []
+   },
+   "from_browser": {
+    "result": 54,
+    "printed": []
+   },
+   "from_literal": {
+    "result": 402,
+    "printed": []
+   },
+   "from_subarray": {
+    "result": 250,
+    "printed": []
+   },
+   "lengths": {
+    "result": 45,
+    "printed": []
+   },
+   "wrapped": {
+    "result": "0,255,65,44,128,128",
+    "printed": []
+   }
+  }
+ },
+ "examples/bytes.utu test": {
+  "calls": {
+   "__test_0": {
+    "result": null,
+    "printed": []
+   },
+   "__test_1": {
+    "result": null,
+    "printed": []
+   },
+   "__test_2": {
+    "result": null,
+    "printed": []
+   }
+  }
+ },
  "examples/ci/codegen_alt_fallback.utu normal": {
   "calls": {}
  },

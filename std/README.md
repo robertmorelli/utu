@@ -64,6 +64,11 @@ host's own (JavaScript's string methods, `Math`).
   for the numbers and Str, and `Order[T[Ord]]`: `max`, `min`, `clamp`,
   `sort` (stable), `is_sorted`, `search`, `max_of`, `min_of`. See
   [generics](../docs/language/generics.md).
+- `std:Bytes` — `Bytes.from_js(view)`, a `JS.Uint8Array` (a `Browser.Uint8Array`,
+  Node's `Buffer`) copied to an `Array[I32]` of 0 to 255, and `Bytes.to_js(bytes)`,
+  a new `Uint8Array` of each value's low eight bits. Four bytes a host call;
+  wrap an `ArrayBuffer` first (`new JS.Uint8Array(buf)`). For bytes in place,
+  a `mem`'s `copy_in` and `view`.
 - `std:Console` — `using console from std:Console;` then `console.log(x)`,
   `warn`, `error`: any value with a `str()` (`console.log(42)`, a Str as is).
 - `std:Time` — `using time from std:Time;` then `time.now()` (milliseconds,

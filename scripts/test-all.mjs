@@ -23,6 +23,7 @@ const commands = [
   ['node', './scripts/test-wat.mjs'],
   ['node', './scripts/test-loader-conversions.mjs'],
   ['node', './scripts/test-stdlib.mjs'],
+  ['node', './scripts/test-bytes.mjs'],
   ['node', './scripts/test-compiler-regressions.mjs'],
   ['node', './scripts/test-profile.mjs'],
   // Optimized early, as an editor's long session would have it.

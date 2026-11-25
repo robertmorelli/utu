@@ -1,0 +1,61 @@
+//! Bytes between JavaScript and utu: `using Bytes from std:Bytes;`, then
+//! `Bytes.from_js(view)`, a `JS.Uint8Array` (or a `Browser.Uint8Array`, or
+//! Node's `Buffer`, which is one) copied into an `Array[I32]` of 0 to 255, and
+//! `Bytes.to_js(bytes)`, the reverse: a new `Uint8Array`. Each copies four
+//! bytes a host call. Nothing is shared: changing one side after a copy does
+//! not change the other. Each function ships only when used.
+//!
+//! ```
+//! let data = Bytes.from_js(Fs.readFileSync(path))
+//! Fs.writeFileSync(out, Bytes.to_js(data))
+//! let body = Bytes.from_js(new JS.Uint8Array(await response.arrayBuffer()))
+//! ```
+//!
+//! For bytes read or written in place, without a copy, see a `mem`'s
+//! `copy_in` and `view`.
+
+using JS from std:JS
+
+mod Bytes {
+    /// The bytes of `view`, each 0 to 255.
+    fn from_js(view: JS.Uint8Array) Array[I32] {
+        let size: fun(JS.Uint8Array) I32 = @es/\ (v) => v.length \/
+        let word: fun(JS.Uint8Array, I32) I32 = @es/\ (v, i) => v[i] | v[i + 1] << 8 | v[i + 2] << 16 | v[i + 3] << 24 \/
+        let byte: fun(JS.Uint8Array, I32) I32 = @es/\ (v, i) => v[i] \/
+        let n = size(view)
+        let out = Array[I32].new(n, 0)
+        let i = 0
+        while (i + 4 <= n) {
+            let w = word(view, i)
+            out[i] = w & 255
+            out[i + 1] = (w >> 8) & 255
+            out[i + 2] = (w >> 16) & 255
+            out[i + 3] = (w >> 24) & 255
+            i += 4
+        }
+        while (i < n) {
+            out[i] = byte(view, i)
+            i += 1
+        }
+        return out
+    }
+
+    /// A new `Uint8Array` of `bytes`, each kept to its low eight bits.
+    fn to_js(bytes: Array[I32]) JS.Uint8Array {
+        let make: fun(I32) JS.Uint8Array = @es/\ (n) => new Uint8Array(n) \/
+        let word: fun(JS.Uint8Array, I32, I32) Void = @es/\ (v, i, w) => { v[i] = w; v[i + 1] = w >> 8; v[i + 2] = w >> 16; v[i + 3] = w >> 24 } \/
+        let byte: fun(JS.Uint8Array, I32, I32) Void = @es/\ (v, i, b) => { v[i] = b } \/
+        let n = bytes.len()
+        let view = make(n)
+        let i = 0
+        while (i + 4 <= n) {
+            word(view, i, bytes[i] & 255 | (bytes[i + 1] & 255) << 8 | (bytes[i + 2] & 255) << 16 | bytes[i + 3] << 24)
+            i += 4
+        }
+        while (i < n) {
+            byte(view, i, bytes[i])
+            i += 1
+        }
+        return view
+    }
+}

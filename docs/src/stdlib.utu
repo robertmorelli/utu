@@ -369,6 +369,20 @@ mod stdlib {
         \\// 4 true true true
         \\using console from std:Console
     }
+    fn bytes_sample() Str {
+        return \\using JS from std:JS
+        \\using Bytes from std:Bytes
+        \\
+        \\main {
+        \\    let view = new JS.Uint8Array([104, 105, 255])   // or Browser.Uint8Array, or Node's Buffer
+        \\    let bytes = Bytes.from_js(view)                  // Array[I32], each 0 to 255
+        \\    bytes[2] = 33
+        \\    let out = Bytes.to_js(bytes)                     // a new JS.Uint8Array
+        \\    console.log(`${bytes} ${out.join(" ")} ${view[2.0]}`)
+        \\}
+        \\// [104, 105, 33] 104 105 33 255
+        \\using console from std:Console
+    }
     fn number_field_sample() Str {
         return \\using NumberField from std:NumberField
         \\
@@ -597,6 +611,12 @@ mod stdlib {
         "r.chance(p) Bool::true with probability p"
         ]
     }
+    fn bytes_rows() Array[Str] {
+        return [
+        "Bytes.from_js(view) Array[I32]::a copy of a JS.Uint8Array (a Browser.Uint8Array, a Buffer), each 0 to 255",
+        "Bytes.to_js(bytes) JS.Uint8Array::a new Uint8Array of an Array[I32], each kept to its low eight bits"
+        ]
+    }
     fn host_rows() Array[Str] {
         return [
         "console.log(x) warn(x) error(x)::the host console, x any value with a str(); using console from std:Console",
@@ -815,6 +835,9 @@ mod stdlib {
             = module("Random", "xoshiro128** in utu: the same seed gives the same numbers on every host.", "using Random from std:Random;")
             = code.block(random_sample())
             = api(random_rows())
+            = module("Bytes", "Binary data in and out: a Uint8Array copied to an Array[I32] and back, four bytes a host call. For bytes in place, use a mem's copy_in and view.", "using Bytes from std:Bytes;")
+            = code.block(bytes_sample())
+            = api(bytes_rows())
             = module("NumberField", "A number input's text, valid or not, with its range check.", "using NumberField from std:NumberField;")
             = code.block(number_field_sample())
             = api(host_rows())

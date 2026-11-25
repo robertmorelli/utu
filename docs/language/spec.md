@@ -876,6 +876,8 @@ Fs.writeSync(1.0, out.view(0, out.len()));   // a JS.Uint8Array over the element
 
 A view is a `JS.Uint8Array`, `JS.Float32Array`, and so on for the element kind,
 and stops seeing the memory once the mem grows.
+To copy bytes to and from an `Array[I32]` instead, use `std:Bytes`
+(`Bytes.from_js(view)`, `Bytes.to_js(bytes)`).
 
 A byte mem (`U8`, `I8`) interns spans of itself in place, without copying:
 
