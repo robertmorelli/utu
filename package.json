@@ -6,7 +6,7 @@
   "publisher": "robertmorelli",
   "author": "Robert Morelli",
   "license": "MIT",
-  "icon": "utu.png",
+  "icon": "editors/vscode/utu.png",
   "repository": {
     "type": "git",
     "url": "git+https://github.com/robertmorelli/utu.git"
@@ -51,14 +51,14 @@
         "extensions": [
           ".utu"
         ],
-        "configuration": "./language-configuration.json"
+        "configuration": "./editors/vscode/language-configuration.json"
       }
     ],
     "grammars": [
       {
         "language": "utu",
         "scopeName": "source.utu",
-        "path": "./jsondata/utu.tmLanguage.json",
+        "path": "./editors/vscode/utu.tmLanguage.json",
         "embeddedLanguages": {
           "meta.embedded.inline.javascript": "javascript"
         }
@@ -168,12 +168,12 @@
     "dist/node/extension.cjs",
     "dist/web/extension.cjs",
     "dist/web/package.json",
-    "jsondata/utu.tmLanguage.json",
-    "language-configuration.json",
-    "PRINCIPLES.md",
+    "editors/vscode/utu.tmLanguage.json",
+    "editors/vscode/language-configuration.json",
+    "editors/vscode/utu.png",
+    "docs/principles.md",
     "README.md",
-    "LICENSE",
-    "utu.png"
+    "LICENSE"
   ],
   "scripts": {
     "build": "node ./scripts/build.mjs",

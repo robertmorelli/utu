@@ -1,30 +1,6 @@
-utu is a language that compiles to WasmGC. The compiler, standard library, parser, and analysis engine ship as one bundle -- same bytes whether you're running it in Node, Bun, a browser, an IDE, or CI. There is no separate stdlib install, no host-specific build, no "lite" version. You get all of utu or none of it.
+# utu
 
-See `PRINCIPLES.md` for the design constraints that keep this true.
-
-## VS Code
-
-The desktop and web extension provides syntax highlighting, compiler-backed
-diagnostics, hover information, Wasm/WAT compilation, syntax and compiler-IR
-views, and `main` execution.
-
-```sh
-bun run package:vscode
-code --install-extension dist/utu-vscode.vsix
-```
-
-Open any `.utu` file or run a command from the **UTU** command palette group.
-
-To try Wutu in VS Code, open this repository as your workspace and run
-**UTU: Create Wutu Website**. Edit the generated `main.utu`, then run
-**UTU: Preview Wutu Website**. The Wutu Website terminal prints a local URL;
-open it to see the page, and keep the terminal running for live reload.
-
-## JavaScript, the browser, and npm
-
-TypeScript declarations are utu's foreign-function interface. `std:Browser`
-gives typed access to the whole DOM and JavaScript standard library, and any
-npm package with types imports directly:
+A programming language that compiles to WasmGC. The self-hosted compiler, standard library, parser, and analyzer ship as a single bundle — the same bytes in Node, Bun, browsers, and editors.
 
 ```utu
 using Browser from std:Browser
@@ -37,43 +13,56 @@ main {
 }
 ```
 
-Only the boundary operations a program actually uses are emitted. See
-[TypeScript declarations as utu's JavaScript ABI](docs/typescript-abi.md) for
-type mapping, packages, and linking your own `.d.ts` files.
-
-## Typed JSON
-
-`@json/\ decode Save text \/` parses straight into native structs, with errors
-that name the field, line, and column. `encode` writes them back, and `match`
-pulls typed fields out of documents you do not control. See [typed JSON](docs/json.md).
-
-## Iterators and Wutu
-
-Native array pipelines fuse into Wasm loops; Wutu combines DOM construction and
-CSS in typed Utu expressions. See [iterators](docs/iterators.md),
-[Wutu](docs/wutu.md), [native range/spatial queries](docs/queries.md), and the [greenhouse website](examples/wutu-garden/README.md).
-
-Wutu now supports reactive roots, keyed DOM reuse, scoped node aliases, two-way
-bindings, typed local storage, prerendering, and a compiler-backed preview.
+## Quick Start
 
 ```sh
-utu examples/wutu-five/folio/main.utu
-utu format examples/wutu-five/folio/main.utu
-utu build examples/wutu-five/folio/main.utu --out dist/folio
+bun install
+bun run build
 ```
 
-The five-site gallery is built with `bun run demo:wutu-five`. Its source viewers
-show the exact readable Utu source; deployed JS/Wasm are optimized separately.
+Run, check, format, or build a program:
 
-For a browser-only editor and live preview, run `npm run demo:webdemo`, then
-serve [webdemo/](webdemo/README.md) with a local HTTP server.
+```sh
+./cli/utu.mjs examples/hello.utu
+./cli/utu.mjs check examples/hello.utu
+./cli/utu.mjs format examples/hello.utu
+./cli/utu.mjs build examples/wutu-five/folio/main.utu --out dist/folio
+```
 
-Three more complete examples—Dispatch, Supper, and Split—are built with
-`bun run demo:wutu-more` and tested with `bun run test:wutu-more`.
-See [the follow-up usability review](docs/wutu-more-review.md) for measured
-rendering/persistence costs and the remaining language and framework friction.
+Run the test suite:
 
-The latest [ten Wutu applications and friction review](docs/wutu-round-two-review.md)
-exercise CSS stenciling, recursive DSL composition, scoped views, persistence,
-routing and lifecycle. Run `npm run test:wutu-rounds` to build and verify both
-five-site batches. Each generated gallery links to its sites and readable source.
+```sh
+bun run test
+```
+
+## VS Code
+
+```sh
+bun run package:vscode
+code --install-extension dist/utu-vscode.vsix
+```
+
+## Layout
+
+- `selfhost/` — self-hosted compiler written in utu
+- `std/` — standard library baked into the compiler bundle
+- `src/` — WasmGC runtime, selfhost loader, TypeScript ABI bindings, and VS Code extension
+- `cli/` — `utu` and `wutu` command-line tools
+- `editors/` — VS Code, Helix, Neovim, and Tree-sitter support
+- `examples/` — language, stdlib, and Wutu web examples
+- `docs/` — language specification, guides, and docs site
+
+## Documentation
+
+- [Language specification](docs/spec.md)
+- [Design principles](docs/principles.md)
+- [Type system](docs/types.md)
+- [TypeScript ABI & JS interop](docs/typescript-abi.md)
+- [Wutu (web DSL)](docs/wutu.md)
+- [Typed JSON](docs/json.md)
+- [Iterators](docs/iterators.md)
+- [Self-hosting & bootstrap](docs/self-hosting.md)
+
+## License
+
+[MIT](LICENSE)

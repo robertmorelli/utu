@@ -3,8 +3,7 @@
 The compiler, written in utu from the start: flat data in vecs and mems,
 no DOM, no string-typed facts. It was checked piece by piece against the
 JavaScript compiler it replaced (stage -1, deleted; tag `stage-1-final`),
-and `baselines/` now holds what it does itself. The plan is in
-docs/history/self-hosting-plan.md (Plan B); docs/self-hosting.md is how it is built and kept honest now.
+and `baselines/` now holds what it does itself. See `docs/self-hosting.md` for how it is built and verified.
 
 | piece | file | checked by |
 |---|---|---|

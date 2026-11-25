@@ -157,7 +157,7 @@ mod compiler {
                 }
                 ". The checker never peeks at representations and codegen never branches on names."
             }
-            = ui.further("TYPES.md", "utu types: name versus representation")
+            = ui.further("docs/types.md", "utu types: name versus representation")
             h2 {
                 "Principles"
             }
@@ -184,7 +184,7 @@ mod compiler {
                     "One person should be able to ship it."
                 }
             }
-            = ui.further("PRINCIPLES.md", "utu design principles")
+            = ui.further("docs/principles.md", "utu design principles")
         }
         \/
     }

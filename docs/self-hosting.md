@@ -1,10 +1,8 @@
 # The self-hosted compiler and stage 0
 
-utu's compiler is written in utu (`selfhost/*.utu`, see selfhost/README.md)
+utu's compiler is written in utu (`selfhost/*.utu`, see `selfhost/README.md`)
 and ships as `dist/utu.wasm`, driven by `src/selfhost/*.js`. It builds
-itself. How it got here (Plan A, the JavaScript compiler made fast; Plan B,
-its port to utu) is in docs/history/self-hosting-plan.md. The JavaScript
-compiler, stage -1, is deleted; the tag `stage-1-final` is its last commit.
+itself. The original JavaScript compiler (stage -1) is preserved at the tag `stage-1-final`.
 
 ## The bootstrap
 

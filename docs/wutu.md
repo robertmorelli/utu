@@ -755,5 +755,3 @@ A closure is `cl(params) Type { … }`: `wutu.after_render(cl() Void { s.ready =
 In a function body, a plain Utu `if`, `for` or `while` is a statement like any
 other (`if s.busy { return }`); Wutu's own `if` and `for` are among elements. `wutu.number`, `wutu.money` (integer USD cents: `-$1.23`), and `wutu.decimal` cover
 simple display without shipping a formatting library.
-
-The [two new five-site batches](wutu-round-two-review.md) exercise these APIs.

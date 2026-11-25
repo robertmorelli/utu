@@ -334,7 +334,7 @@ export function convertExports(exports, exportSpec, asyncExports = []) {
 // A named import lets the bundler tree-shake inside the package. The
 // `(await import('pkg')).member` form pulls in the whole namespace and defeats
 // that — measured at 125x more bundled bytes for a package with independent
-// exports. See IMPORTANT_MINIFICATION_INFO.md.
+// exports. See docs/minification.md.
 const IMPORT_DECL = /^(?:\s|\/\/.*|\/\*[\s\S]*?\*\/)*import\s[^;]*;/;
 
 /**

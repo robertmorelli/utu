@@ -19,7 +19,7 @@ await assertManifest();
 await fs.access(path.join(ROOT, 'dist', 'selfhost', 'utu.js'));
 await fs.access(path.join(ROOT, 'dist', 'node', 'extension.cjs'));
 await fs.access(path.join(ROOT, 'dist', 'web', 'extension.cjs'));
-await fs.access(path.join(ROOT, 'jsondata', 'utu.tmLanguage.json'));
+await fs.access(path.join(ROOT, 'editors', 'vscode', 'utu.tmLanguage.json'));
 
 try {
   await fs.access(packageFile);

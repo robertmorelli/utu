@@ -40,7 +40,8 @@ report.[0-9]_.[0-9]_.[0-9]_.[0-9]_.json
 .generated
 *.vsix
 
-spec.md
+/spec.md
+examples/foundry/SPEC.md
 .npm-cache
 examples/rust_benchmarks/rust_deltablue/target
 examples/rust_benchmarks/rust_deltablue_arena/target
@@ -53,6 +54,10 @@ codex.yml
 .vscode-test-web/
 .tmp
 .tmp/*
+.tmp-*
+__pycache__/
+.mypy_cache/
+v8-repro/
 
 # hand-written FFI binding experiments
 hand_written_bindings
