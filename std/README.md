@@ -15,7 +15,7 @@ boundary code.
 `Math`, `Promise`, …) and `std:Web` the web APIs every modern runtime shares
 (`fetch`, `URL`, streams, `crypto`, timers, …). `std:Worker` is a web worker's
 global scope, linked from `lib.webworker`. See the table in
-[the declaration guide](../docs/typescript-abi.md).
+[the declaration guide](../docs/language/typescript-abi.md).
 
 Numbers convert explicitly with one instruction each: `i.f64()`,
 `f.i32()`, `n.i64()`, `x.f32()`, and so on. Float-to-integer
@@ -23,7 +23,7 @@ conversions saturate, and NaN becomes 0, like Rust's `as`. Integer literals
 adopt a float type from context (`let x: F64 = 1`).
 
 Regenerate the browser declarations with `bun run bindings:browser`, then build
-with `bun run build`. See [the declaration guide](../docs/typescript-abi.md).
+with `bun run build`. See [the declaration guide](../docs/language/typescript-abi.md).
 
 To intern spans of a byte mem without copying them, use the mem's own
 `intern(start, stop)` (see the spec); `std:Interner` is for keys from anywhere.
@@ -51,7 +51,7 @@ host's own (JavaScript's string methods, `Math`).
 - `Result` (prelude) — `Result[T, E]`, a value or an expected error:
   `ok`, `err`, `is_ok`, `is_err`, `value` and `error` (fatal on the other),
   `value_or`. `try r` passes an error on; `errdefer` runs on one. See
-  [errors](../docs/errors.md).
+  [errors](../docs/language/errors.md).
 - `std:StrMap` — `StrMap[V]`, Str keys to any values: `set`, `get(key,
   missing)`, `has`, `remove`, `len`, `keys`. Open addressing, no tombstones.
 - `std:Random` — `Random.new(seed)` (or `Random.from_host()`), xoshiro128**
@@ -63,7 +63,7 @@ host's own (JavaScript's string methods, `Math`).
 - `std:Ord` — `Ord`, the protocol `a.cmp(b)` (negative, zero, positive),
   for the numbers and Str, and `Order[T[Ord]]`: `max`, `min`, `clamp`,
   `sort` (stable), `is_sorted`, `search`, `max_of`, `min_of`. See
-  [generics](../docs/generics.md).
+  [generics](../docs/language/generics.md).
 - `std:Console` — `using console from std:Console;` then `console.log(x)`,
   `warn`, `error`: any value with a `str()` (`console.log(42)`, a Str as is).
 - `std:Time` — `using time from std:Time;` then `time.now()` (milliseconds,

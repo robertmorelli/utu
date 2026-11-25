@@ -529,7 +529,7 @@ changing state. A refresh visits connected roots; this is explicit whole-view
 rendering, not dependency tracking or list virtualization.
 
 **Unchanged components are reused.** A hole that calls a function,
-`= tag(item.title);`, is skipped on a re-render when its arguments are the same
+`|> tag(item.title)`, is skipped on a re-render when its arguments are the same
 as last time: the element the call made then is put back without calling it.
 The compiler allows this only when it cannot be wrong: every argument is a
 scalar or a Str (compared by value), and the function, and everything it
@@ -549,7 +549,7 @@ main {
     }
     for state.items |item| key item.id {
         article {
-            h2 { = item.title }
+            h2 { | item.title }
             button {
                 "Finish"
                 on click { item.done = true }
@@ -560,7 +560,7 @@ main {
 \/
 ```
 
-`= expression;` inserts text, a number, or a component node. An attribute's
+`| value` inserts a value (text, number, or component) and `|> expression` inserts an evaluated expression. An attribute's
 value is a string literal or any expression (`title = "Remove " + item.title;`).
 `on click |e| { ... }` names the event and types it (`MouseEvent` here); without
 `|e|` there is no event variable. `on submit` also prevents navigation. Native
@@ -732,9 +732,11 @@ once the element is gone. Unmounting the view stops either.
 ```utu
 p.clock {
     on mount { wutu.interval("tick", 1000.0, cl() Void { s.seconds = s.seconds + 1; }); }
-    = "Uptime " + s.seconds.str() + "s"
+    |> "Uptime " + s.seconds.str() + "s"
 }
-``` `wutu.route()`
+```
+
+`wutu.route()`
 reads the hash path, and hash/history changes refresh views. This is a small route
 primitive, not a route table, network loader or authentication framework.
 
@@ -747,7 +749,7 @@ using List[Todo] |todos| from std:List
 
 button {
     on click { s.todos = todos.append(s.todos, Todo { text: s.draft, done: false }); }
-    = "Add"
+    "Add"
 }
 ```
 

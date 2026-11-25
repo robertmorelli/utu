@@ -29,5 +29,5 @@ node scripts/test-wutu-browser.mjs --webkit
 
 That test builds the site, exercises search/sorting/toggles/persistence, checks
 mobile overflow, writes desktop/mobile screenshots, and enforces a 9 KB gzip
-application budget. See [the Wutu guide](../../docs/wutu.md) and
-[iterator reference](../../docs/iterators.md).
+application budget. See [the Wutu guide](../../docs/language/wutu.md) and
+[iterator reference](../../docs/language/iterators.md).

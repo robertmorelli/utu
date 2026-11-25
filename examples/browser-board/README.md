@@ -28,7 +28,7 @@ It also exercises 200 inserts plus 203 toggles with persistence and enforces a 6
 gzip budget for the combined Wasm and JS. HTML/CSS are not included in that code
 budget. Local storage is expected to be available and contain this app's JSON.
 
-See [the ABI design and limitations](../../docs/typescript-abi.md) for the type
+See [the ABI design and limitations](../../docs/language/typescript-abi.md) for the type
 mapping, universal callback bridge, package tests, and compiler/app size tradeoff.
 
 The app imports one lazy `Browser` module and uses declaration-derived types,
