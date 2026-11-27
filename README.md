@@ -66,3 +66,5 @@ Full index in [docs/README.md](docs/README.md). Main references:
 ## License
 
 [MIT](LICENSE)
+
+utu targets Chrome and WebKit (Safari). Ladybird, Firefox and other toy browsers are supported only in so far as they support all the Chrome/WebKit features utu relies on.
