@@ -1023,6 +1023,8 @@ fn check_recursive_loop(node: I32, call: I32, gen: I32, cap: I32, elem: I32, ins
 fn check_prune(node: I32) I32 {
     if prune_flag.len() == 0 {
         report(Diag.PruneOutside, node, -1)
+        // `f(prune)`: a value, so meant as a name.
+        if diag_fresh == 1 and not is_kind(parent_of(node), Node.Block) { diag_note(hs(Ht.PruneIsAKeyword)) }
         return error_value()
     }
     // A closure in the consumer is a function of its own.

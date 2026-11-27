@@ -2052,6 +2052,8 @@ lib { fn run() I32 { return f(Many.V1); } }
     ['fn f() I32 {\n    let t = 0;\n    for i in 0..10 { t += i; };\n    t;\n}\n', 'Write for (0 ..< 10) |i|, not for i in'],
     ['let INF = 1;\n', 'Names of values and functions start lowercase (a capital starts a type)'],
     ['fn F() I32 { 1; }\n', 'Names of values and functions start lowercase (a capital starts a type)'],
+    ['mem W: I32\n', 'Names of values and functions start lowercase (a capital starts a type)'],
+    ['vec V: I32\n', 'Names of values and functions start lowercase (a capital starts a type)'],
     ['fn f() I32 {\n    let i = 0;\n    i++;\n    i;\n}\n', 'utu has no ++; write += 1'],
     ['fn f(s: Str) I32 { match s { "+" => 1, ~> 0, }; }\n', 'match takes number, Bool, and enum patterns, not strings'],
     ['fn f() Bool { return true and (0 ..< 5) all |i| { i < 9; }; }\n', 'A pipeline binds looser than and: its source is all of this'],
@@ -2196,6 +2198,8 @@ lib { fn run() I32 { return f(Many.V1); } }
     ['lib { fn run() F64 { return Time.now(); } }\n', 'using time from std:time (the module is time)'],
     ['using Time from std:time;\nlib { fn run() F64 { return time.now(); } }\n', 'using time from std:time (the module is time)'],
     ['main { console.log("hi"); }\n', 'using console from std:console'],
+    // `prune` as a value: meant as a name, which a keyword cannot be.
+    ['fn f(prune: I32) I32 { return prune }\nlib { fn run() I32 { return f(1) } }\n', "'prune' is a keyword, so it cannot name a value: rename it"],
   ]) {
     const { diagnostics } = await compileFile(utu, await write(source), { optimize: 'size' });
     assert.ok(diagnostics[0]?.notes?.includes(note), `${source}\n  notes: ${diagnostics[0]?.notes}`);

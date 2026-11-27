@@ -742,8 +742,8 @@ fn foreign_habit(file: I32, k: I32, t: I32) Bool {
             return true
         }
     }
-    if (tok_says(k, "let") or tok_says(k, "fn")) and tok_is(n, Tok.Word) and lower_byte(src[tok_start[n]]) != src[tok_start[n]] and (t == n or t == tok_after(n)) {
-        // `let INF = 1;`, `fn F() I32`: a capital starts a type's name.
+    if (tok_says(k, "let") or tok_says(k, "fn") or tok_says(k, "mem") or tok_says(k, "vec")) and tok_is(n, Tok.Word) and lower_byte(src[tok_start[n]]) != src[tok_start[n]] and (t == n or t == tok_after(n)) {
+        // `let INF = 1;`, `fn F() I32`, `mem W: I32`: a capital starts a type's name.
         let low = lowered(n)
         diag_focus(n, n, hs1(Ht.AQ, low))
         diag_fix(tok_start[n], tok_end[n], low, hs1(Ht.Use, low))
@@ -1136,6 +1136,7 @@ enum(U8) Ht:
     | DuplicateLocal
     | DuplicateMethod
     | StaticAsMethod
+    | PruneIsAKeyword
 
 fn hs_src(t: Ht) Str {
     return match t {
@@ -1293,6 +1294,7 @@ fn hs_src(t: Ht) Str {
         Ht.DuplicateLocal => "DuplicateLocal",
         Ht.DuplicateMethod => "DuplicateMethod",
         Ht.StaticAsMethod => "StaticAsMethod",
+        Ht.PruneIsAKeyword => "'prune' is a keyword, so it cannot name a value: rename it",
     }
 }
 
