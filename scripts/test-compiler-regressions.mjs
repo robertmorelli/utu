@@ -2076,6 +2076,8 @@ lib { fn run() I32 { return f(Many.V1); } }
 `, 'DSLs nested too deeply (max 16)'],
     ['mod t7 {\n    mem m7: I32 = [5, 6];\n}\nlib { fn run() I32 { return 1; } }\n', "Unexpected 'mem': a mem goes at the top level of a file"],
     ['struct P:\n    | name: Str\nlib { fn run() Str { let a = @stored/\\ P "k" P { name: "x" } \\/; return a.name; } }\n', '@stored needs using Browser from std:Browser'],
+    // A callback parameter of a host's Promise<void> (this crashed encoding a Void parameter).
+    ['using Browser from std:Browser\nlib { fn run(im: Browser.HTMLImageElement) Void { im.decode().then(cl(v) { }) } }\n', 'v would hold no value'],
     ['fn tab() Array[I32] { return [main()]; }\nconst mem t: I32 = @comptime/\\ tab() \\/;\nlib { fn run() I32 { return 5; } }\n', 'main is the entry point, not a function: move its body into a fn'],
     ['lib {\n    fn f(x: ?I32) I32 { promote x { |v| => v, ~> 0 }; }\n}\n', 'Missing , after 0'],
     // A generic module's type with no type arguments (this built invalid Wasm).
