@@ -27,6 +27,8 @@ struct State:
     | width: Str
     | twice: I32
     | picks: Array[Str]
+    | open: Bool
+    | clicks: Str
 
 fn cell(label: Str) Browser.HTMLElement {
     return @wutu/\
@@ -77,6 +79,7 @@ main {
         rows: [Row { id: "a", cells: ["b|c"] }, Row { id: "a|b", cells: ["c"] }],
         number: 2.5, capped: 5.0, pick: "c", options: ["a", "b", "c"],
         timer: true, beats: 0, hidden: true, width: "40%", twice: 0, picks: [""],
+        open: false, clicks: "",
     }
     let app = @wutu/\
     @reactive
@@ -123,6 +126,13 @@ main {
             on mount { chart.append(Browser.document.createTextNode("drawn;")) }
         }
         |> icon(state)
+        form#combo {
+            input#field { on focus { state.open = true } on blur { state.open = false } }
+            if state.open { ul#list { position: { "absolute" }; li { "x" } } }
+            button#pa { type = "button"; "A"; on click { state.clicks = state.clicks + "A" } }
+            button#pb { type = "button"; "B"; on click { state.clicks = state.clicks + "B" } }
+        }
+        p#clicks { | state.clicks }
         div#nested {
             |> framed(cell(state.n.str()))
             for state.rows |row| key row.id { |> framed(cell(row.id)) }

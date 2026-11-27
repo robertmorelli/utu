@@ -76,6 +76,13 @@ try {
     o.chartAfter = $('#chart').textContent;
     return o;
   });
+  // Trusted clicks: renders run between their events. A sibling of an if that
+  // closes on blur keeps its click.
+  await page.click('#field'); await page.click('#pa');
+  await page.click('#field'); await page.click('#pb'); await page.waitForTimeout(20);
+  Object.assign(result, await page.evaluate(() => ({
+    clicks: document.querySelector('#clicks').textContent,
+  })));
   assert.deepEqual(result, {
     pending: 0, enabled: true, hydrated: [true, '40%', 'tip'], label: 'q', card: 'custom', chart: 'drawn;', circle: '0', xlink: ['#c0', 'preserve'],
     rows: [1, 1], method: 'm0',
@@ -84,6 +91,7 @@ try {
     rowsAfter: [1, 1], methodAfter: 'm1', clockChanged: true, submitted: '2',
     numbers: ['7', '20'], pickAfter: 'd',
     template: 'ab;', multiStart: [[true, false], '1'], multiNone: [[false, false], '0'], multiEmpty: [[true, false], '1'], beatsStill: true, chartAfter: 'drawn;',
+    clicks: 'AB',
   });
   assert.deepEqual(errors, []);
   console.log(`${engine.name()}: Wutu regressions (hydration, reuse, bindings, timers, @unmanaged, custom elements, SVG roots) passed`);

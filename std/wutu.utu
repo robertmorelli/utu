@@ -154,13 +154,14 @@ mod wutu {
     const selection = focused && 'selectionStart' in focused
       ? [focused.selectionStart, focused.selectionEnd, focused.selectionDirection]
       : null;
+    const keep = new Set(wanted), end = range ? range.end : null;
     let cursor = range ? range.start.nextSibling : parent.firstChild;
     for (const node of wanted) {
+      while (cursor && cursor !== end && !keep.has(cursor)) cursor = cursor.nextSibling;
       if (node === cursor) { cursor = cursor.nextSibling; continue; }
       if (parent.moveBefore && node.parentNode === parent) parent.moveBefore(node, cursor);
       else parent.insertBefore(node, cursor);
     }
-    const keep = new Set(wanted);
     for (const node of [...children]) {
       if (keep.has(node)) continue;
       // The page's <head> (an `html { }` template may not write one) and Wutu's own
