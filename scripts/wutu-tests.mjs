@@ -676,6 +676,8 @@ export function registerWutuTests({ test, assert, assertEq, assertThrows, assert
       [`${BROWSER}lib { fn run() Browser.HTMLElement { return @wutu/\\ div { p { hreff = "/"; } } \\/; } }`, 'invalid-dsl-usage', 'h'],
       [`${BROWSER}lib { fn run() Browser.HTMLElement { return @wutu/\\ div { p as x { "a"; } p as x { "b"; } button { on click = cl(e) Void { x.focus(); }; } } \\/; } }`, 'invalid-dsl-usage', 'x'],
       [`${BROWSER}lib { fn run() Browser.HTMLElement { return @wutu/\\ div { |> 1 +; } \\/; } }`, 'invalid-dsl-usage', '1'],
+      // A typed event without Browser says so there.
+      ['wn panel() { button { on click |e| { let x = e.clientX; } } }\nhtml { body { |> panel(); } }', 'invalid-dsl-usage', 'o'],
     ];
     for (const [source, kind, text] of cases) {
       const diagnostics = await selfhostDiagnostics({ ROOT, source });
