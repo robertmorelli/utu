@@ -476,7 +476,10 @@ mod wutu {
           owner = outer;
           if (loud) {
             autoSave();
-            if (record.view) schedule(record.view);
+            // (A checkbox or radio is checked once its click ends: the render waits, so as not to undo that.)
+            const view = record.view;
+            if (view && e.type === 'click' && ['checkbox', 'radio'].includes(e.target.type)) setTimeout(() => schedule(view));
+            else if (view) schedule(view);
           }
         }
       });

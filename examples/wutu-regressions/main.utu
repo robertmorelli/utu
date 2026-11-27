@@ -29,6 +29,9 @@ struct State:
     | picks: Array[Str]
     | open: Bool
     | clicks: Str
+    | on: Bool
+    | radio: Str
+    | outer: I32
 
 fn cell(label: Str) Browser.HTMLElement {
     return @wutu/\
@@ -79,7 +82,7 @@ main {
         rows: [Row { id: "a", cells: ["b|c"] }, Row { id: "a|b", cells: ["c"] }],
         number: 2.5, capped: 5.0, pick: "c", options: ["a", "b", "c"],
         timer: true, beats: 0, hidden: true, width: "40%", twice: 0, picks: [""],
-        open: false, clicks: "",
+        open: false, clicks: "", on: false, radio: "a", outer: 0,
     }
     let app = @wutu/\
     @reactive
@@ -133,6 +136,13 @@ main {
             button#pb { type = "button"; "B"; on click { state.clicks = state.clicks + "B" } }
         }
         p#clicks { | state.clicks }
+        div#checks {
+            on click { state.outer += 1 }
+            input#cb { type = "checkbox"; bind:checked = state.on }
+            input#ra { type = "radio"; name = "g"; value = "a"; bind:group = state.radio }
+            input#rb { type = "radio"; name = "g"; value = "b"; bind:group = state.radio }
+        }
+        p#checked { |> state.on.str() + " " + state.radio + " " + state.outer.str() }
         div#nested {
             |> framed(cell(state.n.str()))
             for state.rows |row| key row.id { |> framed(cell(row.id)) }
