@@ -445,7 +445,8 @@ export function createWutuRuntime() {
    * saves stores and schedules the owning view, unless every handler that ran
    * was quiet (`~event`: it changed only DOM the template does not read).
    * `mount` is no DOM event: its handler runs once per element, after the
-   * render that made it.
+   * render that made it. A handler that awaits gives a promise: when it
+   * settles, every view redraws.
    */
   function listen(node, event, handler) {
     if (event === 'mount') {
@@ -455,9 +456,11 @@ export function createWutuRuntime() {
       queueMicrotask(() => {
         const outer = owner;
         owner = [node, view];
-        try { handler(new Event('mount')); } finally { owner = outer; }
+        let result;
+        try { result = handler(new Event('mount')); } finally { owner = outer; }
         autoSave();
         if (view) schedule(view);
+        if (result?.then) result.then(refresh, error => { refresh(); setTimeout(() => { throw error; }); });
       });
       return;
     }

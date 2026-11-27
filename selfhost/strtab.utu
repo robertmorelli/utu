@@ -689,9 +689,6 @@ enum(U8) Sml:
     | QuoteBracketEnd
     | MaySuspend
     | AStackSuspendsOnlyThroughUtu
-    | Suspends
-    | TheHostCallsIt
-    | AStackSuspendsOnlyThroughUtuTickCommaTickSem
     | Await
     | ForAValueUsePromote
     | Promise
@@ -890,9 +887,6 @@ fn sms_src(t: Sml) Str {
         Sml.QuoteBracketEnd => "\"]",
         Sml.MaySuspend => "may suspend",
         Sml.AStackSuspendsOnlyThroughUtu => "A stack suspends only through utu's calls, not the host's; pass a function that does not await",
-        Sml.Suspends => "suspends",
-        Sml.TheHostCallsIt => "the host calls it",
-        Sml.AStackSuspendsOnlyThroughUtuTickCommaTickSem => "A stack suspends only through utu's calls, not the host's; await outside the closure",
         Sml.Await => "await_{0}{1}",
         Sml.ForAValueUsePromote => "for a value, use promote",
         Sml.Promise => "Promise",

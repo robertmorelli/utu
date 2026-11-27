@@ -547,7 +547,6 @@ fn diag_text(i: I32) Str {
             x = word_text(view_prefix[a])
             0
         },
-        Diag.AwaitInClosure => if is_kind(node, Node.Identifier) { 0 } else { 1 },
         Diag.InvalidEscape => if a >= 1 and a <= 3 { a - 1 } else if a == 4 { 4 } else { 3 },
         Diag.EntrySurface => if a == 0 { 0 } else if a == 1 { 1 } else { 2 },
         // (No name: a closure's return, main's, or a test's.)
@@ -829,7 +828,7 @@ fn diag_text_src(k: Diag) Array[Str] {
         Diag.ForeignRecordMissing => ["Missing property {w}"],
         Diag.DslError => ["{w}"],
         Diag.WatPlace => ["@wat must be a function's whole body"],
-        Diag.AwaitInClosure => ["A function the host calls cannot await", "A closure the host calls cannot await"],
+        Diag.AwaitInClosure => ["A function the host calls cannot await"],
         Diag.AwaitInGlobal => ["A global's initializer cannot await"],
         Diag.GenericGlobal => ["A global of generic {na} cannot use {w}"],
         Diag.InvalidEscape => ["Lone surrogate", "Unknown escape {w}", "Not UTF-8", "\\u needs four hex digits", "{w} is not one character"],
