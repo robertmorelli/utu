@@ -2382,8 +2382,12 @@
           "type": "PREC",
           "value": -1,
           "content": {
-            "type": "SYMBOL",
-            "name": "type_ident"
+            "type": "PREC_DYNAMIC",
+            "value": -2,
+            "content": {
+              "type": "SYMBOL",
+              "name": "type_ident"
+            }
           }
         },
         {
