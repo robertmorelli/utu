@@ -2105,7 +2105,11 @@ fn word_expression(p: Parser) I32 {
         field_inits(p)
         return node(p, Node.Struct_init, at, first)
     }
-    if not is(p, Tok.Dot) { fail(p) }
+    // `Dot`: a variant without fields, as a value (check_type_value).
+    if not is(p, Tok.Dot) {
+        bare_type_value = true
+        return name
+    }
     advance(p)
     if is_kw(p, Kw.Null) {
         advance(p)
@@ -2241,16 +2245,22 @@ fn index_ahead(p: Parser) Bool {
 
 /// The first index on a lowercase name. Keep the successful probe's tree
 /// so the postfix parser only has to read subsequent operations.
+/// Whether a bare type name was read as a value (since try_named_index began).
+let bare_type_value: Bool = false
+
 fn try_named_index(p: Parser) I32 {
     if not is_at(p, 1, Tok.LBracket) { return -1 }
     let saved = save(p)
     let at = mark()
     let first = p.pos
+    let outer = bare_type_value
+    bare_type_value = false
     let made = try {
         identifier(p)
         advance(p)
         let slice = index_items(p)
-        if is(p, Tok.RBracket) {
+        // `m[I32]`, `m[Array[T]]`: type arguments (a bare type is no index).
+        if bare_type_value { -1 } else if is(p, Tok.RBracket) {
             advance(p)
             if index_ends_here(p) {
                 node(p, if slice { Node.Slice_expr } else { Node.Index_expr }, at, first)
@@ -2263,6 +2273,7 @@ fn try_named_index(p: Parser) I32 {
     } catch {
         -1
     }
+    bare_type_value = outer
     if made < 0 { restore(p, saved) }
     return made
 }

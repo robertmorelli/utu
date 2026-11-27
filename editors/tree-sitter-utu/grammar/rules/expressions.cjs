@@ -22,6 +22,8 @@ exports.buildExpressionRules = function buildExpressionRules() {
         // read both ways (`m[Array[T]].f()`), they are M's arguments.
         prec.dynamic(-1, $.instantiated_module_ref),
         $.type_member_expr,
+        // `Dot`: a variant without fields, as a value.
+        prec(-1, $.type_ident),
         $.null_expr,
         $.field_expr,
         $.optional_field_expr,

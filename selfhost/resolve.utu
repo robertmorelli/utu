@@ -2338,8 +2338,11 @@ fn walk_expr(node: I32, w: Walk) Void {
         if ambiguous(decl, node) { return }
         if decl < 0 { report_unknown(Diag.UnknownVariable, node, word, Seek.Value) } else { node_decl[node] = decl }
     } else if kind == Node.Type_ident.i32() {
-        // `Tag(i)`: a type called (the parser makes no other bare type an expression).
-        walk_owner_name(node)
+        // `Tag(i)`: a type called; `Dot`: a variant as a value, which two
+        // enums may have (check_type_value picks by the enum expected).
+        let decl = lookup(word_of(node))
+        if decl_is(decl, Decl.Ambiguous) and not is_kind(parent_of(node), Node.Call_expr) { node_decl[node] = decl } else { walk_owner_name(node) }
+        if decl < 0 { bool_habit(node_first[node]) }
     } else {
         walk_compound(node, kind, w)
     }

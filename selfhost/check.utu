@@ -750,6 +750,7 @@ fn check_node(node: I32, expect: I32, cx: Cx) I32 {
         Node.Assert_expr => check_assert(node, cx),
         Node.Field_expr => check_field(node, expect, cx),
         Node.Type_member_expr => check_type_member(node, expect, cx),
+        Node.Type_ident => check_type_value(node, expect, cx),
         Node.Struct_init => check_struct_init(node, expect, cx),
         Node.Implicit_struct_init => check_implicit_init(node, expect, cx),
         Node.Index_expr => check_index(node, expect, cx),
@@ -3657,6 +3658,31 @@ fn not_value(at: I32, decl: I32) I32 {
     if decl_is(decl, Decl.Alias) and not decl_is(decl_a[decl], Decl.Module) and any_reported() { return error_value() }
     if not reported_within(at) { report2(Diag.NotValue, at, decl_name[decl], if decl_is(decl, Decl.Module) or decl_is(decl, Decl.Alias) or decl_is(decl, Decl.Foreign) { 1 } else { 0 }, -1) }
     return error_value()
+}
+
+/// A bare capitalized name as a value: a variant without fields (`Dot`, as
+/// `Dot {}` is; by the enum expected when two enums have it), else no value.
+fn check_type_value(node: I32, expect: I32, cx: Cx) I32 {
+    if decl_is(node_decl[node], Decl.Ambiguous) and not expected_variant(node, expect) { return error_value() }
+    let want = expected_decl(expect)
+    if decl_is(node_decl[node], Decl.Variant) and decl_is(want, Decl.Enum) and decl_owner[node_decl[node]] != want {
+        let v = member(want, word_of(node), Space.Member)
+        if decl_is(v, Decl.Variant) { node_decl[node] = v }
+    }
+    hidden_variant(node, expect)
+    let decl = node_decl[node]
+    if decl_is(decl, Decl.Variant) and decl_is(decl_owner[decl], Decl.IntEnum) { return enum_variant_value(decl, -1) }
+    if decl_is(decl, Decl.Variant) {
+        let holder = fields_holder(decl)
+        if holder >= 0 and first_child(holder) >= 0 {
+            report2(Diag.VariantNotValue, node, word_of(node), decl_owner[decl], -1)
+            return error_value()
+        }
+        let t = type_path(node, cx.inst)
+        return if ty_is(t, Ty.Error) { error_value() } else { build_struct(t, decl, -1, node, cx) }
+    }
+    if decl >= 0 { return not_value(node, decl) }
+    return unsupported(node)
 }
 
 /// `E.V` of an enum whose variants are structs: the variant `V {}`, when it

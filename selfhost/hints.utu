@@ -897,6 +897,15 @@ fn range_text(a: I32, b: I32) Str {
 }
 
 /// Report a habit: tokens a to b written where `text` is utu's.
+/// `True` or `False` (token t) as a value, just reported unknown: the Bool literal.
+fn bool_habit(t: I32) Void {
+    if diag_fresh != 1 or not (tok_says(t, hs(Ht.True)) or tok_says(t, hs(Ht.False))) { return }
+    let lower = if tok_text(t) == hs(Ht.True) { "true" } else { "false" }
+    diag_focus(t, t, lower)
+    diag_fix(tok_start[t], tok_end[t], lower, hs1(Ht.Use, lower))
+    diag_note(hs2(Ht.WriteNot, lower, tok_text(t)))
+}
+
 fn habit(a: I32, b: I32, text: Str, message: Str) Bool {
     diag_focus(a, b, text)
     diag_fix(tok_start[a], tok_end[b], text, hs1(Ht.Use, text))

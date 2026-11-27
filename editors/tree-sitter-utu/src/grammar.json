@@ -2379,6 +2379,14 @@
           "name": "type_member_expr"
         },
         {
+          "type": "PREC",
+          "value": -1,
+          "content": {
+            "type": "SYMBOL",
+            "name": "type_ident"
+          }
+        },
+        {
           "type": "SYMBOL",
           "name": "null_expr"
         },
@@ -6055,7 +6063,8 @@
     [
       "module_name",
       "_capital_module_name",
-      "_type_head"
+      "_type_head",
+      "_expr"
     ],
     [
       "qualified_type_ref",

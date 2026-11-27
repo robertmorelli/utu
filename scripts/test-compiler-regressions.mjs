@@ -68,6 +68,29 @@ try {
 lib { fn run() I32 { let p = P { f: cl(x: I32) I32 { return x + 1; } }; return p.f(4); } }`, { run: 5 }],
     // A replacement is its text, \`$\` and all.
     ['lib { fn run() Str { return "ab-ab".replace("a", "$&$$") + "|" + "xay".replace("a", "$\'"); } }', { run: "$&$$b-$&$$b|x$'y" }],
+    // A variant without fields is a value by its bare name, as `Dot {}` is; a
+    // name two enums have, by the enum expected.
+    [`enum Shape:
+    | Dot
+    | Circle { r: I32 }
+tag enum Color:
+    | Red
+    | Green
+enum Light:
+    | Red
+    | Off
+fn area(s: Shape) I32 => alt s {
+    Dot => 0,
+    Circle |c| => c.r * c.r,
+}
+fn hue(c: Color) I32 => alt c { Green => 20, ~> 10, }
+fn lit(l: Light) I32 => alt l { Off => 300, ~> 100, }
+lib { fn run() I32 {
+    let a = Dot
+    let xs = [Dot, Circle { r: 2 }, Dot]
+    let r: Color = Red
+    return area(a) + area(xs[1]) + xs.len() + area(Dot) + hue(Green) + hue(r) + lit(Red)
+} }`, { run: 137 }],
     // `let _ = e` drops e, a Void one too.
     ['let n: I32 = 0\nfn bump() Void { n += 1 }\nlib { fn run() I32 { let _ = bump(); let _ = bump(); return n } }', { run: 2 }],
   ];
@@ -2164,6 +2187,9 @@ lib { fn run() I32 { return f(Many.V1); } }
     ['fn f(a: $T, b: $T) I32 { return 0; }\nlib { fn run() I32 { return f(1, 2); } }\n', '$T twice: bind it once, then write T'],
     ['fn show(x: $T) Str { return "a"; }\nlib { fn run() I32 { let g = show; return 0; } }\n', 'show has a $ type: call it, or name its types (let g: fun(I32) Str = show)'],
     ['using console from std:console;\nstruct Q:\n    | x: I32\nlib { fn run() I32 { console.log(Q { x: 1 }); return 0; } }\n', 'No method Q.str'],
+    // A bare variant: one with fields is a type; one two enums have needs its enum.
+    ['enum S:\n    | Dot\n    | Circle { r: I32 }\nlib { fn run() I32 { let a = Circle\n return 0 } }\n', 'S.Circle is a type, not a value'],
+    ['enum A:\n    | Red\nenum B:\n    | Red\nlib { fn run() I32 { let a = Red\n return 0 } }\n', 'Red is a variant of A and of B: write A.Red or B.Red'],
     ['fn f(a: $T, b: T) T { return a; }\nlib { fn run() I32 { let x: I64 = 1; f("s", x); return 0; } }\n', 'f takes Str, got I64'],
     // F64(x), I64(n): a literal of that type, or x converted.
     ['lib { fn run() I32 { let s = F64("a"); return 0; } }\n', 'No method Str.f64'],

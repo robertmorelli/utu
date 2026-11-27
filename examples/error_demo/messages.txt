@@ -2729,8 +2729,8 @@ ok
 --- exit 1
 
 === utu check examples/error_demo/names/09_unknown_variable_true_case.utu
- ERROR  Write true, not True
-        foreign-syntax · examples/error_demo/names/09_unknown_variable_true_case.utu:4:17
+ ERROR  Unknown type True; did you mean true?
+        unknown-type · examples/error_demo/names/09_unknown_variable_true_case.utu:4:17
 
  2 │ // Expect: Unknown variable 'True'; Bool literals are true and false
  3 │ main {
@@ -2739,6 +2739,8 @@ ok
    │                 ╰─ true
  5 │     if ready { 1; } else { 0; };
  6 │ }
+
+  note  Write true, not True
 
   fix   Use true
  4 │     let ready = true;
@@ -8046,26 +8048,26 @@ FAIL after tests: boom
 --- exit 1
 
 === utu check examples/error_demo/syntax/1020_bare_variant_value.utu
- ERROR  Dot is a type: write Dot { … }, or Enum.Dot for a variant
-        foreign-syntax · examples/error_demo/syntax/1020_bare_variant_value.utu:8:5
+ ERROR  Shape.Circle is a type, not a value
+        variant-not-value · examples/error_demo/syntax/1020_bare_variant_value.utu:8:12
 
  6 │
  7 │ fn origin() Shape {
- 8 │     Dot;
-   │     ━━━
-   │     ╰─ a type
+ 8 │     return Circle
+   │            ━━━━━━
+   │            ╰─ make one: Shape.Circle {…}
  9 │ }
 --- exit 1
 
 === utu check examples/error_demo/syntax/1021_bare_type_in_call.utu
- ERROR  Point is a type: write Point { … }, or Enum.Point for a variant
-        foreign-syntax · examples/error_demo/syntax/1021_bare_type_in_call.utu:12:22
+ ERROR  Point is a type, not a value
+        not-value · examples/error_demo/syntax/1021_bare_type_in_call.utu:12:22
 
 10 │
 11 │ main {
 12 │     console.log(norm(Point));
    │                      ━━━━━
-   │                      ╰─ a type
+   │                      ╰─ not a value
 13 │ }
 14 │ using console from std:console
 --- exit 1

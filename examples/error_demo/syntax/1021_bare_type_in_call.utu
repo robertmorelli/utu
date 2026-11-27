@@ -1,11 +1,11 @@
 // What: a struct's name passed as an argument without its braces
-// Expect: Point is a type: write Point { … }, or Enum.Point for a variant
+// Expect: Point is a type, not a value
 struct Point:
     | x: I32
     | y: I32
 
 fn norm(p: Point) I32 {
-    p.x + p.y;
+    return p.x + p.y;
 }
 
 main {
