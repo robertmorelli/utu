@@ -167,6 +167,19 @@ lib { fn run() I32 {
     checked++;
   }
 
+  // A wn's bind: is reported at the binding: without std:Browser, and (with
+  // it) a field of the wrong type, once (both had no place: a wn's template
+  // is generated code in generated code).
+  for (const [source, message, line, column] of [
+    ['struct S:\n    | t: Str\nwn field(s: S) {\n    input { bind:value = s.t }\n}\nhtml {\n    body {\n        |> field(S { t: "" })\n    }\n}\n', 'bind:value needs using Browser from std:Browser', 4, 13],
+    ['using Browser from std:Browser\nstruct S:\n    | n: I32\nwn field(s: S) {\n    input { bind:value = s.n }\n}\nhtml {\n    body {\n        |> field(S { n: 1 })\n    }\n}\n', 'Field n is I32, got Str', 5, 13],
+  ]) {
+    const file = await write(source);
+    const { diagnostics } = await compileFile(utu, file);
+    assert.deepEqual(diagnostics.map(d => [d.message, d.file, d.line, d.column]), [[message, file, line, column]], source);
+    checked++;
+  }
+
   // An @ir function named as a value, in the middle of another function's
   // locals, which its making once overwrote (stage 0 cannot build this).
   const valued = await selfhost(await write(`fn plus(a: I32, b: I32) I32 => @ir/\\ <ir-i32-add><ir-ident name="a"/><ir-ident name="b"/></ir-i32-add> \\/;

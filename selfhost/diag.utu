@@ -1150,6 +1150,8 @@ fn diag_at(i: I32) I32 {
     // Code a DSL generated: its site.
     if node >= 0 {
         let site = dsl_site_of(node)
+        // (A site in code generated for another, as a wn's template is: that one's.)
+        while (site >= 0 and dsl_site_of(site) >= 0) { site = dsl_site_of(site) }
         if site >= 0 { return site }
     }
     return node

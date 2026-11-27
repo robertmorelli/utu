@@ -976,6 +976,7 @@ fn wd_element(n: I32, outer_svg: Bool, o: WOps) Str {
 
 /// A binding's code: the property written on render, read back on input.
 fn wd_binding(n: I32, i: I32) Str {
+    if wu_has_browser == 0 { wutu_fail(wus1(Wut.BindNeedsBrowser, word_text(ti_a[i])), ti_at[i]) }
     let id = node_uid(n)
     let target = wutu_island(word_text(ti_b[i]), ti_from[i], ti_to[i], n)
     let kind = word_text(ti_a[i])
@@ -1215,6 +1216,7 @@ enum(U16) Wut:
     | Node
     | AmbiguousElementAliasReferenceItInside
     | TypedEventNeedsBrowser
+    | BindNeedsBrowser
     | InvalidUtuInterpolationAtOffset
     | InternalNoWutuHelper
     | LetFunEs
@@ -1486,6 +1488,7 @@ fn wus_src(t: Wut) Str {
         Wut.Node => "{0}node{1}",
         Wut.AmbiguousElementAliasReferenceItInside => "Ambiguous element alias '{0}'; reference it inside its own subtree",
         Wut.TypedEventNeedsBrowser => "on {0} |{1}| makes {1} a Browser.{2}, which needs using Browser from std:Browser",
+        Wut.BindNeedsBrowser => "bind:{0} needs using Browser from std:Browser",
         Wut.InvalidUtuInterpolationAtOffset => "Invalid Utu interpolation at offset {0}: {1}{2}",
         Wut.InternalNoWutuHelper => "internal: no Wutu helper {0}",
         Wut.LetFunEs => "let {0}: fun({1}) {2} = @es/\\ {3} \\/;",
