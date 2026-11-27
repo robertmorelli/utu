@@ -1,6 +1,7 @@
 // DSL envelopes: `@name/\ payload \/`, where payloads may nest balanced
-// envelopes. Mirrors the external scanner; used by DSL expanders, formatters,
-// and editor projections that must find payloads without parsing Utu.
+// envelopes. Mirrors the external scanner; used by the editor's CSS
+// projection (css-stencil.js), which must find payloads without parsing Utu.
+// (The formatter's are selfhost/tools/wutu_format.utu's.)
 
 /** The offset just past the string whose `"` is at `i` (its line's end if it has no closing quote). */
 export function dslStringEnd(source, i) {
@@ -37,12 +38,6 @@ const OPENER = /@(\w+)\s*\/\\/y;
 export function dslOpenerAt(source, offset) {
   OPENER.lastIndex = offset;
   return OPENER.exec(source);
-}
-
-/** If a DSL literal starts at `start`, the offset just past it; otherwise `start`. */
-export function skipDsl(source, start) {
-  const opener = dslOpenerAt(source, start);
-  return opener ? dslEnd(source, start + opener[0].length) + 2 : start;
 }
 
 /**

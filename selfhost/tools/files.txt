@@ -4,3 +4,5 @@ blame_places.utu
 blame_module.utu
 blame_report.utu
 blame_page.utu
+wutu_format.utu
+format.utu

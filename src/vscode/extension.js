@@ -1,6 +1,6 @@
 import * as vscode from 'vscode';
 import { cssProjection } from '../wutu/css-stencil.js';
-import { createSyntaxShape, formatUtu, wutuCompletions } from '../wutu/wutu-tooling.js';
+import { formatUtu, wutuCompletions } from '../wutu/wutu-tooling.js';
 
 const LANGUAGE_ID = 'utu';
 const DOCUMENT_SELECTOR = Object.freeze({ language: LANGUAGE_ID, scheme: '*' });
@@ -62,7 +62,7 @@ export async function activate(context) {
     }),
     vscode.languages.registerCompletionItemProvider(DOCUMENT_SELECTOR, {
       provideCompletionItems(document, position) {
-        return wutuCompletions(document.getText(), document.offsetAt(position));
+        return service.completions(document.getText(), document.offsetAt(position));
       },
     }, '<', ':', '@'),
     vscode.languages.registerHoverProvider(DOCUMENT_SELECTOR, semanticHoverProvider(service)),
@@ -188,7 +188,8 @@ export function deactivate() {
 }
 
 /**
- * Everything comes from the self-hosted compiler (dist/utu.wasm), which
+ * Everything comes from the self-hosted compiler with its tools
+ * (dist/utu-tools.wasm: formatting and completions are the tools'), which
  * holds one program at a time. A document's program is built for its tests,
  * for its exports and for analysis (every function checked, the last build):
  * diagnostics come from all three, and hover, inlay hints, definitions,
@@ -206,8 +207,8 @@ export function createCompilerService(output = null) {
     const read = name => vscode.workspace.fs.readFile(vscode.Uri.joinPath(dist, name));
     const [api, wasm, spec] = await Promise.all([
       import(vscode.Uri.joinPath(dist, 'selfhost', 'utu.js').toString()),
-      read('utu.wasm'),
-      read('utu.host.json').then(bytes => JSON.parse(decoder.decode(bytes))),
+      read('utu-tools.wasm'),
+      read('utu-tools.host.json').then(bytes => JSON.parse(decoder.decode(bytes))),
     ]);
     const utu = await api.loadCompiler(wasm, spec);
     const host = {
@@ -338,8 +339,12 @@ export function createCompilerService(output = null) {
     format(source) {
       return exclusive(async ({ utu }) => {
         current = null;
-        return (await formatUtu(source, { shape: createSyntaxShape(utu) })).text;
+        return formatUtu(utu, source).text;
       }).catch(() => null);
+    },
+    // The Wutu completions at `offset` (they read no program: no need to wait for one).
+    async completions(source, offset) {
+      return wutuCompletions((await load()).utu, source, offset);
     },
     invalidate() {
       generation++;
