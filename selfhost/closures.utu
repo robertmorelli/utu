@@ -639,7 +639,8 @@ fn check_closure(node: I32, expect: I32, cx: Cx) I32 {
     }
     if not single { w_node(Op.StructNew, vt_ref(env, false), env, 0, me) }
     let t = ty(Ty.Closure, types_list(ptypes, n), result)
-    w_i32((if single { 2 } else { 0 }) + closure_bits(ty_a[t], result))
+    let awaits = if awaits_in(last_child(node)) >= 0 { 1 << 30 } else { 0 }
+    w_i32((if single { 2 } else { 0 }) + awaits + closure_bits(ty_a[t], result))
     w_node(Op.Call, vt_externref, closure_new(), 0, m)
     return t
 }
@@ -692,7 +693,8 @@ fn closure_syntax_type(node: I32, inst: I32) I32 {
 /// `(fn: funcref, env: anyref, flags: i32) → externref`: a closure, made by
 /// the host's `utu.closure_new(fn, env, flags, record)`, the record a struct
 /// of fn and env the host keeps on it for @closure_invoker. Flags: 1, the
-/// result is a Bool; 2, the environment is there even when null.
+/// result is a Bool; 2, the environment is there even when null; 1 << 30,
+/// the body may await (the host's calls give a promise).
 fn closure_new() I32 {
     if closure_parts[2] >= 0 { return closure_parts[2] }
     let m = vl_begin()
@@ -906,12 +908,14 @@ fn write_closure_json() Void {
 
 //! = Closures the host calls
 //!
-//! The host calls a closure through its JS function, a frame JSPI cannot
-//! suspend through: such a closure may not await. Reported where a closure
-//! written in the call (or bound by a `let`) is given to the host: an `@es`
-//! or declared host function, or a utu function that hands the parameter on
-//! to one (`Promise.then`, `Stream.map`). A closure value given to the host
-//! that awaits fails when it suspends, at run time.
+//! The host calls a closure through its JS function. One whose body may
+//! await is made with @closure_new's flag 1 << 30, and its JS function is
+//! then an async one (`WebAssembly.promising`): the host's call gives a
+//! promise of its result, and the body suspends under it. A named function
+//! given to the host is its funcref, a frame JSPI cannot suspend through:
+//! such a function may not await. Reported where it is given to the host: an
+//! `@es` or declared host function, or a utu function that hands the
+//! parameter on to one (`Promise.then`, `Stream.map`).
 
 /// By function declaration: 1 when its body may await (itself, or a function
 /// it calls by name), 2 when not, 3 while it is looked at.
@@ -919,23 +923,13 @@ vec decl_awaits: U8
 /// By parameter declaration: 1 when its function hands it to the host, 2 when not.
 vec param_to_host: U8
 
-/// Report a closure `arg` that awaits, given to the host.
+/// Report a named function `arg` that awaits, given to the host.
 fn host_callback(arg: I32) Void {
-    let c = closure_node(arg)
-    if c < 0 {
-        let d = named_fn(arg)
-        if d < 0 or not fn_awaits(d) { return }
-        report(Diag.AwaitInClosure, arg, -1)
-        diag_label(sms(Sml.MaySuspend))
-        diag_note(sms(Sml.AStackSuspendsOnlyThroughUtu))
-        return
-    }
-    let at = awaits_in(last_child(c))
-    if at < 0 { return }
-    report(Diag.AwaitInClosure, at, -1)
-    diag_label(if is_kind(at, Node.Await_expr) { sms(Sml.Suspends) } else { sms(Sml.MaySuspend) })
-    diag_place_tokens(Extra.Related, node_first[c], node_first[c], sms(Sml.TheHostCallsIt))
-    diag_note(sms(Sml.AStackSuspendsOnlyThroughUtuTickCommaTickSem))
+    let d = named_fn(arg)
+    if d < 0 or not fn_awaits(d) { return }
+    report(Diag.AwaitInClosure, arg, -1)
+    diag_label(sms(Sml.MaySuspend))
+    diag_note(sms(Sml.AStackSuspendsOnlyThroughUtu))
 }
 
 /// The function declaration an argument names (in parentheses, too); or -1.
@@ -948,16 +942,16 @@ fn named_fn(written: I32) I32 {
 }
 
 /// The arguments of a call of function `decl` (-1: a host function's), from
-/// its parameter `first`: each closure or named function the host is given,
-/// reported when it awaits.
+/// its parameter `first`: each named function the host is given, reported
+/// when it awaits.
 fn host_callbacks(decl: I32, args: I32, first: I32) Void {
     if args < 0 { return }
-    // (The parameters, made at the first closure: most calls pass none.)
+    // (The parameters, made at the first function: most calls pass none.)
     let decls = -1
     let i = first
     let a = first_child(args)
     while (a >= 0) {
-        if closure_node(a) >= 0 or named_fn(a) >= 0 {
+        if named_fn(a) >= 0 {
             if decl >= 0 and decls < 0 { decls = param_decls(decl) }
             if decl < 0 or (i < vl_len[decls] and to_host(decl, vl_item(decls, i))) { host_callback(a) }
         }

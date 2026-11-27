@@ -1907,67 +1907,6 @@ ok
  7 │ }
 --- exit 1
 
-=== utu check examples/error_demo/iterators/340_await_closure_to_es.utu
- ERROR  A closure the host calls cannot await
-        await-in-closure · examples/error_demo/iterators/340_await_closure_to_es.utu:7:31
-
- 5 │
- 6 │ main {
- 7 │     each(cl(v) { let w: I32 = await later(v); });
-   │          ──                   ━━━━━━━━━━━━━━
-   │          │                    ╰─ suspends
-   │          ╰─ the host calls it
- 8 │ }
-
-  note  A stack suspends only through utu's calls, not the host's; await outside the closure
---- exit 1
-
-=== utu check examples/error_demo/iterators/341_await_through_fn_in_then.utu
- ERROR  A closure the host calls cannot await
-        await-in-closure · examples/error_demo/iterators/341_await_through_fn_in_then.utu:8:35
-
- 6 │
- 7 │ main {
- 8 │     later(1).then(cl(v) { let w = slow(v); });
-   │                   ──              ━━━━━━━
-   │                   │               ╰─ may suspend
-   │                   ╰─ the host calls it
- 9 │ }
-
-  note  A stack suspends only through utu's calls, not the host's; await outside the closure
---- exit 1
-
-=== utu check examples/error_demo/iterators/342_await_let_closure_to_es.utu
- ERROR  A closure the host calls cannot await
-        await-in-closure · examples/error_demo/iterators/342_await_let_closure_to_es.utu:7:36
-
- 5 │
- 6 │ main {
- 7 │     let tick = cl() { let v: I32 = await later(1); };
-   │                ──                  ━━━━━━━━━━━━━━
-   │                │                   ╰─ suspends
-   │                ╰─ the host calls it
- 8 │     on_tick(tick);
- 9 │ }
-
-  note  A stack suspends only through utu's calls, not the host's; await outside the closure
---- exit 1
-
-=== utu check examples/error_demo/iterators/343_await_closure_to_declared_host.utu
- ERROR  A closure the host calls cannot await
-        await-in-closure · examples/error_demo/iterators/343_await_closure_to_declared_host.utu:8:49
-
- 6 │
- 7 │ main {
- 8 │     Browser.setTimeout(cl() Void { let v: I32 = await later(1); }, 0.0);
-   │                        ──                       ━━━━━━━━━━━━━━
-   │                        │                        ╰─ suspends
-   │                        ╰─ the host calls it
- 9 │ }
-
-  note  A stack suspends only through utu's calls, not the host's; await outside the closure
---- exit 1
-
 === utu check examples/error_demo/iterators/34_for_float_range.utu
  ERROR  for needs an array or range, not F32
         invalid-for-source · examples/error_demo/iterators/34_for_float_range.utu:5:10
@@ -2424,37 +2363,12 @@ ok
 --- exit 1
 
 === utu check examples/error_demo/iterators/66_await_in_closure.utu
- ERROR  A closure the host calls cannot await
-        await-in-closure · examples/error_demo/iterators/66_await_in_closure.utu:8:22
-
- 6 │ main {
- 7 │     later(1).then(cl(v) {
-   │                   ──
-   │                   ╰─ the host calls it
- 8 │         let w: I32 = await later(v + 1);
-   │                      ━━━━━━━━━━━━━━━━━━
-   │                      ╰─ suspends
- 9 │         return record(w);
-10 │     });
-
-  note  A stack suspends only through utu's calls, not the host's; await outside the closure
---- exit 1
+ok
+--- exit 0
 
 === utu check examples/error_demo/iterators/68_await_in_stream_map.utu
- ERROR  A closure the host calls cannot await
-        await-in-closure · examples/error_demo/iterators/68_await_in_stream_map.utu:6:61
-
- 4 │
- 5 │ main {
- 6 │     let s = Stream[I32].of([1, 2]).map(cl(v) { let w: I32 = await later(v); return w; });
-   │                                        ──                   ━━━━━━━━━━━━━━
-   │                                        │                    ╰─ suspends
-   │                                        ╰─ the host calls it
- 7 │     let total = 0;
- 8 │     await for (s) |v| { total += v; };
-
-  note  A stack suspends only through utu's calls, not the host's; await outside the closure
---- exit 1
+ok
+--- exit 0
 
 === utu check examples/error_demo/iterators/69_await_promise_wrong_type.utu
  ERROR  n is I32, got Str

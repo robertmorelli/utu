@@ -104,16 +104,19 @@ export function closureImports(closureSpec, utu = {}) {
 // result (unsigned in JS); the rest, from bit 4, one plus an index into the
 // module's `sigs`, a string of one letter per argument: b, a Bool (as 0 or 1);
 // h (safe builds), a handle, never null (wasm would take null); n, nullable
-// (undefined is null, as for host calls). A decayed `fun` is
+// (undefined is null, as for host calls); 1 << 30, the body may await: its
+// JS function is async, and gives its result as a promise. A decayed `fun` is
 // one closure per function (a funcref is one JS function per wasm function),
 // so `removeEventListener` finds the one `addEventListener` was given.
 const DECAYED = new WeakMap();
+const ASYNC = 1 << 30;
 export const closureNew = (fn, env, flags, record, sigs) => {
   const fun = env == null && !(flags & 2);
   const known = fun && DECAYED.get(fn);
   if (known) return known;
-  const call = fun ? (...args) => fn(...args) : (...args) => fn(env, ...args);
-  const kinds = sigs?.[(flags >> 4) - 1];
+  const body = flags & ASYNC ? promising(fn) : fn;
+  const call = fun ? (...args) => body(...args) : (...args) => body(env, ...args);
+  const kinds = sigs?.[((flags & ~ASYNC) >> 4) - 1];
   const invoke = kinds ? (...args) => {
     for (let k = 0; k < kinds.length; k++) {
       const c = kinds[k];
@@ -123,7 +126,8 @@ export const closureNew = (fn, env, flags, record, sigs) => {
     }
     return call(...args);
   } : call;
-  const closure = flags & 1 ? (...args) => !!invoke(...args)
+  const closure = flags & ASYNC ? (flags & 13 ? (...args) => invoke(...args).then(v => flags & 1 ? !!v : flags & 4 ? v >>> 0 : BigInt.asUintN(64, v)) : invoke)
+    : flags & 1 ? (...args) => !!invoke(...args)
     : flags & 4 ? (...args) => invoke(...args) >>> 0
     : flags & 8 ? (...args) => BigInt.asUintN(64, invoke(...args))
     : invoke;

@@ -654,6 +654,59 @@ export function registerWutuTests({ test, assert, assertEq, assertThrows, assert
     });
   });
 
+  test('wutu: a handler that awaits redraws when its promise settles', async ({ ROOT }) => {
+    await withDom(async (document) => {
+      globalThis.__wutuGate = [];
+      try {
+        const { instance } = await compileAndInstantiateSelfhost({ ROOT, name: 'wutu_await_handler.utu', source: `${BROWSER}
+          let load: fun(I32) Promise[I32] = @es/\\ (n) => new Promise((r, no) => globalThis.__wutuGate.push(ok => ok ? r(n) : no(new Error('no')))) \\/
+          struct State:
+              | n: I32
+              | text: Str
+          lib { fn run() Browser.HTMLElement {
+            let state = State { n: 0, text: "" }
+            return @wutu/\\
+            @reactive;
+            main {
+              p { | state.n.str(); }
+              span { | state.text; }
+              button { on click { state.n = await load(state.n + 1) } }
+              form { on submit = cl(e) { state.text = "wait"; state.n = await load(10); state.text = "half"; state.n = await load(20); state.text = "done" } }
+              i { on mount { state.text = "mount " + (await load(5)).str() } }
+            }
+            \\/
+          } }
+        `});
+        const root = instance.exports.run();
+        document.body.append(root);
+        const open = async ok => { globalThis.__wutuGate.shift()(ok); await settle(); };
+        await settle();
+        await open(true);
+        assertEq(root.querySelector('span').textContent, 'mount 5');
+        root.querySelector('button').dispatchEvent(new globalThis.Event('click'));
+        await settle();
+        assertEq(root.querySelector('p').textContent, '0');
+        await open(true);
+        assertEq(root.querySelector('p').textContent, '1');
+        root.querySelector('form').dispatchEvent(new globalThis.Event('submit'));
+        await settle();
+        assertEq(root.querySelector('span').textContent, 'wait');
+        await open(true);
+        // A rejection redraws too, then reports the error.
+        const errors = [];
+        const timeout = globalThis.setTimeout;
+        globalThis.setTimeout = (f, ms) => timeout(() => { try { f(); } catch (e) { errors.push(e); } }, ms);
+        try {
+          await open(false);
+          await settle();
+        } finally { globalThis.setTimeout = timeout; }
+        assertEq(root.querySelector('p').textContent, '10');
+        assertEq(root.querySelector('span').textContent, 'half');
+        assert(errors.length === 1, `the rejection is reported once: ${errors}`);
+      } finally { delete globalThis.__wutuGate; }
+    });
+  });
+
   test('wutu: a float prop changing from negative zero redraws its component', async ({ ROOT }) => {
     await withDom(async document => {
       const { instance } = await compileAndInstantiateSelfhost({ ROOT, name: 'wutu_signed_zero.utu', source: `${BROWSER}
