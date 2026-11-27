@@ -767,6 +767,8 @@ fn host_assignable(actual: I32, expected: I32) Bool {
     // (a closure's result too: `cl(F64) Promise[F64]` for `(x: number) => Promise<number>`)
     if ty_is(a, Ty.Closure) and ty_is(e, Ty.Closure) and ty_a[a] == ty_a[e] and ty_b[a] >= 0 and ty_b[e] >= 0 and (same_promise(ty_b[a], ty_b[e]) or same_promise(ty_b[e], ty_b[a])) { return true }
     if is_foreign(a) and is_foreign(e) and has_base(a, e, 0) { return true }
+    if is_foreign(a) and ty_is(e, Ty.Closure) and closure_fits(a, e) { return true }
+    if ty_is(a, Ty.Closure) and is_foreign(e) and closure_fits(e, a) { return true }
     if is_foreign(e) {
         let host = is_host_value(a)
         if host and (is_dynamic(e) or is_dynamic(a)) { return true }
@@ -923,6 +925,24 @@ fn sig_fits(da: Ref, sa: I32, de: Ref, se: I32, view: I32) Bool {
     if ty_is(re, Ty.Void) or is_dynamic(re) { return true }
     let ra = foreign_type(Ref { doc: da.doc, at: jget(sa, "result"), env: da.env }, view)
     return ra == re or host_assignable(ra, re) or (ty_is(re, Ty.Nullable) and boxed_primitive(ty_a[re]) == ra)
+}
+
+/// Whether host function type `f` is closure type `c`: one call signature,
+/// of c's parameters' types (no rest), and c's result. Both are a JS function.
+fn closure_fits(f: I32, c: I32) Bool {
+    let d = describe(ref_of(f))
+    let calls = desc_get(d, "calls")
+    if jlen(calls) != 1 { return false }
+    let sig = jfirst(calls)
+    let params = jget(sig, "params")
+    let cps = ty_a[c]
+    if jlen(params) != vl_len[cps] { return false }
+    for (0 ..< vl_len[cps]) |i| {
+        let p = jitem(params, i)
+        if jis_true(jget(p, "rest")) or param_type(d, p, fty_view[f]) != vl_item(cps, i) { return false }
+    }
+    let r = foreign_type(Ref { doc: d.doc, at: jget(sig, "result"), env: d.env }, fty_view[f])
+    return r == ty_b[c] or (ty_is(r, Ty.Void) and ty_is(ty_b[c], Ty.Void))
 }
 
 /// Parameter `i` of a signature's `params`: its own, or past the last its
