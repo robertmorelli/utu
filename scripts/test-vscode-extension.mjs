@@ -57,7 +57,7 @@ try {
   const template=makeDocument(vscode.Uri.parse('file:///format.utu'), 'fn page() Void { let node=@wutu/\\ main {button {"Go";}} \\/; }');
   const edits=await providers.format.provideDocumentFormattingEdits(template);
   if(edits.length!==1||!edits[0].newText.includes('\n'))throw Error('Wutu formatter did not provide an edit');
-  const completions=providers.completion.provideCompletionItems(template,template.positionAt(template.getText().indexOf('button')));
+  const completions=await providers.completion.provideCompletionItems(template,template.positionAt(template.getText().indexOf('button')));
   if(!completions.some(c=>c.label==='bind:value'))throw Error('Wutu completions missing');
   const hover = await providers.hover.provideHover(document, document.positionAt(source.indexOf('x +')));
   if (!hover?.contents?.value?.includes('I32')) throw new Error('semantic hover did not expose the inferred type');
