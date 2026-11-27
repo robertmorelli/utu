@@ -27,7 +27,7 @@ export function programIndex(utu, files) {
     kind: decl => utu.decl_kind_name(decl),
     /** Every declaration made in file `key` (in every file, for null), each with its kind and owner. */
     declarations: (key = null) => json(utu.query_declarations(id(key))),
-    /** Every name in file `key` (in every file, for null) that resolves, with its declaration, in source order. */
+    /** Every name in file `key` that resolves, with its declaration, in source order. */
     names: key => json(utu.query_names(id(key))),
     /** The smallest typed syntax at a cursor, with facts from the checker. */
     explainAt: (key, offset) => json(utu.query_explain(id(key), offset)),

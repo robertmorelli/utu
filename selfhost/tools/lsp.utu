@@ -104,17 +104,28 @@ fn q_links() Void {
         if q_kind(d) == Decl.ProtoMember and q_definition(d).file >= 0 { members.push(d) }
     }
     if members.len() == 0 { return }
-    // The names of protocols, in order.
-    let names = q_names(-1)
+    // The names of protocols, by file, in order (each place once).
+    let is_protocol = Array[I32].new(decl_kind.len(), 0)
+    for (0 ..< members.len()) |m| { if decl_owner[members[m]] >= 0 { is_protocol[decl_owner[members[m]]] = 1 } }
     let protocols = Pile[I32].new()
     let places = Pile[QPlace].new()
-    for (0 ..< names.len()) |i| {
-        let d = names[i]
-        let is_protocol = false
-        for (0 ..< members.len()) |m| { if decl_owner[members[m]] == d { is_protocol = true } }
-        if is_protocol {
-            protocols.push(d)
-            places.push(q_name_places[i])
+    q_file_nodes()
+    for (0 ..< file_start.len()) |f| {
+        let found = Pile[I32].new()
+        let starts = Pile[I32].new()
+        for (q_fn_at[f] ..< q_fn_at[f + 1]) |k| {
+            let n = q_fn[k]
+            if pl_named(n) and node_decl[n] < decl_kind.len() and is_protocol[node_decl[n]] == 1 {
+                found.push(n)
+                starts.push(pl_node_start(n))
+            }
+        }
+        let order = pl_order(starts.finish(), found.len())
+        for (0 ..< order.len()) |o| {
+            let n = found[order[o]]
+            if o > 0 and starts[order[o]] == starts[order[o - 1]] { continue }
+            protocols.push(node_decl[n])
+            places.push(q_place(n))
         }
     }
     for (0 ..< all.len()) |i| {

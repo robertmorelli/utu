@@ -665,18 +665,15 @@ fn q_declarations(f: I32) Str {
     return "[" + out + "]"
 }
 
-/// Every name in file f (every file, for -1) that resolves, with its
-/// declaration, in order (by file, then place; each place once): see @pl_names.
+/// Every name in file f that resolves, with its declaration, in order
+/// (each place once): see @pl_names.
 fn q_names(f: I32) Pile[I32] {
     let decls = Pile[I32].new()
     q_name_places = Pile[QPlace].new()
-    if f < -1 { return decls }
-    for (0 ..< file_start.len()) |g| {
-        if f >= 0 and g != f { continue }
-        for (0 ..< pl_names(g)) |k| {
-            decls.push(pl_name_decl[k])
-            q_name_places.push(QPlace { file: g, start: pl_unit(g, pl_name_start[k]), end_: pl_unit(g, pl_name_end[k]) })
-        }
+    if f < 0 { return decls }
+    for (0 ..< pl_names(f)) |k| {
+        decls.push(pl_name_decl[k])
+        q_name_places.push(QPlace { file: f, start: pl_unit(f, pl_name_start[k]), end_: pl_unit(f, pl_name_end[k]) })
     }
     return decls
 }
