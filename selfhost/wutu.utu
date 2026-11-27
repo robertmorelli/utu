@@ -562,6 +562,7 @@ fn element_interface(tag: Str) Str {
     if tag == wus(Wut.Progress) { return wus(Wut.Progress2) }
     if tag == wus(Wut.Meter) { return wus(Wut.Meter2) }
     if tag == wus(Wut.Output) { return wus(Wut.Output2) }
+    if tag == "data" { return "Data" }
     return ""
 }
 

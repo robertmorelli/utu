@@ -230,6 +230,7 @@ fn tag_attributes(tag: Str) Str {
     if tag == wps(Wpt.Meter) { return wps(Wpt.ValueMinMaxLowHighOptimum) }
     if tag == wps(Wpt.Ol) { return wps(Wpt.StartReversedType) }
     if tag == wps(Wpt.Li) { return "value" }
+    if tag == "data" { return "value" }
     if tag == "time" { return wps(Wpt.Datetime) }
     if tag == wps(Wpt.Del) or tag == wps(Wpt.Ins) { return wps(Wpt.DatetimeCite) }
     if tag == wps(Wpt.Blockquote) or tag == wps(Wpt.Q) { return wps(Wpt.Cite) }

@@ -464,6 +464,23 @@ export function registerWutuTests({ test, assert, assertEq, assertThrows, assert
     }
   });
 
+  test('wutu: data takes a value attribute and is an HTMLDataElement', async ({ ROOT }) => {
+    // (linkedom has no HTMLDataElement, so `.value` is only checked.)
+    const typed = await selfhostDiagnostics({ ROOT, source: `${BROWSER}
+      lib { fn run(x: Str) Browser.HTMLElement {
+        return @wutu/\\ data as d { .value = x; on click { d.value = d.value + "?"; } } \\/;
+      } }
+    `});
+    assertEq(typed.filter(d => d.severity !== 'warning').map(d => d.message).join('; '), '');
+    await withDom(async (document) => {
+      const { instance } = await compileAndInstantiateSelfhost({ ROOT, name: 'wutu_data_value.utu', source: `${BROWSER}
+        lib { fn run(x: Str) Browser.HTMLElement { return @wutu/\\ div { data { value = x; "a"; } } \\/; } }
+      `});
+      const root = instance.exports.run('12');
+      assertEq(root.querySelector('data').getAttribute('value'), '12');
+    });
+  });
+
   test('wutu: CSS declarations with { expr } values apply at render time, statically and reactively', async ({ ROOT }) => {
     for (const reactive of [false, true]) {
       await withDom(async (document) => {
