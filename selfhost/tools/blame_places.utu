@@ -1,0 +1,243 @@
+//! = Size blame: places
+//!
+//! The last build's syntax as places: each node a file of the host's
+//! (blame_file), a line, and the declaration it is in, numbered as they are
+//! first asked (blame_tables); and the module's entities (by index there)
+//! and source map entries on them.
+
+// ── Strings ─────────────────────────────────────────────────────────────────
+
+/// The strings blame keeps (names, file keys, texts), by id (bs_add).
+let bs_items: Array[Str] = Array[Str].new(0, "")
+let bs_count: I32 = 0
+
+fn bs_add(s: Str) I32 {
+    if bs_count == bs_items.len() {
+        let grown = Array[Str].new(bs_count * 2 + 64, "")
+        for (0 ..< bs_count) |i| { grown[i] = bs_items[i] }
+        bs_items = grown
+    }
+    bs_items[bs_count] = s
+    bs_count += 1
+    return bs_count - 1
+}
+
+fn bs(id: I32) Str => bs_items[id]
+
+/// The text of `count` UTF-8 bytes; a byte that is not UTF-8 is U+FFFD.
+fn utf8_text(bytes: Array[I32], count: I32) Str {
+    let codes = Array[I32].new(count, 0)
+    let k = 0
+    let i = 0
+    while (i < count) {
+        let b = bytes[i]
+        let n = if b < 128 { 1 } else if b >= 194 and b <= 223 { 2 } else if b >= 224 and b <= 239 { 3 } else if b >= 240 and b <= 244 { 4 } else { -1 }
+        if n > 1 and i + n > count { n = -1 }
+        if n > 1 { for (i + 1 ..< i + n) |m| { if (bytes[m] & 192) != 128 { n = -1 } } }
+        if n < 0 {
+            codes[k] = 65533
+            k += 1
+            i += 1
+        } else if n == 1 {
+            codes[k] = b
+            k += 1
+            i += 1
+        } else {
+            let cp = if n == 2 { b & 31 } else if n == 3 { b & 15 } else { b & 7 }
+            for (1 ..< n) |m| { cp = (cp << 6) | (bytes[i + m] & 63) }
+            if cp >= 65536 {
+                codes[k] = 55296 + ((cp - 65536) >> 10)
+                codes[k + 1] = 56320 + ((cp - 65536) & 1023)
+                k += 2
+            } else {
+                codes[k] = cp
+                k += 1
+            }
+            i += n
+        }
+    }
+    return Str.from_codes(codes, k)
+}
+
+// ── Files ───────────────────────────────────────────────────────────────────
+
+/// The files places are in (blame_file): each one's key, label (as the
+/// report prints it), and text (string ids; -1: none given), and its bytes
+/// in src (start, count). @bf_order: the files by start.
+vec bf_key: I32
+vec bf_label: I32
+vec bf_text: I32
+vec bf_start: I32
+vec bf_size: I32
+vec bf_order: I32
+/// By file, where its lines start in @bl_starts (-1 until a place is in it), and how many.
+vec bf_lines: I32
+vec bf_line_count: I32
+/// Each line's start, a byte offset in its file.
+vec bl_starts: I32
+
+/// A file of the host's: `key`, `label`, at `start` in src, `size` bytes.
+fn add_blame_file(key: Str, label: Str, start: I32, size: I32) Void {
+    let f = bf_key.len()
+    bf_key.push(bs_add(key))
+    bf_label.push(bs_add(label))
+    bf_text.push(-1)
+    bf_start.push(start)
+    bf_size.push(size)
+    bf_lines.push(-1)
+    bf_line_count.push(0)
+    // (Few files: kept in order by moving the later ones up.)
+    bf_order.push(f)
+    let k = f
+    while (k > 0 and bf_start[bf_order[k - 1]] > start) {
+        bf_order[k] = bf_order[k - 1]
+        k -= 1
+    }
+    bf_order[k] = f
+}
+
+/// The file byte `at` of src is in (its end too), or -1.
+fn file_at(at: I32) I32 {
+    let lo = 0
+    let hi = bf_order.len() - 1
+    let found = -1
+    while (lo <= hi) {
+        let mid = (lo + hi) / 2
+        if bf_start[bf_order[mid]] <= at { found = bf_order[mid]; lo = mid + 1 } else { hi = mid - 1 }
+    }
+    if found < 0 or at > bf_start[found] + bf_size[found] { return -1 }
+    return found
+}
+
+/// File `f`'s lines, found once: a line ends at LF, CR LF, or a lone CR.
+fn file_lines(f: I32) Void {
+    if bf_lines[f] >= 0 { return }
+    bf_lines[f] = bl_starts.len()
+    bl_starts.push(0)
+    let start = bf_start[f]
+    let n = bf_size[f]
+    for (0 ..< n) |i| {
+        let b = src[start + i]
+        if b == 10 or (b == 13 and not (i + 1 < n and src[start + i + 1] == 10)) { bl_starts.push(i + 1) }
+    }
+    bf_line_count[f] = bl_starts.len() - bf_lines[f]
+}
+
+/// The 1-based line of file `f` byte `at` of src is on.
+fn line_at(f: I32, at: I32) I32 {
+    file_lines(f)
+    let base = bf_lines[f]
+    let local = at - bf_start[f]
+    let lo = 0
+    let hi = bf_line_count[f] - 1
+    while (lo < hi) {
+        let mid = (lo + hi + 1) / 2
+        if bl_starts[base + mid] <= local { lo = mid } else { hi = mid - 1 }
+    }
+    return lo + 1
+}
+
+// ── Places ──────────────────────────────────────────────────────────────────
+
+/// Places: a syntax node's file, line, and declaration (an index of @dc_name, or -1).
+vec pl_file: I32
+vec pl_line: I32
+vec pl_decl: I32
+/// Declarations: name and kind (string ids), file, and line.
+vec dc_name: I32
+vec dc_kind: I32
+vec dc_file: I32
+vec dc_line: I32
+/// By syntax node, its place and its declaration's index (-1 none), or -2 before it is asked.
+vec bl_node_place: I32
+vec bl_node_decl: I32
+/// By node kind, its name (a string id), or -1 before it is asked.
+vec kind_names: I32
+
+/// The source map's entries: offset in the module, place, and the call it was inlined at (a place), or -1.
+vec en_at: I32
+vec en_place: I32
+vec en_site: I32
+/// By function of the module (imports first): its place, role (func_role), and name (a string id, or -1).
+vec fn_place: I32
+vec fn_role: I32
+vec fn_named: I32
+/// By type, global, data segment, and memory of the module: its place.
+vec ty_place: I32
+vec gl_place: I32
+vec dt_place: I32
+vec mm_place: I32
+
+/// A node's kind's name, as node_kind_name gives it (a string id).
+fn kind_name(node: I32) I32 {
+    let kind = node_kind[node]
+    if kind_names[kind] < 0 {
+        let name = node_name_of(Node(kind))
+        kind_names[kind] = bs_add(Str.from_code_point(name.get(0) + 32) + name.slice(1, name.len()))
+    }
+    return kind_names[kind]
+}
+
+/// Node `node` as a declaration (an index of @dc_name), or -1 when it is in no file.
+fn decl_index(node: I32) I32 {
+    if node < 0 { return -1 }
+    if bl_node_decl[node] == -2 {
+        let at = span_start(node)
+        let f = file_at(at)
+        if f < 0 { bl_node_decl[node] = -1 } else {
+            bl_node_decl[node] = dc_name.len()
+            dc_name.push(bs_add(decl_label(node)))
+            dc_kind.push(kind_name(node))
+            dc_file.push(f)
+            dc_line.push(line_at(f, at))
+        }
+    }
+    return bl_node_decl[node]
+}
+
+/// Node `node`'s place, or -1. Code a DSL made (parsed from a generated
+/// file, in no file of the host's) is placed on the literal it was made for.
+fn place_of(node: I32) I32 {
+    if node < 0 { return -1 }
+    if bl_node_place[node] == -2 {
+        let at = span_start(node)
+        let f = file_at(at)
+        if f < 0 { bl_node_place[node] = place_of(dsl_site_of(node)) } else {
+            let line = line_at(f, at)
+            let decl = decl_index(outer_decl(node))
+            bl_node_place[node] = pl_file.len()
+            pl_file.push(f)
+            pl_line.push(line)
+            pl_decl.push(decl)
+        }
+    }
+    return bl_node_place[node]
+}
+
+/// Read the last build's tables, numbering places and declarations as they are first asked.
+fn blame_tables() Void {
+    blame_invert()
+    let nodes = node_kind.len()
+    bl_node_place.resize(nodes)
+    bl_node_decl.resize(nodes)
+    for (0 ..< nodes) |n| {
+        bl_node_place[n] = -2
+        bl_node_decl[n] = -2
+    }
+    kind_names.resize(256)
+    for (0 ..< 256) |k| { kind_names[k] = -1 }
+    for (0 ..< map_at.len()) |k| {
+        en_at.push(map_at[k])
+        en_place.push(place_of(map_node[k]))
+        en_site.push(place_of(map_site[k]))
+    }
+    for (0 ..< func_order.len()) |i| {
+        fn_named.push(func_name_text(i))
+        fn_place.push(place_of(func_syntax(i)))
+        fn_role.push(func_role(i))
+    }
+    for (0 ..< type_order.len()) |i| { ty_place.push(place_of(type_syntax(i))) }
+    for (0 ..< glob_order.len()) |i| { gl_place.push(place_of(glob_syntax(i))) }
+    for (0 ..< data_src.len()) |d| { dt_place.push(place_of(data_src[d])) }
+    for (0 ..< memory_kind.len()) |i| { mm_place.push(place_of(memory_syntax(i))) }
+}

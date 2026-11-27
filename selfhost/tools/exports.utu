@@ -7,3 +7,48 @@
 
     /// 1: this module is utu-tools.wasm.
     fn tools_version() I32 => 1
+
+    // ── size blame ──
+
+    /// Size blame (tools/blame*.utu), of the build this module just made
+    /// (with a source map): blame_begin, then the host's files (`start`:
+    /// where the file is in src, `size` its bytes; a file of the build's may
+    /// be given as several), the module's bytes (written to blame_in after
+    /// blame_wasm_room), its brotli costs and glue if any; then blame_run
+    /// ("" or why not) and its outputs.
+    fn blame_begin(name: Str) Void => blame_reset(name)
+
+    fn blame_file(key: Str, label: Str, start: I32, size: I32) Void => add_blame_file(key, label, start, size)
+
+    /// The last file's text, for the page.
+    fn blame_text(text: Str) Void { bf_text[bf_text.len() - 1] = bs_add(text) }
+
+    fn blame_wasm_room(n: I32) Void {
+        blame_in.resize(n)
+        rd_size = n
+    }
+
+    /// The module's quality-11 brotli size, and that the costs of `chunk` bytes each follow (blame_cost).
+    fn blame_brotli(total: I32, chunk: I32) Void {
+        br_total = total
+        br_chunk = chunk
+    }
+
+    fn blame_cost(bytes: I32) Void => br_costs.push(bytes)
+
+    /// The glue's size, then each @es binding's bytes in it (blame_glue).
+    fn blame_glue_size(bytes: I32) Void { glue_size = bytes }
+
+    fn blame_glue(field: Str, bytes: I32) Void {
+        gl_field.push(bs_add(field))
+        gl_bytes.push(bytes)
+    }
+
+    fn blame_run() Str => blame_report_run()
+
+    /// NAME.blame.json, NAME.blame.html, and the top `n` of each list as text.
+    fn blame_json() Str => report_json()
+
+    fn blame_html() Str => page_html()
+
+    fn blame_top(n: I32) Str => top_text(n)

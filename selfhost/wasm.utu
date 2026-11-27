@@ -160,7 +160,7 @@ vec ht_open: U8
 vec ht_single: U8
 /// Per field: storage type, then 1 when mutable.
 vec ht_fields: I32
-/// The syntax being checked when it was made (@cur_src), or -1: blame.utu's.
+/// The syntax being checked when it was made (@cur_src), or -1: tools/blame.utu's.
 vec ht_src: I32
 
 /// Function types are interned by signature; arrays by element; structs are
@@ -303,7 +303,7 @@ vec data_memory: I32
 vec data_start: I32
 vec data_len: I32
 vec data_bytes: U8
-/// Its mem's declaration node: blame.utu's.
+/// Its mem's declaration node: tools/blame.utu's.
 vec data_src: I32
 
 /// At `[0]`: 1 when the JS exception tag is imported.

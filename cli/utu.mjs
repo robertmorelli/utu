@@ -46,11 +46,13 @@ delete process.env.UTU_WORKER_TTY;
 // built from selfhost/ as it is.
 // `utu FILE.utu …` runs it: `utu run FILE.utu …` (still accepted) spelled short.
 if (process.argv[2]?.endsWith('.utu')) process.argv.splice(2, 0, 'run');
+// A build that blames runs on the tools (dist/utu-tools.wasm): blame reads the build's state.
+const BLAMES = process.argv[2] === 'build' && process.argv.slice(3, process.argv.includes('--') ? process.argv.indexOf('--') : undefined).includes('--blame');
 const COMPILING = ['check', 'run', 'test', 'bench', 'build', 'build-exe'].includes(process.argv[2]) ? compileEarly() : null;
 
 function compileEarly() {
   try {
-    const bytes = readFileSync(path.join(ROOT, 'dist', 'utu.wasm'));
+    const bytes = readFileSync(path.join(ROOT, 'dist', BLAMES ? 'utu-tools.wasm' : 'utu.wasm'));
     return WebAssembly.compile(bytes, { builtins: ['js-string'], importedStringConstants: "'" }).catch(() => null);
   } catch { return null; }
 }
@@ -83,7 +85,7 @@ async function main() {
   }
   if (command === 'grep') return grepCommand(process.argv.slice(3));
   const commands = { check, run, test, bench, build, 'build-exe': buildExe };
-  const [{ MODES }, { loadNodeCompiler }] = await Promise.all([import('../src/selfhost/compiler.js'), selfhost()]);
+  const [{ MODES }, { loadNodeCompiler, loadNodeTools }] = await Promise.all([import('../src/selfhost/compiler.js'), selfhost()]);
   // (Own names only: `utu constructor` is no command.)
   if (!Object.hasOwn(commands, command)) {
     const near = closest(command, [...Object.keys(commands), 'lsp', 'grep', ...VIEW_COMMANDS]);
@@ -184,7 +186,7 @@ async function main() {
   const asked = ours.includes('--source-map');
   if (asked && !safe) fail(`No source map in ${mode}`, 'source-map', ['The unsafe modes keep none; -O small, fast, or debug do.']);
   try {
-    await commands[command](file, { optimize, safe, out, argv, mode, title, port, noPrerender, sourceMap: mode === 'debug' || asked, blame: ours.includes('--blame'), luge: ours.includes('--luge'), target, profile, interval, utu: await loadNodeCompiler({ module: COMPILING }) });
+    await commands[command](file, { optimize, safe, out, argv, mode, title, port, noPrerender, sourceMap: mode === 'debug' || asked, blame: BLAMES, luge: ours.includes('--luge'), target, profile, interval, utu: await (BLAMES ? loadNodeTools : loadNodeCompiler)({ module: COMPILING }) });
   } catch (error) {
     // A place build cannot write (-o somewhere read-only, or under a file).
     if (!FS_REASONS[error?.code] || !error.path) throw error;
@@ -702,7 +704,7 @@ async function build(file, options) {
       extra.push([path.join(app.out, 'app.wasm.map'), sourceMapJson(built.map, { file: 'app.wasm', relative, texts: new Map(built.files.map(f => [f.key, f.text])) })]);
       wasm = withMapUrl(wasm, 'app.wasm.map');
     }
-    const top = built.blame ? await blameOutputs(built, wasm, app.out, 'app', extra) : null;
+    const top = blame ? await blameOutputs(utu, built, wasm, app.out, 'app', extra) : null;
     await (await import('./site.mjs')).buildCommand({ ...app, compiled: { ...built, wasm } }, { prerender: !options.noPrerender, extra });
     if (top) console.log(top);
     return;
@@ -743,7 +745,7 @@ async function build(file, options) {
     write: false,
   })).outputFiles[0].contents;
   outputs.push([path.join(dir, `${name}.mjs`), js], [path.join(dir, `${name}.wasm`), wasm]);
-  const top = built.blame ? await blameOutputs(built, wasm, dir, name, outputs) : null;
+  const top = blame ? await blameOutputs(utu, built, wasm, dir, name, outputs) : null;
   await fs.mkdir(dir, { recursive: true });
   await writeAll(outputs);
   console.log(`${displayPath(path.join(dir, `${name}.wasm`))}  ${wasm.length} bytes`);
@@ -753,14 +755,11 @@ async function build(file, options) {
 }
 
 /** NAME.blame.json and NAME.blame.html (to `outputs`): each byte of the module on its source (src/selfhost/blame.js); returns what to print, the top. */
-async function blameOutputs(built, wasm, dir, name, outputs) {
-  const B = await import('../src/selfhost/blame.js');
-  const blamed = B.blameModule(wasm, built.blame);
-  B.checkTiling(blamed.records, wasm.length);
-  const rep = B.report({ wasm, tables: built.blame, blamed, compressed: await B.estimateCompressed(wasm), glue: B.blameGlue(built.spec, blamed.esPlaces), name: `${name}.wasm` });
-  outputs.push([path.join(dir, `${name}.blame.json`), JSON.stringify(rep)]);
-  outputs.push([path.join(dir, `${name}.blame.html`), B.blameHtml(rep, new Map(built.files.map(f => [f.key, f.text])), { relative: displayPath })]);
-  return `${displayPath(path.join(dir, `${name}.blame.json`))}\n${displayPath(path.join(dir, `${name}.blame.html`))}\n\n${B.formatTop(rep, { relative: displayPath })}`;
+async function blameOutputs(utu, built, wasm, dir, name, outputs) {
+  const rep = await (await import('../src/selfhost/blame.js')).blame(utu, { wasm, spec: built.spec, files: built.files, name: `${name}.wasm`, relative: displayPath });
+  outputs.push([path.join(dir, `${name}.blame.json`), rep.json()]);
+  outputs.push([path.join(dir, `${name}.blame.html`), rep.html()]);
+  return `${displayPath(path.join(dir, `${name}.blame.json`))}\n${displayPath(path.join(dir, `${name}.blame.html`))}\n\n${rep.top()}`;
 }
 
 /**

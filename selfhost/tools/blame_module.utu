@@ -1,0 +1,656 @@
+//! = Size blame: the module, byte by byte
+//!
+//! The module (as the host wrote it to @blame_in: the build's, with any
+//! section the host added) read section by section, each byte range blamed:
+//!
+//!   code       by the source map: each run of instructions on its syntax;
+//!              locals and the body's size on the function's; code inlined
+//!              from another function on the callee's line, and its call
+//!              (`site`) as well; a helper the compiler made and shares
+//!              (array.slice, Tag (an enum made), closure.*, mem.push, ...) split
+//!              among the calls to it
+//!   types      on their struct, enum, or closure (else where first needed)
+//!   imports    on their @es declaration, or where first needed (a string
+//!              constant on its literal)
+//!   globals    on their `let` or mem; data on its mem; exports on what they export
+//!   the rest   (headers, counts, custom sections) in buckets of their own
+//!
+//! so blamed bytes and those buckets add up to the file's size, byte for
+//! byte: the records tile the module (check_tiling).
+
+/// The module's bytes, written by the host (blame_wasm_room).
+export mem blame_in: U8
+
+// ── Reading ─────────────────────────────────────────────────────────────────
+
+/// Where the reader is in @blame_in, and the module's size.
+let rd: I32 = 0
+let rd_size: I32 = 0
+/// 1 once a read failed (and why), until rd_clear.
+let rd_bad: I32 = 0
+let rd_error: Str = ""
+
+let hex: fun(I32) Str = @es/\ (n) => n.toString(16) \/
+
+fn rd_fail(message: Str) Void {
+    if rd_bad == 0 { rd_error = message }
+    rd_bad = 1
+}
+
+fn rd_clear() Void {
+    rd_bad = 0
+    rd_error = ""
+}
+
+fn rd_byte() I32 {
+    if rd >= rd_size {
+        rd_fail(`read past the end at ${rd}`)
+        return 0
+    }
+    rd += 1
+    return blame_in[rd - 1]
+}
+
+/// Little-endian base 128.
+fn rd_u32() I32 {
+    let result: I64 = 0
+    let shift: I64 = 0
+    while (true) {
+        let b = rd_byte()
+        result = result | ((b & 127).i64() << shift)
+        shift += 7
+        if (b & 128) == 0 { break }
+    }
+    return result.i32()
+}
+
+/// A signed (or any) LEB, skipped.
+fn rd_leb() Void {
+    while ((rd_byte() & 128) != 0) {}
+}
+
+/// A name: its length, then its UTF-8.
+fn rd_name() Str {
+    let n = rd_u32()
+    let count = if rd + n > rd_size { rd_size - rd } else { n }
+    let bytes = Array[I32].new(count, 0)
+    for (0 ..< count) |k| { bytes[k] = blame_in[rd + k] }
+    rd += n
+    return utf8_text(bytes, count)
+}
+
+/// A name, skipped.
+fn rd_skip_name() Void {
+    let n = rd_u32()
+    rd += n
+}
+
+fn rd_valtype() Void {
+    let b = rd_byte()
+    if b == 0x63 or b == 0x64 { rd_leb() }
+}
+
+fn rd_blocktype() Void {
+    let b = if rd < rd_size { blame_in[rd] } else { 0 }
+    if b == 0x63 or b == 0x64 {
+        rd += 1
+        rd_leb()
+        return
+    }
+    if b == 0x40 or (b & 0xc0) == 0x40 {
+        rd += 1
+        return
+    }
+    rd_leb()
+}
+
+fn rd_memarg() Void {
+    if (rd_u32() & 64) != 0 { let _ = rd_u32() }
+    rd_leb()
+}
+
+fn rd_limits() Void {
+    let flags = rd_u32()
+    rd_leb()
+    if (flags & 1) != 0 { rd_leb() }
+}
+
+fn rd_subtype() Void {
+    let b = rd_byte()
+    if b == 0x50 or b == 0x4f {
+        for (0 ..< rd_u32()) |_| { let _ = rd_u32() }
+        b = rd_byte()
+    }
+    if b == 0x60 {
+        for (0 ..< rd_u32()) |_| { rd_valtype() }
+        for (0 ..< rd_u32()) |_| { rd_valtype() }
+    } else if b == 0x5f {
+        for (0 ..< rd_u32()) |_| {
+            rd_valtype()
+            let _ = rd_byte()
+        }
+    } else if b == 0x5e {
+        rd_valtype()
+        let _ = rd_byte()
+    } else {
+        rd_fail(`unknown composite type 0x${hex(b)}`)
+    }
+}
+
+/// A constant expression, through its `end`.
+fn rd_expr() Void {
+    while (rd_bad == 0 and rd_instr(-1) != 0x0b) {}
+}
+
+/// One instruction, its immediates read; returns its opcode. With `body`
+/// (a function's index, or -1 for none), each call and return_call of a
+/// shared helper (but the function's own) is a call of it (@cl_fn).
+fn rd_instr(body: I32) I32 {
+    let op = rd_byte()
+    if op <= 0x01 or op == 0x05 or op == 0x0b or op == 0x0f or op == 0x19 or op == 0x0a or op == 0x1a or op == 0x1b
+        or (op >= 0x45 and op <= 0xc4) or op == 0xd1 or op == 0xd3 or op == 0xd4 { return op }
+    match op {
+        0x02, 0x03, 0x04, 0x06 => rd_blocktype(),
+        0x07, 0x08, 0x09, 0x0c, 0x0d, 0x18, 0x14, 0x15, 0x20, 0x21, 0x22, 0x23, 0x24, 0x25, 0x26, 0x3f, 0x40, 0xd5, 0xd6 => {
+            let _ = rd_u32()
+        },
+        0x10, 0x12, 0xd2 => {
+            let at = rd - 1
+            let f = rd_u32()
+            if body >= 0 and f >= 0 and f < fn_role.len() and fn_role[f] == 2 and f != body {
+                cl_fn.push(f)
+                cl_at.push(at)
+            }
+        },
+        0x11, 0x13 => {
+            let _ = rd_u32()
+            let _ = rd_u32()
+        },
+        0x0e => {
+            let n = rd_u32()
+            for (0 ... n) |_| { let _ = rd_u32() }
+        },
+        0x1c => {
+            for (0 ..< rd_u32()) |_| { rd_valtype() }
+        },
+        0x1f => {
+            rd_blocktype()
+            for (0 ..< rd_u32()) |_| {
+                let kind = rd_byte()
+                if kind < 2 { let _ = rd_u32() }
+                let _ = rd_u32()
+            }
+        },
+        0x41, 0x42, 0xd0 => rd_leb(),
+        0x43 => { rd += 4 },
+        0x44 => { rd += 8 },
+        0xfb => rd_gc(),
+        0xfc => rd_misc(),
+        0xfd => rd_simd(),
+        ~> {
+            if op >= 0x28 and op <= 0x3e { rd_memarg() } else { rd_fail(`unknown opcode 0x${hex(op)} at ${rd - 1}`) }
+        },
+    }
+    return op
+}
+
+fn rd_gc() Void {
+    let sub = rd_u32()
+    if sub <= 1 or (sub >= 6 and sub <= 7) or (sub >= 11 and sub <= 14) or sub == 16 { let _ = rd_u32() }
+    else if (sub >= 2 and sub <= 5) or (sub >= 8 and sub <= 10) or (sub >= 17 and sub <= 19) {
+        let _ = rd_u32()
+        let _ = rd_u32()
+    } else if sub >= 20 and sub <= 23 { rd_leb() }
+    else if sub == 24 or sub == 25 {
+        let _ = rd_byte()
+        let _ = rd_u32()
+        rd_leb()
+        rd_leb()
+    } else if sub != 15 and not (sub >= 26 and sub <= 30) { rd_fail(`unknown opcode 0xfb ${sub}`) }
+}
+
+fn rd_misc() Void {
+    let sub = rd_u32()
+    if sub <= 7 { return }
+    if sub == 8 or sub == 10 or sub == 12 or sub == 14 {
+        let _ = rd_u32()
+        let _ = rd_u32()
+    } else if sub <= 17 { let _ = rd_u32() }
+    else { rd_fail(`unknown opcode 0xfc ${sub}`) }
+}
+
+fn rd_simd() Void {
+    let sub = rd_u32()
+    if sub <= 11 or sub == 92 or sub == 93 { rd_memarg() }
+    else if sub == 12 or sub == 13 { rd += 16 }
+    else if sub >= 21 and sub <= 34 { let _ = rd_byte() }
+    else if sub >= 84 and sub <= 91 {
+        rd_memarg()
+        let _ = rd_byte()
+    }
+}
+
+// ── Sections ────────────────────────────────────────────────────────────────
+
+/// The module's sections: id, name (a string id), where its header and contents start, and where it ends.
+vec sc_id: I32
+vec sc_name: I32
+vec sc_start: I32
+vec sc_body: I32
+vec sc_end: I32
+
+fn section_name(id: I32) Str => match id {
+    0 => "custom",
+    1 => "type",
+    2 => "import",
+    3 => "function",
+    4 => "table",
+    5 => "memory",
+    6 => "global",
+    7 => "export",
+    8 => "start",
+    9 => "element",
+    10 => "code",
+    11 => "data",
+    12 => "datacount",
+    13 => "tag",
+    ~> `section ${id}`,
+}
+
+fn read_sections() Void {
+    rd = 8
+    while (rd < rd_size and rd_bad == 0) {
+        let start = rd
+        let id = rd_byte()
+        let size = rd_u32()
+        let body = rd
+        let name = section_name(id)
+        if id == 0 { name = `custom: ${rd_name()}` }
+        sc_id.push(id)
+        sc_name.push(name_id(name))
+        sc_start.push(start)
+        sc_body.push(body)
+        sc_end.push(body + size)
+        rd = body + size
+    }
+}
+
+// ── Names ───────────────────────────────────────────────────────────────────
+
+/// The names of sections and of what records are (as string ids), each once: few.
+vec nm_text: I32
+
+fn name_id(s: Str) I32 {
+    for (0 ..< nm_text.len()) |k| { if bs(nm_text[k]) == s { return k } }
+    nm_text.push(bs_add(s))
+    return nm_text.len() - 1
+}
+
+fn nm(k: I32) Str => bs(nm_text[k])
+
+/// What a record is, by name_id: those every module has, named once.
+let w_header: I32 = 0
+let w_section_header: I32 = 0
+let w_vec_count: I32 = 0
+let w_code: I32 = 0
+let w_unplaced: I32 = 0
+let w_helper: I32 = 0
+let w_body_size: I32 = 0
+let w_locals: I32 = 0
+
+// ── Records ─────────────────────────────────────────────────────────────────
+
+/// Records, in order of offset: a byte range (`at`, `bytes`), its section and
+/// what it is (name_ids), its place (or -1: a bucket of its own), the call it
+/// was inlined at (a place, or -1), the function it is in (its index, or
+/// -1) and, for a shared helper's share, the helper (or -1).
+vec rc_at: I32
+vec rc_bytes: I32
+vec rc_section: I32
+vec rc_what: I32
+vec rc_place: I32
+vec rc_site: I32
+vec rc_fn: I32
+vec rc_helper: I32
+
+/// Calls of shared helpers, in order: the helper, and where the call is.
+vec cl_fn: I32
+vec cl_at: I32
+/// By function: its calls' range in @cl_sorted (as offsets), and how many there are.
+vec cl_first: I32
+vec cl_count: I32
+vec cl_sorted: I32
+/// What could not be read.
+vec notes: I32
+/// The `@es` imports: field (a string id) and place.
+vec es_field: I32
+vec es_place: I32
+
+fn add(at: I32, bytes: I32, section: I32, what: I32, place: I32, site: I32, fn_: I32, helper: I32) Void {
+    if bytes <= 0 { return }
+    rc_at.push(at)
+    rc_bytes.push(bytes)
+    rc_section.push(section)
+    rc_what.push(what)
+    rc_place.push(place)
+    rc_site.push(site)
+    rc_fn.push(fn_)
+    rc_helper.push(helper)
+}
+
+fn add_plain(at: I32, bytes: I32, section: I32, what: I32, place: I32) Void => add(at, bytes, section, what, place, -1, -1, -1)
+
+fn listed(places: I32, i: I32) I32 => match places {
+    0 => if i >= 0 and i < ty_place.len() { ty_place[i] } else { -1 },
+    1 => if i >= 0 and i < gl_place.len() { gl_place[i] } else { -1 },
+    2 => if i >= 0 and i < mm_place.len() { mm_place[i] } else { -1 },
+    ~> if i >= 0 and i < dt_place.len() { dt_place[i] } else { -1 },
+}
+
+fn fn_place_of(i: I32) I32 => if i >= 0 and i < fn_place.len() { fn_place[i] } else { -1 }
+
+/// The source map entry at or before `at`, or -1.
+fn entry_at(at: I32) I32 {
+    let lo = 0
+    let hi = en_at.len() - 1
+    let found = -1
+    while (lo <= hi) {
+        let mid = (lo + hi) / 2
+        if en_at[mid] <= at { found = mid; lo = mid + 1 } else { hi = mid - 1 }
+    }
+    return found
+}
+
+/// The code section's calls of shared helpers, before it is blamed: a
+/// function not read through is a note, its calls not counted.
+fn find_calls(code: I32) Void {
+    rd = sc_body[code]
+    let count = rd_u32()
+    let first = fn_role.len() - count
+    for (0 ..< count) |k| {
+        let size = rd_u32()
+        let end_ = rd + size
+        let calls = cl_fn.len()
+        for (0 ..< rd_u32()) |_| {
+            let _ = rd_u32()
+            rd_valtype()
+        }
+        while (rd < end_ and rd_bad == 0) { let _ = rd_instr(first + k) }
+        if rd_bad != 0 {
+            notes.push(bs_add(`function ${first + k}: ${rd_error}; its calls are not counted`))
+            cl_fn.resize(calls)
+            cl_at.resize(calls)
+            rd_clear()
+        }
+        rd = end_
+    }
+    // Each helper's calls, in order.
+    let n = fn_role.len()
+    cl_first.resize(n)
+    cl_count.resize(n)
+    for (0 ..< n) |f| { cl_count[f] = 0 }
+    for (0 ..< cl_fn.len()) |c| { cl_count[cl_fn[c]] += 1 }
+    let at = 0
+    for (0 ..< n) |f| {
+        cl_first[f] = at
+        at += cl_count[f]
+    }
+    cl_sorted.resize(cl_fn.len())
+    for (0 ..< n) |f| { cl_count[f] = 0 }
+    for (0 ..< cl_fn.len()) |c| {
+        let f = cl_fn[c]
+        cl_sorted[cl_first[f] + cl_count[f]] = cl_at[c]
+        cl_count[f] += 1
+    }
+}
+
+/// A vector's count, as a record; returns it.
+fn rd_count(s: I32) I32 {
+    let at = rd
+    let n = rd_u32()
+    add_plain(at, rd - at, sc_name[s], w_vec_count, -1)
+    return n
+}
+
+/// Blame every byte of the module; "" when each is blamed once, else why not.
+fn blame_module() Str {
+    w_header = name_id("header")
+    w_section_header = name_id("section header")
+    w_vec_count = name_id("count")
+    w_code = name_id("code")
+    w_unplaced = name_id("unplaced code")
+    w_helper = name_id("helper")
+    w_body_size = name_id("body size")
+    w_locals = name_id("locals")
+    add_plain(0, 8, w_header, w_header, -1)
+    read_sections()
+    if rd_bad != 0 { return rd_error }
+    for (0 ..< sc_id.len()) |s| { if sc_id[s] == 10 { find_calls(s) } }
+    let imported_func = 0
+    let imported_global = 0
+    let imported_memory = 0
+    for (0 ..< sc_id.len()) |s| {
+        let name = sc_name[s]
+        let id = sc_id[s]
+        add_plain(sc_start[s], sc_body[s] - sc_start[s], name, w_section_header, -1)
+        rd = sc_body[s]
+        if id == 1 {
+            let t = 0
+            for (0 ..< rd_count(s)) |_| {
+                if rd < rd_size and blame_in[rd] == 0x4e {
+                    let at = rd
+                    let _ = rd_byte()
+                    let m = rd_u32()
+                    add_plain(at, rd - at, name, name_id("rec group"), -1)
+                    for (0 ..< m) |_| {
+                        let from = rd
+                        rd_subtype()
+                        add_plain(from, rd - from, name, name_id("type"), listed(0, t))
+                        t += 1
+                    }
+                } else {
+                    let from = rd
+                    rd_subtype()
+                    add_plain(from, rd - from, name, name_id("type"), listed(0, t))
+                    t += 1
+                }
+            }
+        } else if id == 2 {
+            for (0 ..< rd_count(s)) |_| {
+                let at = rd
+                let module = rd_name()
+                let field = ""
+                if module == "es" { field = rd_name() } else { rd_skip_name() }
+                let kind = rd_byte()
+                let place = -1
+                let fn_ = -1
+                if kind == 0 {
+                    let _ = rd_u32()
+                    fn_ = imported_func
+                    place = fn_place_of(imported_func)
+                    imported_func += 1
+                } else if kind == 1 {
+                    rd_valtype()
+                    rd_limits()
+                } else if kind == 2 {
+                    rd_limits()
+                    place = listed(2, imported_memory)
+                    imported_memory += 1
+                } else if kind == 3 {
+                    rd_valtype()
+                    let _ = rd_byte()
+                    place = listed(1, imported_global)
+                    imported_global += 1
+                } else if kind == 4 {
+                    let _ = rd_byte()
+                    let _ = rd_u32()
+                }
+                let what = if module == "'" { "string constant" } else if module == "wasm:js-string" { "string builtin" }
+                    else if module == "es" { "@es import" } else if kind == 4 { "exception tag" } else { `${module} import` }
+                add(at, rd - at, name, name_id(what), place, -1, fn_, -1)
+                if module == "es" {
+                    es_field.push(bs_add(field))
+                    es_place.push(place)
+                }
+            }
+        } else if id == 3 {
+            let i = imported_func
+            for (0 ..< rd_count(s)) |_| {
+                let from = rd
+                let _ = rd_u32()
+                add(from, rd - from, name, name_id("function type"), fn_place_of(i), -1, i, -1)
+                i += 1
+            }
+        } else if id == 5 {
+            let i = imported_memory
+            for (0 ..< rd_count(s)) |_| {
+                let from = rd
+                rd_limits()
+                add_plain(from, rd - from, name, name_id("memory"), listed(2, i))
+                i += 1
+            }
+        } else if id == 6 {
+            let i = imported_global
+            for (0 ..< rd_count(s)) |_| {
+                let from = rd
+                rd_valtype()
+                let _ = rd_byte()
+                rd_expr()
+                add_plain(from, rd - from, name, name_id("global"), listed(1, i))
+                i += 1
+            }
+        } else if id == 7 {
+            for (0 ..< rd_count(s)) |_| {
+                let at = rd
+                rd_skip_name()
+                let kind = rd_byte()
+                let index = rd_u32()
+                let place = if kind == 0 { fn_place_of(index) } else if kind == 2 { listed(2, index) } else if kind == 3 { listed(1, index) } else { -1 }
+                add(at, rd - at, name, name_id("export"), place, -1, if kind == 0 { index } else { -1 }, -1)
+            }
+        } else if id == 8 {
+            let index = rd_u32()
+            add(sc_body[s], rd - sc_body[s], name, name_id("start"), fn_place_of(index), -1, index, -1)
+        } else if id == 9 {
+            let n = rd_count(s)
+            let k = 0
+            while (k < n) {
+                let at = rd
+                let flags = rd_u32()
+                if flags > 3 {
+                    rd = sc_end[s]
+                    add_plain(at, sc_end[s] - at, name, name_id("element segment"), -1)
+                    break
+                }
+                if flags == 2 { let _ = rd_u32() }
+                if flags == 0 or flags == 2 { rd_expr() }
+                if flags != 0 { let _ = rd_byte() }
+                let m = rd_u32()
+                add_plain(at, rd - at, name, name_id("element segment"), -1)
+                for (0 ..< m) |_| {
+                    let f = rd
+                    let index = rd_u32()
+                    add(f, rd - f, name, name_id("element"), fn_place_of(index), -1, index, -1)
+                }
+                k += 1
+            }
+        } else if id == 10 {
+            let count = rd_count(s)
+            let first = fn_role.len() - count
+            for (0 ..< count) |k| { blame_body(first + k) }
+        } else if id == 11 {
+            let d = 0
+            for (0 ..< rd_count(s)) |_| {
+                let from = rd
+                let flags = rd_u32()
+                if flags == 2 { let _ = rd_u32() }
+                if flags != 1 { rd_expr() }
+                let n = rd_u32()
+                rd += n
+                add_plain(from, rd - from, name, name_id("data"), listed(3, d))
+                d += 1
+            }
+        } else if id == 0 {
+            add_plain(sc_body[s], sc_end[s] - sc_body[s], name, name_id(if nm(name) == "custom: name" { "names" } else { "custom" }), -1)
+            rd = sc_end[s]
+        } else {
+            // Counts, tables, tags: no place of their own.
+            add_plain(sc_body[s], sc_end[s] - sc_body[s], name, name, -1)
+            rd = sc_end[s]
+        }
+        if rd_bad != 0 { return rd_error }
+        if id != 9 and rd != sc_end[s] { return `${nm(name)} section read to ${rd}, not its end ${sc_end[s]}` }
+    }
+    return ""
+}
+
+/// Function `f`'s body, at the reader: its size and locals on its place,
+/// its code by the map; a shared helper's split among the calls to it.
+fn blame_body(f: I32) Void {
+    let size_at = rd
+    let size = rd_u32()
+    let start = rd
+    let end_ = start + size
+    let own = fn_place_of(f)
+    let calls = if f < cl_count.len() { cl_count[f] } else { 0 }
+    if fn_role[f] == 2 and calls > 0 {
+        // Shared: split among the calls to it, each on its call's place, as
+        // evenly as can be (the first calls a byte more).
+        let total = end_ - size_at
+        let at = size_at
+        for (0 ..< calls) |i| {
+            let k = entry_at(cl_sorted[cl_first[f] + i])
+            let place = if k >= 0 { en_place[k] } else { -1 }
+            let share = total / calls + if i < total % calls { 1 } else { 0 }
+            add(at, share, w_code, w_helper, place, -1, f, f)
+            at += share
+        }
+        rd = end_
+        return
+    }
+    add(size_at, start - size_at, w_code, w_body_size, own, -1, f, -1)
+    for (0 ..< rd_u32()) |_| {
+        let _ = rd_u32()
+        rd_valtype()
+    }
+    add(start, rd - start, w_code, w_locals, own, -1, f, -1)
+    let at = rd
+    let k = entry_at(at)
+    while (at < end_) {
+        let next = if k + 1 < en_at.len() { if en_at[k + 1] < end_ { en_at[k + 1] } else { end_ } } else { end_ }
+        if next > at {
+            // An entry before the body's (none: no map) is no place in it.
+            let inside = k >= 0 and en_at[k] >= start
+            let place = if inside { en_place[k] } else { -1 }
+            add(at, next - at, w_code, if inside and place >= 0 { w_code } else { w_unplaced }, place, if inside { en_site[k] } else { -1 }, f, -1)
+            at = next
+        }
+        k += 1
+    }
+    rd = end_
+}
+
+/// "" when the records tile the module, each starting where the last ended, from 0 to its end; else where not.
+fn check_tiling() Str {
+    let at = 0
+    for (0 ..< rc_at.len()) |r| {
+        if rc_at[r] != at {
+            let lo = if at < rc_at[r] { at } else { rc_at[r] }
+            let hi = if at > rc_at[r] { at } else { rc_at[r] }
+            return `blame: bytes ${lo} to ${hi} ${if rc_at[r] > at { "unblamed" } else { "blamed twice" }} (${nm(rc_section[r])}, ${nm(rc_what[r])})`
+        }
+        at += rc_bytes[r]
+    }
+    if at != rd_size { return `blame: ${at} of ${rd_size} bytes blamed` }
+    return ""
+}
+
+/// The place of the `@es` import named `field` (the last so named), or -1.
+fn es_place_of(field: Str) I32 {
+    let k = es_field.len() - 1
+    while (k >= 0) {
+        if bs(es_field[k]) == field { return es_place[k] }
+        k -= 1
+    }
+    return -1
+}

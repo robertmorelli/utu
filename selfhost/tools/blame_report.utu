@@ -1,0 +1,731 @@
+//! = Size blame: the report
+//!
+//! The records summed: totals by section, bucket (what has no place), file,
+//! declaration, line, function, helper, and inlined callee, each list
+//! largest first. With the host's brotli costs (blame_cost), each has its
+//! estimated brotli share (`br`); with the glue's @es bindings (blame_glue),
+//! the glue counts toward files, declarations and lines too, apart (`glue`).
+//! Written as NAME.blame.json (report_json), the terminal's top of each list
+//! (top_text), and a page (page_html, blame_page.utu).
+
+// ── What the host gives ─────────────────────────────────────────────────────
+
+/// The module's name, as the report names it (a string id).
+let rp_name: I32 = -1
+/// The brotli estimate: the module's quality-11 size (-1: none), and one
+/// stream's cost of each `br_chunk` bytes, given all before them.
+let br_total: I32 = -1
+let br_chunk: I32 = 0
+vec br_costs: I32
+/// Each byte's estimated share of the brotli size, as running sums (`br_cum[i]`: bytes before i).
+vec br_cum: F64
+/// The glue's @es bindings, in order: field (a string id) and bytes; and the glue's size.
+vec gl_field: I32
+vec gl_bytes: I32
+let glue_size: I32 = 0
+
+/// Each chunk's cost spread over its bytes, scaled to the quality-11 size.
+fn brotli_sums() Void {
+    let n = rd_size
+    br_cum.resize(n + 1)
+    br_cum[0] = 0.0
+    let sum = 0
+    for (0 ..< br_costs.len()) |c| { sum += br_costs[c] }
+    let scale = br_total.f64() / (if sum > 1 { sum } else { 1 }).f64()
+    for (0 ..< n) |i| {
+        let c = i / br_chunk
+        let width = if br_chunk < n - c * br_chunk { br_chunk } else { n - c * br_chunk }
+        br_cum[i + 1] = br_cum[i] + br_costs[c].f64() * scale / width.f64()
+    }
+}
+
+fn record_br(r: I32) F64 {
+    if br_total < 0 { return 0.0 }
+    return br_cum[rc_at[r] + rc_bytes[r]] - br_cum[rc_at[r]]
+}
+
+// ── Rows ────────────────────────────────────────────────────────────────────
+
+/// Sections: name, bytes in buckets, bytes, br. By name (its name_id): its row, or -1.
+vec sr_name: I32
+vec sr_unattributed: I32
+vec sr_bytes: I32
+vec sr_br: F64
+vec sr_of: I32
+/// Buckets: section, what (name_ids), bytes, br. By section × name count + what: its row, or -1.
+vec bk_section: I32
+vec bk_what: I32
+vec bk_bytes: I32
+vec bk_br: F64
+vec bk_of: I32
+/// Files: the file, bytes, br, and its glue (with whether it has any). By file: its row, or -1.
+vec fr_file: I32
+vec fr_bytes: I32
+vec fr_br: F64
+vec fr_glue: I32
+vec fr_has_glue: U8
+vec fr_of: I32
+/// Declarations: the declaration (or -1), its inlined copies, helper shares, glue, bytes, br,
+/// and its bytes by section (a list: @ds_first, then @ds_next). By declaration + 1: its row, or -1.
+vec dr_decl: I32
+vec dr_inlined: I32
+vec dr_helpers: I32
+vec dr_glue: I32
+vec dr_bytes: I32
+vec dr_br: F64
+vec ds_first: I32
+vec ds_last: I32
+vec ds_name: I32
+vec ds_bytes: I32
+vec ds_next: I32
+vec dr_of: I32
+/// Lines: file, line, declaration, inlined copies, copies inlined here, helper shares, glue,
+/// bytes, br. By line (@bl_starts's index): its row, or -1.
+vec lr_file: I32
+vec lr_line: I32
+vec lr_decl: I32
+vec lr_inlined: I32
+vec lr_here: I32
+vec lr_helpers: I32
+vec lr_glue: I32
+vec lr_bytes: I32
+vec lr_br: F64
+vec lr_of: I32
+/// Inlined callees: declaration, the calls they are inlined at, bytes, br. By declaration + 1: its row, or -1.
+vec ce_decl: I32
+vec ce_sites: I32
+vec ce_bytes: I32
+vec ce_br: F64
+vec ce_of: I32
+/// Functions (their code): index, inlined copies, bytes, br. By function: its row, or -1.
+vec fw_index: I32
+vec fw_inlined: I32
+vec fw_bytes: I32
+vec fw_br: F64
+vec fw_of: I32
+/// Helpers: index, calls, the lines they are called from, bytes, br. By function: its row, or -1.
+vec hr_index: I32
+vec hr_calls: I32
+vec hr_sites: I32
+vec hr_bytes: I32
+vec hr_br: F64
+vec hr_of: I32
+/// The module's bytes with a place, and those copied from an inlined function.
+let rp_blamed: I32 = 0
+let rp_inlined: I32 = 0
+
+fn fill(n: I32) Array[I32] => Array[I32].new(n, -1)
+
+fn section_row(name: I32) I32 {
+    if sr_of[name] < 0 {
+        sr_of[name] = sr_name.len()
+        sr_name.push(name)
+        sr_unattributed.push(0)
+        sr_bytes.push(0)
+        sr_br.push(0.0)
+    }
+    return sr_of[name]
+}
+
+fn bucket_row(section: I32, what: I32) I32 {
+    let key = section * nm_text.len() + what
+    if bk_of[key] < 0 {
+        bk_of[key] = bk_section.len()
+        bk_section.push(section)
+        bk_what.push(what)
+        bk_bytes.push(0)
+        bk_br.push(0.0)
+    }
+    return bk_of[key]
+}
+
+fn file_row(f: I32) I32 {
+    if fr_of[f] < 0 {
+        fr_of[f] = fr_file.len()
+        fr_file.push(f)
+        fr_bytes.push(0)
+        fr_br.push(0.0)
+        fr_glue.push(0)
+        fr_has_glue.push(0)
+    }
+    return fr_of[f]
+}
+
+/// A place's declaration, or -1.
+fn decl_key(place: I32) I32 => if place >= 0 and pl_decl[place] >= 0 { pl_decl[place] } else { -1 }
+
+fn decl_row(d: I32) I32 {
+    if dr_of[d + 1] < 0 {
+        dr_of[d + 1] = dr_decl.len()
+        dr_decl.push(d)
+        dr_inlined.push(0)
+        dr_helpers.push(0)
+        dr_glue.push(0)
+        dr_bytes.push(0)
+        dr_br.push(0.0)
+        ds_first.push(-1)
+        ds_last.push(-1)
+    }
+    return dr_of[d + 1]
+}
+
+/// Declaration row `row`'s bytes in `section` (a name_id), added to.
+fn decl_section_add(row: I32, section: I32, bytes: I32) Void {
+    let e = ds_first[row]
+    while (e >= 0) {
+        if ds_name[e] == section {
+            ds_bytes[e] += bytes
+            return
+        }
+        e = ds_next[e]
+    }
+    let k = ds_name.len()
+    ds_name.push(section)
+    ds_bytes.push(bytes)
+    ds_next.push(-1)
+    if ds_last[row] < 0 { ds_first[row] = k } else { ds_next[ds_last[row]] = k }
+    ds_last[row] = k
+}
+
+fn line_row(p: I32) I32 {
+    let key = bf_lines[pl_file[p]] + pl_line[p] - 1
+    if lr_of[key] < 0 {
+        lr_of[key] = lr_file.len()
+        lr_file.push(pl_file[p])
+        lr_line.push(pl_line[p])
+        lr_decl.push(decl_key(p))
+        lr_inlined.push(0)
+        lr_here.push(0)
+        lr_helpers.push(0)
+        lr_glue.push(0)
+        lr_bytes.push(0)
+        lr_br.push(0.0)
+    }
+    return lr_of[key]
+}
+
+fn callee_row(d: I32) I32 {
+    if ce_of[d + 1] < 0 {
+        ce_of[d + 1] = ce_decl.len()
+        ce_decl.push(d)
+        ce_sites.push(0)
+        ce_bytes.push(0)
+        ce_br.push(0.0)
+    }
+    return ce_of[d + 1]
+}
+
+fn fn_row(f: I32) I32 {
+    if fw_of[f] < 0 {
+        fw_of[f] = fw_index.len()
+        fw_index.push(f)
+        fw_inlined.push(0)
+        fw_bytes.push(0)
+        fw_br.push(0.0)
+    }
+    return fw_of[f]
+}
+
+fn helper_row(f: I32) I32 {
+    if hr_of[f] < 0 {
+        hr_of[f] = hr_index.len()
+        hr_index.push(f)
+        hr_calls.push(0)
+        hr_sites.push(0)
+        hr_bytes.push(0)
+        hr_br.push(0.0)
+    }
+    return hr_of[f]
+}
+
+// ── Pairs seen ──────────────────────────────────────────────────────────────
+
+/// A set of pairs of non-negative numbers (open addressing; a key is the pair + 1, 0 empty).
+vec ps_keys: I64
+let ps_count: I32 = 0
+
+/// Whether the pair (a, b) is new to the set; it is in it after.
+fn pair_new(a: I32, b: I32) Bool {
+    if (ps_count + 1) * 2 > ps_keys.len() {
+        let old = Array[I64].new(ps_keys.len(), 0)
+        for (0 ..< ps_keys.len()) |k| { old[k] = ps_keys[k] }
+        let size = if ps_keys.len() == 0 { 1024 } else { ps_keys.len() * 2 }
+        ps_keys.resize(size)
+        for (0 ..< size) |k| { ps_keys[k] = 0 }
+        ps_count = 0
+        for (0 ..< old.len()) |k| { if old[k] != 0 { let _ = pair_put(old[k]) } }
+    }
+    return pair_put(((a.i64() << 32) | b.i64()) + 1)
+}
+
+fn pair_put(key: I64) Bool {
+    let mask = ps_keys.len() - 1
+    let k = ((key * -7046029254386353131) >>> 40).i32() & mask
+    while (ps_keys[k] != 0) {
+        if ps_keys[k] == key { return false }
+        k = (k + 1) & mask
+    }
+    ps_keys[k] = key
+    ps_count += 1
+    return true
+}
+
+// ── Summing ─────────────────────────────────────────────────────────────────
+
+/// One decimal place, as Math.round(x * 10) / 10 gives it.
+fn round1(x: F64) F64 {
+    let v = x * 10.0
+    let f = F64.floor(v)
+    let half: F64 = 0.5
+    return (if v - f >= half { f + 1.0 } else { f }) / 10.0
+}
+
+fn sum_records() Void {
+    let names = nm_text.len()
+    sr_of.resize(names)
+    for (0 ..< names) |k| { sr_of[k] = -1 }
+    bk_of.resize(names * names)
+    for (0 ..< names * names) |k| { bk_of[k] = -1 }
+    fr_of.resize(bf_key.len())
+    for (0 ..< bf_key.len()) |k| { fr_of[k] = -1 }
+    dr_of.resize(dc_name.len() + 1)
+    for (0 ..< dc_name.len() + 1) |k| { dr_of[k] = -1 }
+    ce_of.resize(dc_name.len() + 1)
+    for (0 ..< dc_name.len() + 1) |k| { ce_of[k] = -1 }
+    lr_of.resize(bl_starts.len())
+    for (0 ..< bl_starts.len()) |k| { lr_of[k] = -1 }
+    fw_of.resize(fn_role.len())
+    hr_of.resize(fn_role.len())
+    for (0 ..< fn_role.len()) |k| {
+        fw_of[k] = -1
+        hr_of[k] = -1
+    }
+    let code = name_id("code")
+    for (0 ..< rc_at.len()) |r| {
+        let b = record_br(r)
+        let bytes = rc_bytes[r]
+        let place = rc_place[r]
+        let s = section_row(rc_section[r])
+        sr_bytes[s] += bytes
+        sr_br[s] += b
+        if place < 0 {
+            sr_unattributed[s] += bytes
+            let u = bucket_row(rc_section[r], rc_what[r])
+            bk_bytes[u] += bytes
+            bk_br[u] += b
+            continue
+        }
+        rp_blamed += bytes
+        let f = file_row(pl_file[place])
+        fr_bytes[f] += bytes
+        fr_br[f] += b
+        let d = decl_row(decl_key(place))
+        dr_bytes[d] += bytes
+        dr_br[d] += b
+        decl_section_add(d, rc_section[r], bytes)
+        let l = line_row(place)
+        lr_bytes[l] += bytes
+        lr_br[l] += b
+        if rc_helper[r] >= 0 {
+            dr_helpers[d] += bytes
+            lr_helpers[l] += bytes
+        }
+        if rc_site[r] >= 0 {
+            // A copy of the callee's code at a call: the callee's line, and the call's.
+            rp_inlined += bytes
+            dr_inlined[d] += bytes
+            lr_inlined[l] += bytes
+            lr_here[line_row(rc_site[r])] += bytes
+            let c = callee_row(decl_key(place))
+            ce_bytes[c] += bytes
+            ce_br[c] += b
+            if pair_new(c * 2, rc_site[r]) { ce_sites[c] += 1 }
+        }
+        if rc_fn[r] >= 0 and rc_section[r] == code {
+            let w = fn_row(rc_fn[r])
+            fw_bytes[w] += bytes
+            fw_br[w] += b
+            if rc_site[r] >= 0 { fw_inlined[w] += bytes }
+        }
+    }
+    for (0 ..< gl_field.len()) |g| {
+        let place = es_place_of(bs(gl_field[g]))
+        if place < 0 { continue }
+        let f = file_row(pl_file[place])
+        fr_glue[f] += gl_bytes[g]
+        fr_has_glue[f] = 1
+        dr_glue[decl_row(decl_key(place))] += gl_bytes[g]
+        lr_glue[line_row(place)] += gl_bytes[g]
+    }
+    // Helpers: each one's bytes and the calls they are split among.
+    for (0 ..< rc_at.len()) |r| {
+        if rc_helper[r] < 0 { continue }
+        let h = helper_row(rc_helper[r])
+        hr_bytes[h] += rc_bytes[r]
+        hr_br[h] += record_br(r)
+    }
+    for (0 ..< hr_index.len()) |h| { hr_calls[h] = cl_count[hr_index[h]] }
+    for (0 ..< rc_at.len()) |r| {
+        if rc_helper[r] >= 0 and rc_place[r] >= 0 {
+            let h = hr_of[rc_helper[r]]
+            if pair_new(h * 2 + 1, line_row(rc_place[r])) { hr_sites[h] += 1 }
+        }
+    }
+    for (0 ..< sr_br.len()) |k| { sr_br[k] = round1(sr_br[k]) }
+    for (0 ..< bk_br.len()) |k| { bk_br[k] = round1(bk_br[k]) }
+    for (0 ..< fr_br.len()) |k| { fr_br[k] = round1(fr_br[k]) }
+    for (0 ..< dr_br.len()) |k| { dr_br[k] = round1(dr_br[k]) }
+    for (0 ..< lr_br.len()) |k| { lr_br[k] = round1(lr_br[k]) }
+    for (0 ..< ce_br.len()) |k| { ce_br[k] = round1(ce_br[k]) }
+    for (0 ..< fw_br.len()) |k| { fw_br[k] = round1(fw_br[k]) }
+    for (0 ..< hr_br.len()) |k| { hr_br[k] = round1(hr_br[k]) }
+}
+
+/// Rows 0 ..< keys.len(), largest key first; rows of equal keys in order.
+fn largest_first(keys: Array[I32]) Array[I32] {
+    let n = keys.len()
+    let order = Array[I32].new(n, 0)
+    for (0 ..< n) |i| { order[i] = i }
+    let spare = Array[I32].new(n, 0)
+    let width = 1
+    while (width < n) {
+        let lo = 0
+        while (lo < n) {
+            let mid = if lo + width < n { lo + width } else { n }
+            let hi = if lo + 2 * width < n { lo + 2 * width } else { n }
+            let a = lo
+            let b = mid
+            for (lo ..< hi) |k| {
+                if a < mid and (b >= hi or keys[order[a]] >= keys[order[b]]) {
+                    spare[k] = order[a]
+                    a += 1
+                } else {
+                    spare[k] = order[b]
+                    b += 1
+                }
+            }
+            lo = hi
+        }
+        for (0 ..< n) |k| { order[k] = spare[k] }
+        width *= 2
+    }
+    return order
+}
+
+/// The rows of each list in report order (largest first).
+let o_sections: Array[I32] = Array[I32].new(0, 0)
+let o_buckets: Array[I32] = Array[I32].new(0, 0)
+let o_files: Array[I32] = Array[I32].new(0, 0)
+let o_decls: Array[I32] = Array[I32].new(0, 0)
+let o_lines: Array[I32] = Array[I32].new(0, 0)
+let o_fns: Array[I32] = Array[I32].new(0, 0)
+let o_helpers: Array[I32] = Array[I32].new(0, 0)
+let o_callees: Array[I32] = Array[I32].new(0, 0)
+
+fn keys_of(n: I32, kind: I32) Array[I32] {
+    let keys = Array[I32].new(n, 0)
+    for (0 ..< n) |i| {
+        keys[i] = match kind {
+            0 => sr_bytes[i],
+            1 => bk_bytes[i],
+            2 => fr_bytes[i],
+            3 => dr_bytes[i],
+            4 => lr_bytes[i],
+            5 => fw_bytes[i],
+            6 => hr_bytes[i],
+            ~> ce_bytes[i],
+        }
+    }
+    return keys
+}
+
+fn order_rows() Void {
+    o_sections = largest_first(keys_of(sr_name.len(), 0))
+    o_buckets = largest_first(keys_of(bk_section.len(), 1))
+    o_files = largest_first(keys_of(fr_file.len(), 2))
+    o_decls = largest_first(keys_of(dr_decl.len(), 3))
+    o_lines = largest_first(keys_of(lr_file.len(), 4))
+    o_fns = largest_first(keys_of(fw_index.len(), 5))
+    o_helpers = largest_first(keys_of(hr_index.len(), 6))
+    o_callees = largest_first(keys_of(ce_decl.len(), 7))
+}
+
+// ── JSON ────────────────────────────────────────────────────────────────────
+
+let json_quote: fun(Str) Str = @es/\ (s) => JSON.stringify(s) \/
+
+/// By string id, its JSON (a string id), or -1 before it is asked.
+vec bs_json: I32
+
+/// A string's JSON, made once.
+fn q(id: I32) Str {
+    while (bs_json.len() <= id) { bs_json.push(-1) }
+    if bs_json[id] < 0 {
+        let quoted = bs_add(json_quote(bs(id)))
+        while (bs_json.len() <= id) { bs_json.push(-1) }
+        bs_json[id] = quoted
+    }
+    return bs(bs_json[id])
+}
+
+fn qn(id: I32) Str => if id < 0 { "null" } else { q(id) }
+
+fn file_json(f: I32) Str => q(bf_key[f])
+
+fn role_name(role: I32) Str => match role {
+    0 => "defined",
+    1 => "import",
+    2 => "helper",
+    ~> "wat",
+}
+
+/// A list's items, each its JSON, between brackets.
+fn json_list(items: Array[Str]) Str => "[" + ",".join(items) + "]"
+
+fn compressed_json() Str {
+    if br_total < 0 { return "null" }
+    return `{"bytes":${br_total},"estimate":${json_quote(estimate_text())}}`
+}
+
+fn estimate_text() Str => `brotli q9 flushed every ${br_chunk} bytes, each chunk's cost spread over its bytes, scaled to the q11 total`
+
+fn sections_json() Str {
+    let items = Array[Str].new(o_sections.len(), "")
+    for (o_sections, 0 ..< o_sections.len()) |s, i| {
+        items[i] = `{"section":${q(nm_text[sr_name[s]])},"unattributed":${sr_unattributed[s]},"bytes":${sr_bytes[s]},"br":${sr_br[s]}}`
+    }
+    return json_list(items)
+}
+
+fn buckets_json() Str {
+    let items = Array[Str].new(o_buckets.len(), "")
+    for (o_buckets, 0 ..< o_buckets.len()) |u, i| {
+        items[i] = `{"section":${q(nm_text[bk_section[u]])},"what":${q(nm_text[bk_what[u]])},"bytes":${bk_bytes[u]},"br":${bk_br[u]}}`
+    }
+    return json_list(items)
+}
+
+/// The files; `labels`: each with its label (the page's).
+fn files_json(labels: Bool) Str {
+    let items = Array[Str].new(o_files.len(), "")
+    for (o_files, 0 ..< o_files.len()) |f, i| {
+        let glue = if fr_has_glue[f] != 0 { `,"glue":${fr_glue[f]}` } else { "" }
+        let label = if labels { `,"label":${q(bf_label[fr_file[f]])}` } else { "" }
+        items[i] = `{"file":${file_json(fr_file[f])},"bytes":${fr_bytes[f]},"br":${fr_br[f]}${glue}${label}}`
+    }
+    return json_list(items)
+}
+
+fn decls_json() Str {
+    let items = Array[Str].new(o_decls.len(), "")
+    for (o_decls, 0 ..< o_decls.len()) |r, i| {
+        let d = dr_decl[r]
+        let head = if d >= 0 { `{"decl":${d},"name":${q(dc_name[d])},"kind":${q(dc_kind[d])},"file":${file_json(dc_file[d])},"line":${dc_line[d]}` }
+            else { `{"decl":-1,"name":"(no declaration)","kind":null,"file":null,"line":null` }
+        let sections = ""
+        let e = ds_first[r]
+        while (e >= 0) {
+            sections = sections + (if sections == "" { "" } else { "," }) + `${q(nm_text[ds_name[e]])}:${ds_bytes[e]}`
+            e = ds_next[e]
+        }
+        items[i] = `${head},"inlined":${dr_inlined[r]},"helpers":${dr_helpers[r]},"glue":${dr_glue[r]},"sections":{${sections}},"bytes":${dr_bytes[r]},"br":${dr_br[r]}}`
+    }
+    return json_list(items)
+}
+
+fn lines_json() Str {
+    let items = Array[Str].new(o_lines.len(), "")
+    for (o_lines, 0 ..< o_lines.len()) |l, i| {
+        items[i] = `{"file":${file_json(lr_file[l])},"line":${lr_line[l]},"decl":${lr_decl[l]},"inlined":${lr_inlined[l]},"inlinedHere":${lr_here[l]},"helpers":${lr_helpers[l]},"glue":${lr_glue[l]},"bytes":${lr_bytes[l]},"br":${lr_br[l]}}`
+    }
+    return json_list(items)
+}
+
+/// The lines as the page has them: [file, line, decl, bytes, br, inlined, inlinedHere, helpers, glue].
+fn line_tuples_json() Str {
+    let items = Array[Str].new(o_lines.len(), "")
+    for (o_lines, 0 ..< o_lines.len()) |l, i| {
+        items[i] = `[${file_json(lr_file[l])},${lr_line[l]},${lr_decl[l]},${lr_bytes[l]},${lr_br[l]},${lr_inlined[l]},${lr_here[l]},${lr_helpers[l]},${lr_glue[l]}]`
+    }
+    return json_list(items)
+}
+
+fn functions_json() Str {
+    let items = Array[Str].new(o_fns.len(), "")
+    for (o_fns, 0 ..< o_fns.len()) |w, i| {
+        let f = fw_index[w]
+        let p = fn_place[f]
+        let at = if p >= 0 { `"file":${file_json(pl_file[p])},"line":${pl_line[p]},"decl":${decl_key(p)}` } else { `"file":null,"line":null,"decl":-1` }
+        items[i] = `{"index":${f},"name":${qn(fn_named[f])},"role":"${role_name(fn_role[f])}","inlined":${fw_inlined[w]},"bytes":${fw_bytes[w]},"br":${fw_br[w]},${at}}`
+    }
+    return json_list(items)
+}
+
+fn helpers_json() Str {
+    let items = Array[Str].new(o_helpers.len(), "")
+    for (o_helpers, 0 ..< o_helpers.len()) |h, i| {
+        let f = hr_index[h]
+        items[i] = `{"index":${f},"name":${qn(fn_named[f])},"calls":${hr_calls[h]},"sites":${hr_sites[h]},"bytes":${hr_bytes[h]},"br":${hr_br[h]}}`
+    }
+    return json_list(items)
+}
+
+/// The code section's bytes.
+fn code_section_bytes() I32 {
+    for (0 ..< sr_name.len()) |s| { if nm(sr_name[s]) == "code" { return sr_bytes[s] } }
+    return 0
+}
+
+fn inlining_json() Str {
+    let items = Array[Str].new(o_callees.len(), "")
+    for (o_callees, 0 ..< o_callees.len()) |c, i| {
+        items[i] = `{"decl":${ce_decl[c]},"sites":${ce_sites[c]},"bytes":${ce_bytes[c]},"br":${ce_br[c]}}`
+    }
+    let code = code_section_bytes()
+    let of_code: F64 = if code != 0 { rp_inlined.f64() / code.f64() } else { 0.0 }
+    return `{"bytes":${rp_inlined},"ofCode":${of_code},"callees":${json_list(items)}}`
+}
+
+fn decl_table_json() Str {
+    let items = Array[Str].new(dc_name.len(), "")
+    for (0 ..< dc_name.len()) |d| {
+        items[d] = `{"name":${q(dc_name[d])},"kind":${q(dc_kind[d])},"file":${file_json(dc_file[d])},"line":${dc_line[d]}}`
+    }
+    return json_list(items)
+}
+
+fn notes_json() Str {
+    let items = Array[Str].new(notes.len(), "")
+    for (0 ..< notes.len()) |k| { items[k] = q(notes[k]) }
+    return json_list(items)
+}
+
+/// NAME.blame.json.
+fn report_json() Str {
+    return `{"name":${q(rp_name)},"bytes":${rd_size},"blamed":${rp_blamed},"compressed":${compressed_json()},"sections":${sections_json()},"unattributed":${buckets_json()},"files":${files_json(false)},"decls":${decls_json()},"lines":${lines_json()},"functions":${functions_json()},"helpers":${helpers_json()},"inlining":${inlining_json()},"glue":{"bytes":${glue_size}},"declTable":${decl_table_json()},"notes":${notes_json()}}`
+}
+
+// ── A blame ─────────────────────────────────────────────────────────────────
+
+/// Forget the last blame; the next is of the module named `name`.
+fn blame_reset(name: Str) Void {
+    bs_count = 0
+    bf_key.clear()
+    bf_label.clear()
+    bf_text.clear()
+    bf_start.clear()
+    bf_size.clear()
+    bf_order.clear()
+    bf_lines.clear()
+    bf_line_count.clear()
+    bl_starts.clear()
+    pl_file.clear()
+    pl_line.clear()
+    pl_decl.clear()
+    dc_name.clear()
+    dc_kind.clear()
+    dc_file.clear()
+    dc_line.clear()
+    en_at.clear()
+    en_place.clear()
+    en_site.clear()
+    fn_place.clear()
+    fn_role.clear()
+    fn_named.clear()
+    ty_place.clear()
+    gl_place.clear()
+    dt_place.clear()
+    mm_place.clear()
+    br_costs.clear()
+    gl_field.clear()
+    gl_bytes.clear()
+    sr_name.clear()
+    sr_unattributed.clear()
+    sr_bytes.clear()
+    sr_br.clear()
+    bk_section.clear()
+    bk_what.clear()
+    bk_bytes.clear()
+    bk_br.clear()
+    fr_file.clear()
+    fr_bytes.clear()
+    fr_br.clear()
+    fr_glue.clear()
+    fr_has_glue.clear()
+    dr_decl.clear()
+    dr_inlined.clear()
+    dr_helpers.clear()
+    dr_glue.clear()
+    dr_bytes.clear()
+    dr_br.clear()
+    ds_first.clear()
+    ds_last.clear()
+    ds_name.clear()
+    ds_bytes.clear()
+    ds_next.clear()
+    lr_file.clear()
+    lr_line.clear()
+    lr_decl.clear()
+    lr_inlined.clear()
+    lr_here.clear()
+    lr_helpers.clear()
+    lr_glue.clear()
+    lr_bytes.clear()
+    lr_br.clear()
+    ce_decl.clear()
+    ce_sites.clear()
+    ce_bytes.clear()
+    ce_br.clear()
+    fw_index.clear()
+    fw_inlined.clear()
+    fw_bytes.clear()
+    fw_br.clear()
+    hr_index.clear()
+    hr_calls.clear()
+    hr_sites.clear()
+    hr_bytes.clear()
+    hr_br.clear()
+    ps_keys.clear()
+    bs_json.clear()
+    sc_id.clear()
+    sc_name.clear()
+    sc_start.clear()
+    sc_body.clear()
+    sc_end.clear()
+    nm_text.clear()
+    rc_at.clear()
+    rc_bytes.clear()
+    rc_section.clear()
+    rc_what.clear()
+    rc_place.clear()
+    rc_site.clear()
+    rc_fn.clear()
+    rc_helper.clear()
+    cl_fn.clear()
+    cl_at.clear()
+    cl_count.clear()
+    notes.clear()
+    es_field.clear()
+    es_place.clear()
+    rd_clear()
+    ps_count = 0
+    rp_blamed = 0
+    rp_inlined = 0
+    br_total = -1
+    glue_size = 0
+    rp_name = bs_add(name)
+}
+
+/// Blame the module the host wrote (after its files, brotli costs, and glue):
+/// "" when every byte is blamed once, else why not.
+fn blame_report_run() Str {
+    blame_tables()
+    let wrong = blame_module()
+    if wrong != "" { return wrong }
+    let tiles = check_tiling()
+    if tiles != "" { return tiles }
+    if br_total >= 0 { brotli_sums() }
+    sum_records()
+    order_rows()
+    return ""
+}

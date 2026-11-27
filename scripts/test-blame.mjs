@@ -1,4 +1,4 @@
-// Size blame (src/selfhost/blame.js): asking for it changes nothing built,
+// Size blame (src/selfhost/blame.js, on the tools): asking for it changes nothing built,
 // and every byte is blamed once, on a place or in a named bucket.
 //
 //   node scripts/test-blame.mjs
@@ -7,12 +7,17 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { compileFile, loadNodeCompiler } from '../src/selfhost/node.js';
+import { compileFile, loadNodeTools } from '../src/selfhost/node.js';
 import { MODES } from '../src/selfhost/compiler.js';
-import { blameGlue, blameModule, checkTiling, formatTop, report } from '../src/selfhost/blame.js';
+import { blame } from '../src/selfhost/blame.js';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
-const utu = await loadNodeCompiler();
+const utu = await loadNodeTools();
+// The report of the build just made.
+const blamed = async built => {
+  const rep = await blame(utu, { wasm: built.wasm, spec: built.spec, files: built.files, brotli: false });
+  return { rep: JSON.parse(rep.json()), top: rep.top() };
+};
 let checked = 0;
 for (const name of ['closures.utu', 'protocols.utu', 'stdlib.utu', 'promises.utu']) {
   for (const mode of ['small', 'fast', 'debug']) {
@@ -20,14 +25,12 @@ for (const name of ['closures.utu', 'protocols.utu', 'stdlib.utu', 'promises.utu
     const plain = await compileFile(utu, file, MODES[mode]);
     const built = await compileFile(utu, file, { ...MODES[mode], blame: true });
     assert.ok(Buffer.from(plain.wasm).equals(Buffer.from(built.wasm)), `${name} -O ${mode}: blame changed the module`);
-    const blamed = blameModule(built.wasm, built.blame);
-    checkTiling(blamed.records, built.wasm.length);
-    const rep = report({ wasm: built.wasm, tables: built.blame, blamed, glue: blameGlue(built.spec, blamed.esPlaces) });
+    const { rep, top } = await blamed(built);
     const sum = rep.sections.reduce((n, s) => n + s.bytes, 0);
     assert.equal(sum, built.wasm.length, `${name} -O ${mode}: sections sum to the size`);
     assert.equal(rep.blamed + rep.unattributed.reduce((n, u) => n + u.bytes, 0), built.wasm.length, `${name} -O ${mode}: blamed + buckets = size`);
     assert.ok(rep.blamed / built.wasm.length > 0.7, `${name} -O ${mode}: most bytes have a place`);
-    assert.match(formatTop(rep), /declarations/);
+    assert.match(top, /declarations/);
     assert.deepEqual(rep.notes, [], `${name} -O ${mode}: every instruction read`);
     checked++;
   }
@@ -59,8 +62,8 @@ ${Array.from({ length: 40 }, (_, k) => `    let p${k}: ?S${k} = if n > ${k} { S$
 } }
 `);
 const t = await compileFile(utu, typed, { ...MODES.debug, blame: true });
-assert.deepEqual(report({ wasm: t.wasm, tables: t.blame, blamed: blameModule(t.wasm, t.blame), glue: [] }).notes, [], 'blocks typed (ref null T) read whole');
-const labels = new Set((await compileFile(utu, named, { ...MODES.small, blame: true })).blame.decls.map(d => d.name));
+assert.deepEqual((await blamed(t)).rep.notes, [], 'blocks typed (ref null T) read whole');
+const labels = new Set((await blamed(await compileFile(utu, named, { ...MODES.small, blame: true }))).rep.declTable.map(d => d.name));
 fs.rmSync(dir, { recursive: true, force: true });
 for (const name of ['Tok', 'Pair', 'toks', 'run']) assert.ok(labels.has(name), `a declaration named ${name}: ${[...labels]}`);
 assert.ok(!labels.has('tag'), `none named for its modifier: ${[...labels]}`);
