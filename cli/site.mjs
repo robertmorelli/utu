@@ -5,10 +5,10 @@ import { watch } from 'node:fs';
 import path from 'node:path';
 import http from 'node:http';
 import { previewClient } from '../tools/dts/preview-client.mjs';
-import { createSyntaxShape, formatUtu } from '../src/wutu/wutu-tooling.js';
+import { formatUtu } from '../src/wutu/wutu-tooling.js';
 import { buildBrowserApp } from '../tools/dts/build-app.mjs';
 import { prerender } from '../tools/dts/prerender.mjs';
-import { loadNodeCompiler } from '../src/selfhost/node.js';
+import { loadNodeTools } from '../src/selfhost/node.js';
 import { MODES } from '../src/selfhost/compiler.js';
 
 const CONTENT_TYPES = {
@@ -27,7 +27,7 @@ const escapeHtml = (text) => text.replaceAll('&', '&amp;').replaceAll('<', '&lt;
 
 export async function formatCommand(files, { check }) {
   if (!files.length) throw new Error('no files to format');
-  const shape = createSyntaxShape(await loadNodeCompiler());
+  const tools = await loadNodeTools();
   for (const name of files) {
     let source;
     try { source = await fs.readFile(name, 'utf8'); }
@@ -37,7 +37,7 @@ export async function formatCommand(files, { check }) {
       process.exitCode = 1;
       continue;
     }
-    const { text: formatted, refused } = await formatUtu(source, { shape });
+    const { text: formatted, refused } = formatUtu(tools, source);
     if (refused) {
       // A file is formatted only when its layout keeps its meaning.
       console.error(`${name}: left as is: ${refused}`);

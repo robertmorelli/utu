@@ -4,14 +4,14 @@ import os from 'node:os';
 import path from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { chromium } from 'playwright';
-import { createSyntaxShape, formatUtu } from '../src/wutu/wutu-tooling.js';
-import { loadNodeCompiler } from '../src/selfhost/node.js';
+import { formatUtu } from '../src/wutu/wutu-tooling.js';
+import { loadNodeTools } from '../src/selfhost/node.js';
 
 const out = await fs.mkdtemp(path.join(os.tmpdir(), 'wutu-components-'));
 let browser;
 try {
   const source = await fs.readFile('examples/wutu-components/main.utu', 'utf8');
-  const formatted = await formatUtu(source, { shape: createSyntaxShape(await loadNodeCompiler()) });
+  const formatted = formatUtu(await loadNodeTools(), source);
   assert.equal(formatted.refused, null);
   const entry = path.join(out, 'main.utu');
   await fs.writeFile(entry, formatted.text);

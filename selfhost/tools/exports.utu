@@ -7,3 +7,35 @@
 
     /// 1: this module is utu-tools.wasm.
     fn tools_version() I32 => 1
+
+    // ── format ──
+
+    /// `source` laid out (`utu format`), or as it is: then format_refused says why.
+    fn format(source: Str) Str => format_utu(source)
+
+    /// Why the last format left its source as it is (it does not parse, its
+    /// layout would parse differently, its layout is not stable), or "".
+    fn format_refused() Str => fu_refused
+
+    /// `source` with each `@wutu` island laid out.
+    fn format_wutu(source: Str) Str => format_wutu_source(source)
+
+    /// A template laid out, from its first line's start; it throws when it does not parse.
+    fn format_template_text(text: Str) Str => format_wutu_body(text, false)
+
+    /// The shape of `source`'s tree that format compares, as text ("" when it does not parse).
+    fn format_shape(source: Str) Str => syntax_shape(source)
+
+    /// A template's tree as JSON, or its syntax error: `{"error":…,"at":…}` (see wutu_json).
+    fn wutu_template_tree(text: Str) Str => wutu_tree(text)
+
+    /// The `@wutu` islands of `source`: each payload's start and end (UTF-16 offsets), space-separated.
+    fn wutu_islands(source: Str) Str {
+        find_islands(source)
+        let out = ""
+        for (0 ..< fw_islands.len()) |k| { out = out + (if k > 0 { " " } else { "" }) + fw_islands[k].str() }
+        return out
+    }
+
+    /// The Wutu completion words at `offset` of `source` (see wutu_completion_words).
+    fn wutu_completions(source: Str, offset: I32) Str => wutu_completion_words(source, offset)

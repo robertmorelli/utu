@@ -123,7 +123,10 @@ for(const name of ['invalid_batch','invalid_window']){
 }
 console.log('Iterator empty inputs, growth, stage boundaries, short circuit, shadowing, and logarithmic bisect passed');
 
-const { parseWutu }=await import('../src/wutu/wutu-parse.js');
+// The compiler's template parser, from dist/utu-tools.wasm.
+const { wutuTree }=await import('../src/wutu/wutu-tooling.js');
+const wutuTools=await (await import('../src/selfhost/node.js')).loadNodeTools();
+const parseWutu=text=>wutuTree(wutuTools,text);
 // Statements end at line breaks (or `;`, or the `}` closing their block); two on one line need `;`.
 for(const source of ['div { aria-hidden = "true" aspect-ratio: 0.68; }','p { "a" "b" }','div { color: red margin: 0 }']) {
  let threw=false;try{parseWutu(source);}catch(e){threw=/expected a line break or ;|need ; between/.test(e.message);}assertEq(threw,true,source);
