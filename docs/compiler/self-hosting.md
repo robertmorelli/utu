@@ -10,10 +10,12 @@ itself. The original JavaScript compiler (stage -1) is preserved at the tag `sta
 the compiler. `bun run build` uses it to build stage 1 from `selfhost/`;
 stage 1 builds stage 2; stage 2 builds stage 3; stages 2 and 3 must be
 identical, Wasm and host spec (`scripts/selfhost-bootstrap.mjs`, part of
-`bun run test`). Stage 2 is `dist/utu.wasm`. There is no JavaScript
-fallback. For recovery, `UTU_STAGE0=/path/to/utu.wasm` selects another
-compiler (a development `dist/utu.wasm`, or an older stage 0 from git
-history) and its adjacent `.host.json`.
+`bun run test`). Stage 2 is `dist/utu-core.wasm`, which then builds
+`selfhost/` with `selfhost/tools/` (format, the language server, blame,
+grep) into `dist/utu.wasm`: the one module every build and tool loads.
+There is no JavaScript fallback. For recovery, `UTU_STAGE0=/path/to/utu.wasm`
+selects another compiler (a development `dist/utu-core.wasm`, or an older
+stage 0 from git history) and its adjacent `.host.json`.
 
 ## Stage 0
 

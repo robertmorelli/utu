@@ -8,7 +8,7 @@ import { previewClient } from '../tools/dts/preview-client.mjs';
 import { formatUtu } from '../src/wutu/wutu-tooling.js';
 import { buildBrowserApp } from '../tools/dts/build-app.mjs';
 import { prerender } from '../tools/dts/prerender.mjs';
-import { loadNodeTools } from '../src/selfhost/node.js';
+import { loadNodeCompiler } from '../src/selfhost/node.js';
 import { MODES } from '../src/selfhost/compiler.js';
 
 const CONTENT_TYPES = {
@@ -27,7 +27,7 @@ const escapeHtml = (text) => text.replaceAll('&', '&amp;').replaceAll('<', '&lt;
 
 export async function formatCommand(files, { check }) {
   if (!files.length) throw new Error('no files to format');
-  const tools = await loadNodeTools();
+  const tools = await loadNodeCompiler();
   for (const name of files) {
     let source;
     try { source = await fs.readFile(name, 'utf8'); }

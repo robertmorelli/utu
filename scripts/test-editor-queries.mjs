@@ -1,9 +1,9 @@
 // Query exports used by editor hover, inlays, and call hierarchy.
 import assert from 'node:assert/strict';
-import { compileFile, loadNodeTools } from '../src/selfhost/node.js';
+import { compileFile, loadNodeCompiler } from '../src/selfhost/node.js';
 import { programIndex } from '../src/selfhost/query.js';
 
-const utu = await loadNodeTools();
+const utu = await loadNodeCompiler();
 const built = await compileFile(utu, 'examples/closures.utu', { root: process.cwd() });
 assert.ok(built.wasm);
 assert.equal(built.diagnostics.length, 0);

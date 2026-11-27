@@ -1,11 +1,11 @@
 import { parseHTML } from 'linkedom/worker';
 import { printWat } from '../src/selfhost/wat.js';
 import { compileAndInstantiate, compileAndInstantiateSelfhost, selfhostDiagnostics, withTempUtu } from './test-harness.mjs';
-import { loadNodeTools } from '../src/selfhost/node.js';
+import { loadNodeCompiler } from '../src/selfhost/node.js';
 import { wutuTree } from '../src/wutu/wutu-tooling.js';
 
-// The compiler's template parser, from dist/utu-tools.wasm.
-const tools = await loadNodeTools();
+// The compiler's template parser, from dist/utu.wasm.
+const tools = await loadNodeCompiler();
 const parseWutu = text => wutuTree(tools, text);
 
 export function registerIteratorWutuTests({test,assert,assertEq,assertThrows,assertNoErrors,makeCompiler}) {

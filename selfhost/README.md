@@ -30,8 +30,11 @@ module.
 
 `bun run build` ships it: stage 0 builds this compiler, which builds
 itself, and that build (checked to build itself to the same bytes) is
-`dist/utu.wasm`, with `utu.host.json` (what it needs from its host) and
-`utu.sources` (the hash of these files, so a stale build is refused).
+`dist/utu-core.wasm`. It builds these files with `tools/` (the editor and
+command-line tools, whose exports `tools/exports.utu` adds to `lib.utu`'s)
+into `dist/utu.wasm`, the one module every build and tool loads, with
+`utu.host.json` (what it needs from its host) and `utu.sources` (the hash
+of these files, so a stale build is refused).
 `src/selfhost/` drives it from JavaScript; `cli/utu.mjs` is its command
 line.
 

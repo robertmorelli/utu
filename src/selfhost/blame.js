@@ -2,7 +2,7 @@
 // JS glue, blamed on the source it came from. It answers "why is my binary
 // this big".
 //
-// The build that is blamed ran on the tools (loadNodeTools), asked to blame
+// The build that is blamed ran on the tools (loadNodeCompiler), asked to blame
 // (`blame: true`: a source map, which changes nothing built); the tools then
 // read its state and the module (selfhost/tools/blame*.utu) and write the
 // report. Here, what they cannot do: the brotli estimate and the glue's

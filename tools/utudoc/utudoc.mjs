@@ -12,7 +12,7 @@
 // `//!` comment opens its section; a later `//!` block is set where it is.
 // `typst compile` makes the PDF; without typst, the .typ is written for later.
 //
-// The document is made by selfhost/tools/utudoc.utu, in dist/utu-tools.wasm,
+// The document is made by selfhost/tools/utudoc.utu, in dist/utu.wasm,
 // from what each build leaves (the declarations, the tokens, what names
 // resolve to); this reads the files, hands it each build's doc comments and
 // colors, writes the .typ, and runs typst.
@@ -22,7 +22,7 @@ import fs from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
 import { compile } from '../../src/selfhost/compiler.js';
-import { loadNodeTools, nodeHost } from '../../src/selfhost/node.js';
+import { loadNodeCompiler, nodeHost } from '../../src/selfhost/node.js';
 import { highlighter } from '../../src/selfhost/highlight.js';
 
 async function main() {
@@ -62,7 +62,7 @@ async function main() {
     return dir;
   }, path.dirname(entries[0] ?? '.'));
 
-  const utu = await loadNodeTools();
+  const utu = await loadNodeCompiler();
   const documented = new Set();
   let declarations = 0;
   for (const entry of entries) {

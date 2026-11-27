@@ -189,7 +189,7 @@ export function deactivate() {
 
 /**
  * Everything comes from the self-hosted compiler with its tools
- * (dist/utu-tools.wasm: formatting, completions and the queries are the
+ * (dist/utu.wasm: formatting, completions and the queries are its
  * tools'), which holds one program at a time. A document's program is built for its tests,
  * for its exports and for analysis (every function checked, the last build):
  * diagnostics come from all three, and hover, inlay hints, definitions,
@@ -207,8 +207,8 @@ export function createCompilerService(output = null) {
     const read = name => vscode.workspace.fs.readFile(vscode.Uri.joinPath(dist, name));
     const [api, wasm, spec] = await Promise.all([
       import(vscode.Uri.joinPath(dist, 'selfhost', 'utu.js').toString()),
-      read('utu-tools.wasm'),
-      read('utu-tools.host.json').then(bytes => JSON.parse(decoder.decode(bytes))),
+      read('utu.wasm'),
+      read('utu.host.json').then(bytes => JSON.parse(decoder.decode(bytes))),
     ]);
     const utu = await api.loadCompiler(wasm, spec);
     const host = {

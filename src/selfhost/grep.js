@@ -1,6 +1,6 @@
 // src/selfhost/grep.js — semantic grep: utu code by its syntax, names, and types.
 //
-// The matching is selfhost/tools/grep.utu's, in dist/utu-tools.wasm (on
+// The matching is selfhost/tools/grep.utu's, in dist/utu.wasm (on
 // the compiler's own tree and types): this runs it over a build of each
 // entry file, and reads what it found.
 
@@ -8,7 +8,7 @@ import { compile } from './compiler.js';
 
 /**
  * Run a query over each entry file: a pattern (with `where`), or the
- * references of a name. `utu` is loadNodeTools()'s. Returns
+ * references of a name. `utu` is loadNodeCompiler()'s. Returns
  * { matches: [{ at, bindings?, kind?, declaration? }], texts, skipped, unmatched, error }.
  */
 export async function grep(utu, entries, hostFor, { pattern = null, where = {}, references = null } = {}) {

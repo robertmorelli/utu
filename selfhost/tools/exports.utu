@@ -1,12 +1,9 @@
     //! = Tools: exports
     //!
-    //! dist/utu-tools.wasm's exports beyond the compiler's: this file goes into
-    //! lib.utu's `lib { }`. The editor and command-line tools (format, the
-    //! language server, blame, grep) run on it; dist/utu.wasm, the compiler,
-    //! has none of it.
-
-    /// 1: this module is utu-tools.wasm.
-    fn tools_version() I32 => 1
+    //! dist/utu.wasm's exports beyond the bootstrapped compiler's
+    //! (dist/utu-core.wasm): this file goes into lib.utu's `lib { }`. The
+    //! editor and command-line tools (format, the language server, blame,
+    //! grep) are these.
 
     // ── size blame ──
 

@@ -162,8 +162,6 @@
     }
   },
   "files": [
-    "dist/utu-tools.wasm",
-    "dist/utu-tools.host.json",
     "dist/selfhost/**",
     "dist/node/extension.cjs",
     "dist/web/extension.cjs",

@@ -1,6 +1,6 @@
 // Editor and CLI tooling for utu and Wutu: formatting, island discovery,
 // completions. The work is the tools' (selfhost/tools/format.utu and
-// wutu_format.utu, in dist/utu-tools.wasm: `tools` is loadNodeTools()'s, or
+// wutu_format.utu, in dist/utu.wasm: `tools` is loadNodeCompiler()'s, or
 // the extension's); this reads their results.
 
 /** { text, refused }: `source` laid out, or as it is and why it was left so. */

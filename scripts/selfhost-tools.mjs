@@ -1,7 +1,8 @@
-// The tools: dist/utu-tools.wasm, the compiler (dist/utu.wasm) building
-// selfhost/ with selfhost/tools/ (see joinTools in src/selfhost/node.js).
+// dist/utu.wasm, the compiler with its tools: the bootstrap's compiler
+// (dist/utu-core.wasm) building selfhost/ with selfhost/tools/ (see
+// joinTools in src/selfhost/node.js).
 //
-//   node scripts/selfhost-tools.mjs [--out=dist/utu-tools.wasm]
+//   node scripts/selfhost-tools.mjs [--out=dist/utu.wasm]
 //
 // Writes NAME.wasm, NAME.host.json and NAME.sources, as the bootstrap does
 // for the compiler. A mistake is reported at its file and line.
@@ -9,11 +10,11 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { SELF_MOVE_LIMIT } from '../src/selfhost/compiler.js';
-import { COMPILER_WASM, TOOLS_WASM, compileFile, joinTools, loadNodeCompiler, sourcesRecord } from '../src/selfhost/node.js';
+import { COMPILER_WASM, CORE_WASM, compileFile, joinTools, loadNodeCompiler, sourcesRecord } from '../src/selfhost/node.js';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 // The joined source's name; it is never written.
-const JOINED = path.join(ROOT, 'selfhost', 'utu-tools.utu');
+const JOINED = path.join(ROOT, 'selfhost', 'utu.utu');
 
 /** `selfhost/tools/format.utu:12` for line `line` of the joined source. */
 const placeOf = (parts, line) => {
@@ -21,9 +22,9 @@ const placeOf = (parts, line) => {
   return `${part.name}:${line - part.line + part.first}`;
 };
 
-export async function buildTools({ out = TOOLS_WASM } = {}) {
+export async function buildTools({ out = COMPILER_WASM } = {}) {
   const { text, parts } = joinTools();
-  const utu = await loadNodeCompiler({ file: COMPILER_WASM });
+  const utu = await loadNodeCompiler({ file: CORE_WASM });
   const started = performance.now();
   const built = await compileFile(utu, JOINED, {
     root: ROOT,
@@ -45,7 +46,7 @@ if (process.argv[1] === fileURLToPath(import.meta.url)) {
   const out = process.argv.find(arg => arg.startsWith('--out='))?.slice(6);
   try {
     const { size, ms } = await buildTools(out ? { out: path.resolve(out) } : {});
-    console.log(`tools: ${size} bytes, built by the compiler in ${ms.toFixed(0)} ms`);
+    console.log(`dist/utu.wasm: ${size} bytes (the compiler with its tools), built by it in ${ms.toFixed(0)} ms`);
   } catch (error) {
     console.log(error.message);
     process.exit(1);

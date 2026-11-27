@@ -1,14 +1,14 @@
 // src/selfhost/query.js — what names mean, for an editor.
 //
 // After loadProgram, the compiler's tables say what declaration each name
-// resolves to, and where each declaration is: the tools (dist/utu-tools.wasm,
-// loadNodeTools) answer from them (selfhost/tools/query.utu, lsp.utu,
+// resolves to, and where each declaration is: the tools (dist/utu.wasm,
+// loadNodeCompiler) answer from them (selfhost/tools/query.utu, lsp.utu,
 // docs.utu), in JSON. Places are { file (key), start, end }, UTF-16 offsets
 // in the file's text.
 
 /** Queries over the program loaded last (`files` is what loadProgram returned), with the tools' exports. */
 export function programIndex(utu, files) {
-  if (!utu.query_open) throw new Error('programIndex needs the tools (loadNodeTools): the compiler has no queries');
+  if (!utu.query_open) throw new Error('programIndex needs the tools (loadNodeCompiler): the compiler has no queries');
   utu.query_open(files.map(f => f.key).join('\n'));
   const ids = new Map(files.map((f, i) => [f.key, i]));
   const id = key => key == null ? -1 : ids.get(key) ?? -2;

@@ -12,8 +12,8 @@ import { fileURLToPath } from 'node:url';
 import { formatUtu, formatUtuSource } from '../src/wutu/wutu-tooling.js';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
-import { loadNodeTools } from '../src/selfhost/node.js';
-const tools = await loadNodeTools();
+import { loadNodeCompiler } from '../src/selfhost/node.js';
+const tools = await loadNodeCompiler();
 
 
 const files = [];

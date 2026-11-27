@@ -1,5 +1,5 @@
-// The compiler's own size, blamed (src/selfhost/blame.js): the tools
-// (dist/utu-tools.wasm) build selfhost/ again with blame on, which must give dist/utu.wasm
+// The compiler's own size, blamed (src/selfhost/blame.js): dist/utu.wasm
+// builds selfhost/ again with blame on, which must give dist/utu-core.wasm
 // byte for byte (blame changes nothing built), and each byte is placed in
 // its selfhost/ file and line.
 //
@@ -14,7 +14,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { compile, SELF_MOVE_LIMIT } from '../src/selfhost/compiler.js';
-import { loadNodeTools, nodeHost } from '../src/selfhost/node.js';
+import { loadNodeCompiler, nodeHost } from '../src/selfhost/node.js';
 import { blame } from '../src/selfhost/blame.js';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
@@ -39,16 +39,16 @@ for (const name of names) {
 const joined = path.join(dir, 'utu.utu');
 const text = parts.map(part => part.text).join('');
 
-const utu = await loadNodeTools();
+const utu = await loadNodeCompiler();
 const host = nodeHost({ root: ROOT });
 const built = await compile(utu, joined, { ...host, readFile: async file => file === joined ? text : fs.readFileSync(file, 'utf8'), blame: true, moveLimit: SELF_MOVE_LIMIT });
 if (!built.wasm) {
   console.error(`selfhost does not build: ${built.diagnostics.slice(0, 5).map(d => `${d.file}:${d.line}: ${d.message}`).join('\n')}`);
   process.exit(1);
 }
-const dist = path.join(ROOT, 'dist', 'utu.wasm');
+const dist = path.join(ROOT, 'dist', 'utu-core.wasm');
 if (dir === path.join(ROOT, 'selfhost') && !Buffer.from(built.wasm).equals(fs.readFileSync(dist))) {
-  console.error('blame changed the compiler built: it differs from dist/utu.wasm');
+  console.error('blame changed the compiler built: it differs from dist/utu-core.wasm');
   process.exit(1);
 }
 

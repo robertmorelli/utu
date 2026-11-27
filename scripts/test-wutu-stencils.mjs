@@ -4,8 +4,8 @@ import {cssProjection,stencilCss} from '../src/wutu/css-stencil.js';
 import {dslEnd} from '../src/wutu/dsl-envelope.js';
 import {formatUtuSource} from '../src/wutu/wutu-tooling.js';
 
-import {loadNodeTools} from '../src/selfhost/node.js';
-const tools=await loadNodeTools();
+import {loadNodeCompiler} from '../src/selfhost/node.js';
+const tools=await loadNodeCompiler();
 const css=String.raw`@layer reset, theme;
 @property --angle { syntax: "<angle>"; inherits: false; initial-value: 0deg; }
 @future-rule unknown(foo) { --tokens: { a: b; }; }

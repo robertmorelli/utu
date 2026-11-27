@@ -568,7 +568,7 @@ lib {
         let name = node_name_of(Node(kind))
         return Str.from_code_point(name.get(0) + 32) + name.slice(1, name.len())
     }
-    // (dist/utu-tools.wasm: selfhost/tools/exports.utu goes here.)
+    // (dist/utu.wasm: selfhost/tools/exports.utu goes here.)
 }
 
 /// Where a syntax node starts in src, or -1 for none.

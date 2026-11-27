@@ -3,7 +3,7 @@
 // Every answer comes from a build of the program whose entry is the file
 // asked about: its diagnostics (both builds `utu check` makes, the exports'
 // and the tests'), and what its names resolve to (query.js: the tools'
-// lsp.utu and query.utu, so `utu` is the tools, loadNodeTools). A build takes
+// lsp.utu and query.utu, so `utu` is the tools, loadNodeCompiler). A build takes
 // milliseconds, so there is nothing incremental: the compiler holds one
 // program, and a question about another file, or after an edit, builds again.
 //

@@ -17,10 +17,14 @@ import { catalogStdlib } from './catalog.js';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
 
-/** Where `bun run build` puts the compiler: built from stage 0, then by itself. */
+/**
+ * Where `bun run build` puts the compiler, with its tools (format, the
+ * language server, blame, grep: selfhost/tools/): the one every build and
+ * tool loads.
+ */
 export const COMPILER_WASM = path.join(ROOT, 'dist', 'utu.wasm');
-/** And the tools (format, the language server, blame, grep): the compiler with selfhost/tools/. */
-export const TOOLS_WASM = path.join(ROOT, 'dist', 'utu-tools.wasm');
+/** The bootstrap's: the compiler built from stage 0, then by itself; it builds dist/utu.wasm. */
+export const CORE_WASM = path.join(ROOT, 'dist', 'utu-core.wasm');
 
 /**
  * The compiler's exports, from dist/utu.wasm (or the given bytes and spec).
@@ -32,7 +36,7 @@ export async function loadNodeCompiler({ wasm, spec, module = null, file = COMPI
   if (!wasm) {
     const base = file.replace(/\.wasm$/, '');
     if (!fs.existsSync(file)) throw new Error(`${file} is missing: run \`bun run build\``);
-    if (!builtFromCurrentSources(`${base}.sources`, file === TOOLS_WASM)) {
+    if (!builtFromCurrentSources(`${base}.sources`, file !== CORE_WASM)) {
       throw new Error(`${file} was built from other sources than selfhost/: run \`bun run build\``);
     }
     wasm = await module ?? fs.readFileSync(file);
@@ -41,10 +45,6 @@ export async function loadNodeCompiler({ wasm, spec, module = null, file = COMPI
   return loadCompiler(wasm, spec);
 }
 
-/** The tools' exports (the compiler's and selfhost/tools/'s), from dist/utu-tools.wasm. */
-export function loadNodeTools(options = {}) {
-  return loadNodeCompiler({ ...options, file: TOOLS_WASM });
-}
 
 /**
  * The hash a compiler's sources are known by: their code, without comments
@@ -123,7 +123,7 @@ function currentSources(files, tools = false) {
 }
 
 // Where selfhost/tools/exports.utu goes, in lib.utu's `lib { }`.
-const TOOLS_MARK = '    // (dist/utu-tools.wasm: selfhost/tools/exports.utu goes here.)\n';
+const TOOLS_MARK = '    // (dist/utu.wasm: selfhost/tools/exports.utu goes here.)\n';
 
 /**
  * The tools' source, as one program: selfhost/'s files with

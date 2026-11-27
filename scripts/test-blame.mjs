@@ -7,12 +7,12 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { compileFile, loadNodeTools } from '../src/selfhost/node.js';
+import { compileFile, loadNodeCompiler } from '../src/selfhost/node.js';
 import { MODES } from '../src/selfhost/compiler.js';
 import { blame } from '../src/selfhost/blame.js';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
-const utu = await loadNodeTools();
+const utu = await loadNodeCompiler();
 // The report of the build just made.
 const blamed = async built => {
   const rep = await blame(utu, { wasm: built.wasm, spec: built.spec, files: built.files, brotli: false });

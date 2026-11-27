@@ -1,12 +1,12 @@
 // Wutu parser, formatter, expansion, diagnostics, and @stored regressions.
 import { parseHTML } from 'linkedom/worker';
 import { compileAndInstantiateSelfhost, selfhostDiagnostics, withTempUtu } from './test-harness.mjs';
-import { loadNodeTools } from '../src/selfhost/node.js';
+import { loadNodeCompiler } from '../src/selfhost/node.js';
 import * as tooling from '../src/wutu/wutu-tooling.js';
 import { WutuSyntaxError } from '../src/wutu/wutu-tooling.js';
 
-// The compiler's template parser and the formatter, from dist/utu-tools.wasm.
-const tools = await loadNodeTools();
+// The compiler's template parser and the formatter, from dist/utu.wasm.
+const tools = await loadNodeCompiler();
 const parseWutu = text => tooling.wutuTree(tools, text);
 const formatWutuBody = text => tooling.formatWutuBody(tools, text);
 const formatWutuSource = source => tooling.formatWutuSource(tools, source);
