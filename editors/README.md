@@ -7,3 +7,4 @@ All editor integrations use the self-hosted compiler (`utu lsp`) as the single s
 - [neovim/](neovim/README.md) — Neovim LSP and Tree-sitter setup
 - [tree-sitter-utu/](tree-sitter-utu/README.md) — Tree-sitter grammar for utu
 - [tree-sitter-wutu/](tree-sitter-wutu/README.md) — Tree-sitter grammar for Wutu
+- [skill/](skill/README.md) — Claude Code skill for writing idiomatic utu (`writing-utu`)
