@@ -1,0 +1,5 @@
+//! = Tools
+//!
+//! The editor and command-line tools written in utu, built with the compiler
+//! into dist/utu-tools.wasm (selfhost/tools/files.txt; exports.utu is the
+//! part of lib.utu's `lib { }` they add).

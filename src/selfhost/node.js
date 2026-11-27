@@ -19,6 +19,8 @@ const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..')
 
 /** Where `bun run build` puts the compiler: built from stage 0, then by itself. */
 export const COMPILER_WASM = path.join(ROOT, 'dist', 'utu.wasm');
+/** And the tools (format, the language server, blame, grep): the compiler with selfhost/tools/. */
+export const TOOLS_WASM = path.join(ROOT, 'dist', 'utu-tools.wasm');
 
 /**
  * The compiler's exports, from dist/utu.wasm (or the given bytes and spec).
@@ -26,17 +28,22 @@ export const COMPILER_WASM = path.join(ROOT, 'dist', 'utu.wasm');
  * refused: it is not the compiler they are. `module`: dist/utu.wasm's,
  * compiling already (or null), as cli/utu.mjs starts it.
  */
-export async function loadNodeCompiler({ wasm, spec, module = null } = {}) {
+export async function loadNodeCompiler({ wasm, spec, module = null, file = COMPILER_WASM } = {}) {
   if (!wasm) {
-    const base = COMPILER_WASM.replace(/\.wasm$/, '');
-    if (!fs.existsSync(COMPILER_WASM)) throw new Error(`${COMPILER_WASM} is missing: run \`bun run build\``);
-    if (!builtFromCurrentSources(`${base}.sources`)) {
-      throw new Error(`${COMPILER_WASM} was built from other sources than selfhost/: run \`bun run build\``);
+    const base = file.replace(/\.wasm$/, '');
+    if (!fs.existsSync(file)) throw new Error(`${file} is missing: run \`bun run build\``);
+    if (!builtFromCurrentSources(`${base}.sources`, file === TOOLS_WASM)) {
+      throw new Error(`${file} was built from other sources than selfhost/: run \`bun run build\``);
     }
-    wasm = await module ?? fs.readFileSync(COMPILER_WASM);
+    wasm = await module ?? fs.readFileSync(file);
     spec = JSON.parse(fs.readFileSync(`${base}.host.json`, 'utf8'));
   }
   return loadCompiler(wasm, spec);
+}
+
+/** The tools' exports (the compiler's and selfhost/tools/'s), from dist/utu-tools.wasm. */
+export function loadNodeTools(options = {}) {
+  return loadNodeCompiler({ ...options, file: TOOLS_WASM });
 }
 
 /**
@@ -94,32 +101,74 @@ function codeOf(text) {
 
 const SELFHOST = path.join(ROOT, 'selfhost');
 
-/** selfhost/'s source files (with files.txt), or null outside the repository. */
-function sourceFiles() {
+/** selfhost/'s source files (with files.txt), or null outside the repository; `tools`: and selfhost/tools/'s. */
+function sourceFiles(tools = false) {
   const list = readOr(path.join(SELFHOST, 'files.txt'), null);
   if (list == null) return null;
-  return list.split('\n').map(line => line.trim()).filter(Boolean);
+  const files = listed(list);
+  if (!tools) return files;
+  const more = readOr(path.join(SELFHOST, 'tools', 'files.txt'), null);
+  return more == null ? null : [...files, 'tools/exports.utu', 'tools/files.txt', ...listed(more).map(name => `tools/${name}`)];
 }
 
-/** The hash of selfhost/'s sources as they are, as scripts/selfhost.mjs joins them. */
-function currentSources(files) {
+const listed = list => list.split('\n').map(line => line.trim()).filter(Boolean);
+
+/** The hash of selfhost/'s sources as they are, as scripts/selfhost.mjs joins them (`tools`: as joinTools does). */
+function currentSources(files, tools = false) {
+  if (tools) return sourcesHash(joinTools().text);
   return sourcesHash(files.map(name => {
     const part = fs.readFileSync(path.join(SELFHOST, name), 'utf8');
     return part.endsWith('\n') ? part : `${part}\n`;
   }).join(''));
 }
 
+// Where selfhost/tools/exports.utu goes, in lib.utu's `lib { }`.
+const TOOLS_MARK = '    // (dist/utu-tools.wasm: selfhost/tools/exports.utu goes here.)\n';
+
+/**
+ * The tools' source, as one program: selfhost/'s files with
+ * tools/exports.utu in lib.utu's `lib { }`, then tools/files.txt's files.
+ * `parts`: where each piece begins (1-based lines), and its first line in its file.
+ */
+export function joinTools() {
+  const read = name => {
+    const text = fs.readFileSync(path.join(SELFHOST, name), 'utf8');
+    return text.endsWith('\n') ? text : `${text}\n`;
+  };
+  const pieces = [];
+  for (const name of sourceFiles()) {
+    const text = read(name);
+    if (name !== 'lib.utu') { pieces.push({ name, text, first: 1 }); continue; }
+    const at = text.indexOf(TOOLS_MARK);
+    if (at < 0) throw new Error('selfhost/lib.utu has no place for selfhost/tools/exports.utu');
+    const head = text.slice(0, at + TOOLS_MARK.length);
+    pieces.push({ name, text: head, first: 1 });
+    pieces.push({ name: 'tools/exports.utu', text: read('tools/exports.utu'), first: 1 });
+    pieces.push({ name, text: text.slice(at + TOOLS_MARK.length), first: head.split('\n').length });
+  }
+  for (const name of listed(fs.readFileSync(path.join(SELFHOST, 'tools', 'files.txt'), 'utf8'))) {
+    pieces.push({ name: `tools/${name}`, text: read(`tools/${name}`), first: 1 });
+  }
+  const parts = [];
+  let line = 1;
+  for (const { name, text, first } of pieces) {
+    parts.push({ name: `selfhost/${name}`, line, first });
+    line += text.split('\n').length - 1;
+  }
+  return { text: pieces.map(piece => piece.text).join(''), parts };
+}
+
 /** Each source's time and size: when all are as recorded, the sources are. */
 function sourceStamps(files) {
-  return Object.fromEntries([...files, 'files.txt'].map(name => {
+  return Object.fromEntries([...new Set([...files, 'files.txt'])].map(name => {
     const s = fs.statSync(path.join(SELFHOST, name));
     return [name, [s.mtimeMs, s.size]];
   }));
 }
 
 /** What the build records of its sources: their hash, and their stamps. */
-export function sourcesRecord(text) {
-  const files = sourceFiles();
+export function sourcesRecord(text, tools = false) {
+  const files = sourceFiles(tools);
   return { hash: sourcesHash(text), stamps: files ? sourceStamps(files) : {} };
 }
 
@@ -127,14 +176,14 @@ export function sourcesRecord(text) {
 // outside the repository): by the files' stamps, and when one differs (a
 // checkout, a touch) by their hash, then recording the new stamps so the
 // next run need not hash.
-function builtFromCurrentSources(record) {
-  const files = sourceFiles();
+function builtFromCurrentSources(record, tools = false) {
+  const files = sourceFiles(tools);
   if (!files) return true;
   let recorded;
   try { recorded = JSON.parse(fs.readFileSync(record, 'utf8')); } catch { return false; }
   const now = sourceStamps(files);
   if (JSON.stringify(now) === JSON.stringify(recorded.stamps)) return true;
-  if (currentSources(files) !== recorded.hash) return false;
+  if (currentSources(files, tools) !== recorded.hash) return false;
   try {
     const partial = `${record}.${process.pid}.${randomBytes(6).toString('hex')}.tmp`;
     fs.writeFileSync(partial, `${JSON.stringify({ hash: recorded.hash, stamps: now })}\n`);

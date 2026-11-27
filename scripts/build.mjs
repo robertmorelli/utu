@@ -41,6 +41,7 @@ async function main() {
   await syncGpuRuntime();
   await generatePlatformSources();
   buildCompiler();
+  buildTools();
   await bundleSelfhost();
   execSync(`node ${path.join('scripts', 'build-catalog.mjs')}`, { cwd: ROOT, stdio: 'inherit' });
   await bundleVscodeExtension();
@@ -81,6 +82,12 @@ async function generateParser() {
 function buildCompiler() {
   console.log('Building the self-hosted compiler…');
   execSync(`node ${path.join('scripts', 'selfhost-bootstrap.mjs')} --out=${path.join(DIST_DIR, 'utu.wasm')}`, { cwd: ROOT, stdio: 'inherit' });
+}
+
+// dist/utu-tools.wasm: the compiler and selfhost/tools/ (format, the
+// language server, blame, grep), built by the compiler just built.
+function buildTools() {
+  execSync(`node ${path.join('scripts', 'selfhost-tools.mjs')}`, { cwd: ROOT, stdio: 'inherit' });
 }
 
 // dist/compiler.pdf: the compiler's doc comments, by tools/utudoc. lib.utu
