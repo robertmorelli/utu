@@ -525,6 +525,10 @@ fn check_closure(node: I32, expect: I32, cx: Cx) I32 {
             if exp >= 0 and expected < 0 { return error_value() }
             t = ty_error()
         }
+        if ty_is(t, Ty.Void) {
+            report(Diag.VoidLet, first_child(p), word_of(first_child(p)))
+            t = ty_error()
+        }
         ptypes[i] = t
         pd[i] = node_decl[first_child(p)]
         i += 1

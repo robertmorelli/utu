@@ -58,6 +58,15 @@ await test('contextual closures preserve real JS boolean results', async () => {
   `);
   assert.equal(exports.apply(), 5); assert.equal(exports.boolean(), true);
 });
+await test('a host function type and the closure type of its signature are one', async () => {
+  const functions = linkFiles({ files: [path.join(ROOT, 'scripts/fixtures/dts/functions.d.ts')], prefix: 'Fn', moduleSpecifier: path.join(ROOT, 'scripts/fixtures/dts/functions.mjs') });
+  const { exports } = await run(`
+    fn twice(f: cl(F64) F64, x: F64) F64 { return f(f(x)); }
+    fn passed() F64 { return twice(Fn.adder(2.0), 1.0); }
+    fn back() F64 { let f: cl(F64) F64 = Fn.adder(3.0); return Fn.apply(1.0, f); }
+  `, functions);
+  assert.equal(exports.passed(), 5); assert.equal(exports.back(), 4);
+});
 await test('object arguments use normal contextual record syntax and JS primitives', async () => {
   const { exports } = await run(`fn run() Str {
     let result = Fixture.make(&{ label: "hello", count: 2.0, enabled: true }); return result.label;
