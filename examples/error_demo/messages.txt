@@ -10488,6 +10488,28 @@ ok
  8 │ }
 --- exit 1
 
+=== utu check examples/error_demo/types/1368_float_let_for_f64.utu
+ ERROR  take takes F64, got F32
+        type-mismatch · examples/error_demo/types/1368_float_let_for_f64.utu:7:22
+
+ 3 │ fn take(x: F64) F64 => x * 2.0
+   │         ──────
+   │         ╰─ F64
+   ┆
+ 5 │ main {
+ 6 │     let best = -1.0
+ 7 │     console.log(take(best))
+   │                      ━━━━
+   │                      ╰─ F32
+ 8 │ }
+ 9 │ using console from std:console
+
+  note  an untyped float literal is F32
+
+  fix   Write let best: F64
+ 6 │     let best: F64 = -1.0
+--- exit 1
+
 === utu check examples/error_demo/types/13_if_else_branches.utu
  ERROR  Branches differ: I32 and Str
         type-mismatch · examples/error_demo/types/13_if_else_branches.utu:5:41

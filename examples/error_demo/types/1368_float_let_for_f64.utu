@@ -1,0 +1,9 @@
+// What: an untyped float literal's let (F32) passed where an F64 is wanted
+// Expect: take takes F64, got F32; fix: let best: F64
+fn take(x: F64) F64 => x * 2.0
+
+main {
+    let best = -1.0
+    console.log(take(best))
+}
+using console from std:console

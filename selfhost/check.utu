@@ -569,11 +569,21 @@ fn mismatch(at: I32, expected: I32, actual: I32) Void {
         return
     }
     let k = want_for(site, expected)
-    if k >= 0 {
-        report_wanted(k, site, expected, actual)
-        return
-    }
-    report2(Diag.TypeMismatch, site, -1, expected, actual)
+    if k >= 0 { report_wanted(k, site, expected, actual) } else { report2(Diag.TypeMismatch, site, -1, expected, actual) }
+    float_let_hint(site, expected, actual)
+}
+
+/// `let x = 0.0` where an F64 is wanted of x: x is F32, and `let x: F64` fixes it.
+fn float_let_hint(site: I32, expected: I32, actual: I32) Void {
+    if expected != prelude(Prelude.F64) or actual != prelude(Prelude.F32) or not is_kind(site, Node.Identifier) { return }
+    let d = node_decl[site]
+    if d < 0 or not decl_is(d, Decl.Local) or not is_kind(decl_node[d], Node.Bind_expr) { return }
+    let name = first_child(decl_node[d])
+    let init = last_child(decl_node[d])
+    if not is_kind(name, Node.Identifier) or next_sibling(name) != init or not is_number_literal(init) { return }
+    let text = node_text(name)
+    diag_note(cks(Ckt.FloatLetIsF32))
+    diag_fix(tok_end[node_first[name]], tok_end[node_first[name]], ": F64", cks1(Ckt.AnnotateF64, text))
 }
 
 //! = Consequences
@@ -4805,6 +4815,8 @@ enum(U8) Ckt:
     | BenchLc
     | TestLc
     | Len
+    | FloatLetIsF32
+    | AnnotateF64
 
 fn cks_src(t: Ckt) Str {
     return match t {
@@ -4872,6 +4884,8 @@ fn cks_src(t: Ckt) Str {
         Ckt.BenchLc => "bench",
         Ckt.TestLc => "test",
         Ckt.Len => "len",
+        Ckt.FloatLetIsF32 => "an untyped float literal is F32",
+        Ckt.AnnotateF64 => "Write let {0}: F64",
     }
 }
 
