@@ -601,12 +601,7 @@ class WutuParser {
       this.skipTrivia();
     }
     while (this.at('@style')) {
-      this.p += '@style'.length;
-      this.skipTrivia();
-      if (this.at('$[')) this.failInterpolation();
-      const { source, range } = this.readBareExpression();
-      this.expectEnd();
-      styleUses.push({ value: source, range });
+      this.parseStyle(styleUses);
       this.skipTrivia();
     }
     while (this.at('@document')) {
@@ -617,6 +612,7 @@ class WutuParser {
       this.skipTrivia();
     }
     this.global = global;
+    this.styleUses = styleUses;
     const children = [];
     while (!this.done) {
       if (this.text[this.p] === ';') { this.p++; this.skipTrivia(); continue; }
@@ -626,6 +622,16 @@ class WutuParser {
     const root = children.length === 1 && children[0].kind === 'element'
       ? children[0] : { kind: 'fragment', children };
     return { root, global, reactive, scope, styleUses };
+  }
+
+  /** `@style e`, at the cursor. */
+  parseStyle(styleUses) {
+    this.p += '@style'.length;
+    this.skipTrivia();
+    if (this.at('$[')) this.failInterpolation();
+    const { source, range } = this.readBareExpression();
+    this.expectEnd();
+    styleUses.push({ value: source, range });
   }
 
   /** Anything that can appear as a child: text, expression, if, for, or element. */
@@ -798,6 +804,10 @@ class WutuParser {
         this.skipTrivia();
         if (this.text[this.p] !== '{') this.fail('expected document CSS block');
         this.global.push(this.readCssBlock());
+        continue;
+      }
+      if (tag === 'html' && this.global && this.at('@style')) {
+        this.parseStyle(this.styleUses);
         continue;
       }
       this.parseElementStatement(node);

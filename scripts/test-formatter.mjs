@@ -73,6 +73,25 @@ html {
   assert.notEqual(shape(source), shape(source.replace('| text;', '| text; "extra";')), 'Wutu children are meaningful');
 }
 
+// A page's @style and @document stay inside its html.
+{
+  const source = 'fn sheet() Str => "p{}"\nhtml { @style sheet(); @document { p { color: red; } } body { p { "x"; } } }\n';
+  const expected = `fn sheet() Str => "p{}"
+html {
+    @style sheet()
+    @document {
+        p { color: red }
+    }
+    body {
+        p { "x" }
+    }
+}
+`;
+  const result = await formatUtu(source, { shape });
+  assert.equal(result.refused, null);
+  assert.equal(result.text, expected);
+}
+
 // Compile formatted brace bodies, including comments, CSS, handlers, and opaque JS.
 {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'utu-format-braces-'));

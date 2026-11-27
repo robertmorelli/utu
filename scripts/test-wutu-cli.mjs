@@ -80,11 +80,12 @@ try {
   assert.ok((await fs.readFile(path.join(out, 'index.html'), 'utf8')).includes('<title>A &lt;b> &amp; &quot;c&quot;</title>'));
   // An html page follows the same path, including default prerendering.
   const htmlEntry = path.join(dir, 'page.utu');
-  await fs.writeFile(htmlEntry, 'using Browser from std:Browser\nhtml { body { h1 { "Prerendered page"; } } }\n');
+  await fs.writeFile(htmlEntry, 'using Browser from std:Browser\nfn sheet() Str => "h1{color:red}"\nhtml { @style sheet(); body { h1 { "Prerendered page"; } } }\n');
   const htmlOut = path.join(dir, 'html-out');
   const htmlBuilt = run('build', htmlEntry, '-o', htmlOut);
   assert.equal(htmlBuilt.status, 0, htmlBuilt.stderr);
   assert.match(await fs.readFile(path.join(htmlOut, 'index.html'), 'utf8'), /Prerendered page/);
+  assert.match(await fs.readFile(path.join(htmlOut, 'index.html'), 'utf8'), /h1\{color:red\}/, 'an html page takes @style');
   const broken = path.join(dir, 'broken.utu');
   await fs.writeFile(broken, app('Broken').replace('"Broken";', '"Broken" "x"'));
   const failed = run('build', broken, '--out', path.join(dir, 'broken-out'), '--no-prerender');
