@@ -125,6 +125,7 @@ class BodyFormatter {
       for (const use of tree.styleUses) this.add(0, `@style ${compactExpression(use.value)}`);
       for (const css of tree.global) this.block(`@document {${css}}`, 0);
     }
+    for (const let_ of tree.lets) this.add(0, `let ${let_.head} = ${compactExpression(let_.value)}`);
     this.node(tree.root, 0);
     return '\n' + this.lines.join('\n') + '\n';
   }

@@ -240,6 +240,40 @@ export function registerWutuTests({ test, assert, assertEq, assertThrows, assert
     });
   });
 
+  test('wutu lets: a wn body\'s let statements, evaluated each render', async ({ ROOT }) => {
+    await withDom(async document => {
+      const { instance } = await compileAndInstantiateSelfhost({ ROOT, name: 'wutu_lets.utu', source: `
+        struct State:
+            | n: I32
+        let state: State = State { n: 1 }
+        wn badge(text: Str) {
+          let up = text.to_upper()
+          let twice: Str = up + up
+          strong { | twice }
+        }
+        wn page() {
+          @reactive
+          let label = "n" + state.n.str()
+          main {
+            |> badge(label)
+            span { | label }
+          }
+        }
+        lib {
+          fn render() Externref => page()
+          fn bump() Void { state.n += 1 }
+        }
+      `});
+      const root = instance.exports.render(); document.body.append(root);
+      assertEq(root.querySelector('strong').textContent, 'N1N1');
+      assertEq(root.querySelector('span').textContent, 'n1');
+      instance.exports.bump();
+      globalThis.__utuWutu.refresh();
+      assertEq(root.querySelector('span').textContent, 'n2');
+      assertEq(root.querySelector('strong').textContent, 'N2N2');
+    });
+  });
+
   test('wutu fragments: reactive empty roots grow, reorder and shrink without wrappers', async ({ ROOT }) => {
     await withDom(async document => {
       const { instance } = await compileAndInstantiateSelfhost({ ROOT, name: 'wutu_fragment_updates.utu', source: `${BROWSER}
@@ -420,6 +454,13 @@ export function registerWutuTests({ test, assert, assertEq, assertThrows, assert
     assertEq(formatWutuBody(formatted), formatted, 'formatting is idempotent');
     const reparsed = parseWutu(formatted);
     assert(reparsed.root.children[0].otherwise[0].elseIf, 'else-if survives a round trip');
+  });
+
+  test('wutu formatter: a body\'s let statements stay, each on its line', () => {
+    const formatted = formatWutuBody('@reactive; let up = text.to_upper(); let n: I32 = up.len(); div { | up; | n }');
+    assertEq(formatted, '\n@reactive\nlet up = text.to_upper()\nlet n: I32 = up.len()\ndiv { | up; | n }\n');
+    assertEq(formatWutuBody(formatted), formatted, 'formatting is idempotent');
+    assertEq(parseWutu(formatted).lets.map(l => l.head).join(','), 'up,n: I32');
   });
 
   test('wutu formatter: nested DSL payloads are restored byte-for-byte', () => {

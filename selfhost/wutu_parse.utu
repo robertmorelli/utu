@@ -66,6 +66,12 @@ vec tw_style_from: I32
 vec tw_style_to: I32
 /// `@document { … }` blocks (words)
 vec tw_global: I32
+/// Its `let name: T = value` statements: each name and type, its value's
+/// source (words), and the value's range.
+vec tw_let_head: I32
+vec tw_let_value: I32
+vec tw_let_from: I32
+vec tw_let_to: I32
 
 /// The cursor: an offset in the template's text.
 let wp_at: I32 = 0
@@ -111,6 +117,10 @@ fn reset_template() Void {
     tw_style_from.clear()
     tw_style_to.clear()
     tw_global.clear()
+    tw_let_head.clear()
+    tw_let_value.clear()
+    tw_let_from.clear()
+    tw_let_to.clear()
     wp_svg_kids = 0
     wp_svg_el = 0
 }
@@ -899,6 +909,11 @@ fn parse_template(text: Str) I32 {
     let last = -1
     while (not wp_done(text)) {
         if wp_char(text) == 59 { wp_at += 1; wp_trivia(text); continue }
+        if wp_keyword(text, "let") {
+            parse_tlet(text)
+            wp_trivia(text)
+            continue
+        }
         let child = parse_tnode(text)
         tn_parent[child] = fragment
         if last < 0 { tn_first[fragment] = child } else { tn_next[last] = child }
@@ -912,6 +927,19 @@ fn parse_template(text: Str) I32 {
         return first
     }
     return fragment
+}
+
+/// `let name: T = value`, the cursor on `let`.
+fn parse_tlet(text: Str) Void {
+    wp_at += 3
+    let head = wp_expression_until(text, "=", wps(Wpt.ANameBeforeEq))
+    wp_at += 1
+    let value = wp_bare_expression(text)
+    tw_let_head.push(intern_text(head))
+    tw_let_value.push(intern_text(value))
+    tw_let_from.push(wx_from)
+    tw_let_to.push(wx_to)
+    wp_end(text)
 }
 
 /// Text, an expression, if, for, or an element.
@@ -1789,6 +1817,7 @@ enum(U8) Wpt:
     | UnterminatedMatch
     | ExpectedFatArrowInMatch
     | ExpectedPatternInMatch
+    | ANameBeforeEq
 
 fn wps_src(t: Wpt) Str {
     return match t {
@@ -1987,6 +2016,7 @@ fn wps_src(t: Wpt) Str {
         Wpt.UnterminatedMatch => "unterminated match",
         Wpt.ExpectedFatArrowInMatch => "expected => after match pattern",
         Wpt.ExpectedPatternInMatch => "expected a pattern before =>",
+        Wpt.ANameBeforeEq => "a name before =",
     }
 }
 

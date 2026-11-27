@@ -22,7 +22,7 @@ module.exports = grammar({
   extras: $ => [/\s/, $.comment],
   word: $ => $.name,
   rules: {
-    template: $ => repeat(choice($._directive, $._node, ';')),
+    template: $ => repeat(choice($._directive, $.let, $._node, ';')),
 
     comment: _ => token(choice(seq('//', /[^\n]*/), seq('/*', /[^*]*\*+([^/*][^*]*\*+)*/, '/'))),
     name: _ => /[a-zA-Z_][a-zA-Z0-9_-]*/,
@@ -37,6 +37,9 @@ module.exports = grammar({
     document: $ => seq('@document', '{', optional($.css_text), '}'),
     // (Ahead of a CSS at-rule's selector, which `@unmanaged }` would also match.)
     unmanaged: $ => seq(alias(token(prec(1, '@unmanaged')), '@unmanaged'), $._end),
+
+    // `let name: T = value`, before or between the template's nodes.
+    let: $ => seq('let', alias($.name, $.identifier), optional(seq(':', alias($._condition, $.type))), '=', $.expression, $._end),
 
     // Children
     _node: $ => choice($.text, $.hole, $.if, $.for, $.element),

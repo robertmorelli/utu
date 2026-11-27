@@ -25,6 +25,8 @@
 ; Control
 ["if" "else" "for" "key" "global"] @keyword.control
 (capture (name) @variable.parameter)
+"let" @keyword
+(let (identifier) @variable)
 
 ; CSS
 (css_property) @variable.other.member

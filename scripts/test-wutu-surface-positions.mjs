@@ -21,7 +21,7 @@ assert.equal(built.diagnostics.filter(d => d.severity === 'error').length, 0);
 const index = programIndex(utu, built.files);
 const file = built.files.find(f => f.key === entry);
 const lines = file.text.split('\n');
-for (const [word, line, definitionLine, cls] of [['text', 14, 13, 'parameter'], ['heading_value', 50, 38, 'function']]) {
+for (const [word, line, definitionLine, cls] of [['text', 14, 13, 'parameter'], ['heading_value', 51, 39, 'function']]) {
   const offset = lines.slice(0, line - 1).reduce((n, s) => n + s.length + 1, 0) + lines[line - 1].indexOf(word);
   const decl = index.declarationAt(entry, offset);
   const definition = index.definition(decl);

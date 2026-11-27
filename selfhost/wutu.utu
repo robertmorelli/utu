@@ -140,8 +140,11 @@ fn expand_wutu(site: I32) Void {
     for (0 ..< wx_event_ops.len()) |k| { wd_op(ops, word_text(wx_event_ops[k])) }
     code = wus3(Wut.AOpenBCloseSemiNlC, wutu_helper(wus(Wut.Begin)), js_string(wus1(Wut.BracketABracketEnd, ops.text)), code)
     events = wus2(Wut.ABOpenClose, events, wutu_typed_fn("done", if fragment { wus(Wut.Fragment) } else { tag }, svg))
-    // Shared sheets install in source order, so later ones win the cascade.
     let prelude = ""
+    for (0 ..< tw_let_head.len()) |k| {
+        prelude = prelude + "let " + word_text(tw_let_head[k]) + " = " + wutu_island(word_text(tw_let_value[k]), tw_let_from[k], tw_let_to[k], root) + "\n"
+    }
+    // Shared sheets install in source order, so later ones win the cascade.
     for (0 ..< tw_style_value.len()) |k| {
         prelude = wus2(Wut.WutuStyle, prelude, wutu_island(word_text(tw_style_value[k]), tw_style_from[k], tw_style_to[k], root))
     }

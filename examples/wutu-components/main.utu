@@ -32,7 +32,8 @@ wn Component[Counter].render |c| () {
 }
 
 wn heading(text: Str) {
-    h1 { | text; "}" }
+    let shown = text + "}"
+    h1 { | shown }
 }
 
 fn heading_value(text: Str) Externref {

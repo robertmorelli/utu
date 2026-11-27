@@ -613,15 +613,27 @@ class WutuParser {
     }
     this.global = global;
     this.styleUses = styleUses;
-    const children = [];
+    const children = [], lets = [];
     while (!this.done) {
       if (this.text[this.p] === ';') { this.p++; this.skipTrivia(); continue; }
+      if (this.peek(/let\s/y)) { lets.push(this.parseLet()); this.skipTrivia(); continue; }
       children.push(this.parseNode());
       this.skipTrivia();
     }
     const root = children.length === 1 && children[0].kind === 'element'
       ? children[0] : { kind: 'fragment', children };
-    return { root, global, reactive, scope, styleUses };
+    return { root, global, reactive, scope, styleUses, lets };
+  }
+
+  /** `let name: T = value`. */
+  parseLet() {
+    const start = this.p;
+    this.p += 'let'.length;
+    const head = this.readExpressionUntil('=', 'a name before =');
+    this.p++;
+    const { source, range } = this.readBareExpression();
+    this.expectEnd();
+    return { head: head.source, value: source, range, start };
   }
 
   /** `@style e`, at the cursor. */
