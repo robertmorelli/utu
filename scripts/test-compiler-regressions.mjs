@@ -68,6 +68,8 @@ try {
 lib { fn run() I32 { let p = P { f: cl(x: I32) I32 { return x + 1; } }; return p.f(4); } }`, { run: 5 }],
     // A replacement is its text, \`$\` and all.
     ['lib { fn run() Str { return "ab-ab".replace("a", "$&$$") + "|" + "xay".replace("a", "$\'"); } }', { run: "$&$$b-$&$$b|x$'y" }],
+    // `let _ = e` drops e, a Void one too.
+    ['let n: I32 = 0\nfn bump() Void { n += 1 }\nlib { fn run() I32 { let _ = bump(); let _ = bump(); return n } }', { run: 2 }],
   ];
   for (const [source, expected] of programs) {
     const file = await write(source);

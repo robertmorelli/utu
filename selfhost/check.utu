@@ -1592,6 +1592,10 @@ fn check_let(node: I32, cx: Cx) I32 {
         t = ty_error()
     }
     decl_ty[decl] = t
+    if ty_is(t, Ty.Void) and node_text(name) == "_" {
+        w_node(Op.Seq, vt_none, 0, 0, m)
+        return ty_void()
+    }
     if ty_is(t, Ty.Void) {
         // (After a mistake in the value, its being void is no news; a
         // defer as a value is validation's to report.)
