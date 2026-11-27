@@ -454,6 +454,7 @@ export function createWutuRuntime() {
       mounted.add(node);
       const view = active;
       queueMicrotask(() => {
+        if (!node.isConnected) { mounted.delete(node); return; }
         const outer = owner;
         owner = [node, view];
         try { handler(new Event('mount')); } finally { owner = outer; }

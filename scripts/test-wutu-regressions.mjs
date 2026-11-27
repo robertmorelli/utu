@@ -78,13 +78,14 @@ try {
   });
   // Trusted clicks: renders run between their events. A sibling of an if that
   // closes on blur keeps its click; a checkbox or radio under an `on click`
-  // stays checked.
+  // stays checked; an `on mount` runs only on a connected element.
   await page.click('#field'); await page.click('#pa');
   await page.click('#field'); await page.click('#pb');
   await page.click('#cb'); await page.click('#rb'); await page.waitForTimeout(20);
   Object.assign(result, await page.evaluate(() => ({
     clicks: document.querySelector('#clicks').textContent,
     checks: [document.querySelector('#cb').checked, document.querySelector('#rb').checked, document.querySelector('#checked').textContent],
+    mounts: document.querySelector('#mounts').textContent,
   })));
   assert.deepEqual(result, {
     pending: 0, enabled: true, hydrated: [true, '40%', 'tip'], label: 'q', card: 'custom', chart: 'drawn;', circle: '0', xlink: ['#c0', 'preserve'],
@@ -94,7 +95,7 @@ try {
     rowsAfter: [1, 1], methodAfter: 'm1', clockChanged: true, submitted: '2',
     numbers: ['7', '20'], pickAfter: 'd',
     template: 'ab;', multiStart: [[true, false], '1'], multiNone: [[false, false], '0'], multiEmpty: [[true, false], '1'], beatsStill: true, chartAfter: 'drawn;',
-    clicks: 'AB', checks: [true, true, 'true b 2'],
+    clicks: 'AB', checks: [true, true, 'true b 2'], mounts: '1;',
   });
   assert.deepEqual(errors, []);
   console.log(`${engine.name()}: Wutu regressions (hydration, reuse, bindings, timers, @unmanaged, custom elements, SVG roots) passed`);
