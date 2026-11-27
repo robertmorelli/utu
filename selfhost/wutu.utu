@@ -613,6 +613,7 @@ fn element_interface(tag: Str) Str {
     if tag == wus(Wut.Progress) { return wus(Wut.Progress2) }
     if tag == wus(Wut.Meter) { return wus(Wut.Meter2) }
     if tag == wus(Wut.Output) { return wus(Wut.Output2) }
+    if tag == "data" { return "Data" }
     return ""
 }
 
@@ -957,6 +958,9 @@ fn wd_element(n: I32, outer_svg: Bool, o: WOps) Str {
             let handler = wutu_island(word_text(ti_b[i]), ti_from[i], ti_to[i], n)
             let name = word_text(ti_a[i])
             let shorthand = (ti_flags[i] & 1) != 0
+            if shorthand and ti_c[i] >= 0 and wu_has_browser == 0 and event_type(name).len() > 0 {
+                wutu_fail(wus3(Wut.TypedEventNeedsBrowser, name, word_text(ti_c[i]), event_type(name)), ti_at[i])
+            }
             let listener = if shorthand { event_listener(name, handler, ti_c[i]) } else { handler }
             let quiet = (ti_flags[i] & 4) != 0 or (shorthand and quiet_handler(word_text(ti_b[i]), ti_c[i]))
             wx_events.push(intern_text(wus2(Wut.AOpenOpenBCloseCloseSemiNl, wutu_helper("on"), listener)))
@@ -1207,6 +1211,7 @@ enum(U16) Wut:
     | LayerWutuDocumentAtDotBraceBraceE
     | Node
     | AmbiguousElementAliasReferenceItInside
+    | TypedEventNeedsBrowser
     | InvalidUtuInterpolationAtOffset
     | InternalNoWutuHelper
     | LetFunEs
@@ -1477,6 +1482,7 @@ fn wus_src(t: Wut) Str {
         Wut.LayerWutuDocumentAtDotBraceBraceE => "@layer wutu.document{{0}}",
         Wut.Node => "{0}node{1}",
         Wut.AmbiguousElementAliasReferenceItInside => "Ambiguous element alias '{0}'; reference it inside its own subtree",
+        Wut.TypedEventNeedsBrowser => "on {0} |{1}| makes {1} a Browser.{2}, which needs using Browser from std:Browser",
         Wut.InvalidUtuInterpolationAtOffset => "Invalid Utu interpolation at offset {0}: {1}{2}",
         Wut.InternalNoWutuHelper => "internal: no Wutu helper {0}",
         Wut.LetFunEs => "let {0}: fun({1}) {2} = @es/\\ {3} \\/;",

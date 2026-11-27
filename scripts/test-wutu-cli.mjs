@@ -80,12 +80,13 @@ try {
   assert.ok((await fs.readFile(path.join(out, 'index.html'), 'utf8')).includes('<title>A &lt;b> &amp; &quot;c&quot;</title>'));
   // An html page follows the same path, including default prerendering.
   const htmlEntry = path.join(dir, 'page.utu');
-  await fs.writeFile(htmlEntry, 'using Browser from std:Browser\nhtml {\n    @document { body { color: red } }\n    body { h1 { "Prerendered page" } }\n}\n');
+  await fs.writeFile(htmlEntry, 'using Browser from std:Browser\nfn sheet() Str => "h1{color:red}"\nhtml {\n    @style sheet()\n    @document { body { color: red } }\n    body { h1 { "Prerendered page" } }\n}\n');
   const htmlOut = path.join(dir, 'html-out');
   const htmlBuilt = run('build', htmlEntry, '-o', htmlOut);
   assert.equal(htmlBuilt.status, 0, htmlBuilt.stderr);
   const pageHtml = await fs.readFile(path.join(htmlOut, 'index.html'), 'utf8');
   assert.match(pageHtml, /Prerendered page/);
+  assert.match(pageHtml, /h1\{color:red\}/, 'an html page takes @style');
   // Its CSS is a file of its own, linked from the page's head, not in app.js.
   const sheet = (await fs.readdir(htmlOut)).find(name => /^app\.[0-9a-f]{10}\.css$/.test(name));
   assert.equal(await fs.readFile(path.join(htmlOut, sheet), 'utf8'), '@layer wutu.document{body{color:red;}}');

@@ -117,10 +117,14 @@ class BodyFormatter {
   format(tree) {
     if (tree.scope) this.add(0, `@island ${tree.scope}`);
     else if (tree.reactive) this.add(0, '@reactive');
-    for (const use of tree.styleUses) this.add(0, `@style ${compactExpression(use.value)}`);
     // (A page's go first inside its `html`: see element.)
-    if (this.page && tree.root.tag === 'html') this.pageCss = tree.global;
-    else for (const css of tree.global) this.block(`@document {${css}}`, 0);
+    if (this.page && tree.root.tag === 'html') {
+      this.pageStyles = tree.styleUses;
+      this.pageCss = tree.global;
+    } else {
+      for (const use of tree.styleUses) this.add(0, `@style ${compactExpression(use.value)}`);
+      for (const css of tree.global) this.block(`@document {${css}}`, 0);
+    }
     this.node(tree.root, 0);
     return '\n' + this.lines.join('\n') + '\n';
   }
@@ -266,6 +270,7 @@ class BodyFormatter {
     this.add(depth, head);
     const from = this.lines.length;
     if (this.pageCss && node.tag === 'html') {
+      for (const use of this.pageStyles) this.add(depth + 1, `@style ${compactExpression(use.value)}`);
       for (const css of this.pageCss) this.block(`@document {${css}}`, depth + 1);
       this.pageCss = null;
     }

@@ -230,6 +230,7 @@ fn tag_attributes(tag: Str) Str {
     if tag == wps(Wpt.Meter) { return wps(Wpt.ValueMinMaxLowHighOptimum) }
     if tag == wps(Wpt.Ol) { return wps(Wpt.StartReversedType) }
     if tag == wps(Wpt.Li) { return "value" }
+    if tag == "data" { return "value" }
     if tag == "time" { return wps(Wpt.Datetime) }
     if tag == wps(Wpt.Del) or tag == wps(Wpt.Ins) { return wps(Wpt.DatetimeCite) }
     if tag == wps(Wpt.Blockquote) or tag == wps(Wpt.Q) { return wps(Wpt.Cite) }
@@ -847,6 +848,21 @@ fn wp_css_block(text: Str) Str {
 
 //! = Template structure
 
+/// `@style e`, at the cursor.
+fn wp_style(text: Str) Void {
+    wp_at += 6
+    wp_trivia(text)
+    if wp_at_text(text, "$[") { wp_fail_interpolation(text) }
+    if wp_char(text) == 61 { wutu_fail(wps(Wpt.StyleTakesOneExpressionNotAn), wp_at) }
+    let source = wp_bare_expression(text)
+    let from = wx_from
+    let to = wx_to
+    wp_end(text)
+    tw_style_value.push(intern_text(source))
+    tw_style_from.push(from)
+    tw_style_to.push(to)
+}
+
 /// The template; returns its single element or a synthetic fragment.
 fn parse_template(text: Str) I32 {
     reset_template()
@@ -868,17 +884,7 @@ fn parse_template(text: Str) I32 {
         wp_trivia(text)
     }
     while (wp_at_text(text, wps(Wpt.StyleAt))) {
-        wp_at += 6
-        wp_trivia(text)
-        if wp_at_text(text, "$[") { wp_fail_interpolation(text) }
-        if wp_char(text) == 61 { wutu_fail(wps(Wpt.StyleTakesOneExpressionNotAn), wp_at) }
-        let source = wp_bare_expression(text)
-        let from = wx_from
-        let to = wx_to
-        wp_end(text)
-        tw_style_value.push(intern_text(source))
-        tw_style_from.push(from)
-        tw_style_to.push(to)
+        wp_style(text)
         wp_trivia(text)
     }
     while (wp_at_text(text, wps(Wpt.Document))) {
@@ -1160,6 +1166,10 @@ fn parse_telement(text: Str) I32 {
             wp_trivia(text)
             if wp_char(text) != 123 { wutu_fail(wps(Wpt.ExpectedDocumentCSSBlock), wp_at) }
             tw_global.push(intern_text(wp_css_block(text)))
+            continue
+        }
+        if tag == wps(Wpt.Html) and wp_at_text(text, wps(Wpt.StyleAt)) {
+            wp_style(text)
             continue
         }
         parse_element_statement(text, n)
