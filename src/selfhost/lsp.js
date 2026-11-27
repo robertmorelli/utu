@@ -2,7 +2,8 @@
 //
 // Every answer comes from a build of the program whose entry is the file
 // asked about: its diagnostics (both builds `utu check` makes, the exports'
-// and the tests'), and what its names resolve to (query.js). A build takes
+// and the tests'), and what its names resolve to (query.js: the tools'
+// lsp.utu and query.utu, so `utu` is the tools, loadNodeTools). A build takes
 // milliseconds, so there is nothing incremental: the compiler holds one
 // program, and a question about another file, or after an edit, builds again.
 //
@@ -15,51 +16,15 @@
 // utuFiles gives); it calls `handle(message)` with each message the editor sends.
 
 import { compile } from './compiler.js';
-import { programIndex, renderEditorHover } from './query.js';
-import { docComments, typstToMarkdown } from './docs.js';
+import { importPaths, isNewName, programIndex } from './query.js';
 
 const SEMANTIC_TYPES = ['namespace', 'type', 'enum', 'enumMember', 'struct', 'property', 'function', 'method', 'variable', 'parameter', 'interface', 'typeParameter'];
 const SEMANTIC_MODIFIERS = ['declaration'];
-
-// resolve.utu's Decl kinds as an editor names them.
-const SEMANTIC_KIND = {
-  Module: 'namespace', Foreign: 'namespace', ModuleParam: 'typeParameter', Struct: 'struct', Enum: 'enum', IntEnum: 'enum',
-  Variant: 'enumMember', Field: 'property', Proto: 'interface', ProtoMember: 'method', TypeDecl: 'type', Distinct: 'type',
-  Alias: 'type', Fn: 'function', Main: 'function', Global: 'variable', Mem: 'variable', Param: 'parameter', SelfParam: 'parameter',
-  ClosureParam: 'parameter', Local: 'variable', Capture: 'variable', ArmBinding: 'variable', Promoted: 'variable', Caught: 'variable',
-};
-
-// LSP's SymbolKind, for the declarations an outline shows.
-const SYMBOL_KIND = {
-  Module: 2, Foreign: 2, Struct: 23, Enum: 10, IntEnum: 10, Variant: 22, Field: 8, Proto: 11, ProtoMember: 6,
-  TypeDecl: 5, Distinct: 5, Fn: 12, Main: 12, Global: 13, Mem: 18,
-};
-
-// LSP's CompletionItemKind.
-const COMPLETION_KIND = {
-  Module: 9, Foreign: 9, ModuleParam: 25, Struct: 22, Enum: 13, IntEnum: 13, Variant: 20, Field: 5, Proto: 8, ProtoMember: 2,
-  TypeDecl: 7, Distinct: 7, Alias: 9, Fn: 3, Main: 3, Global: 6, Mem: 6, Param: 6, SelfParam: 6, ClosureParam: 6, Local: 6,
-  Capture: 6, ArmBinding: 6, Promoted: 6, Caught: 6,
-};
-
-const KEYWORDS = ['mod', 'using', 'struct', 'proto', 'enum', 'fn', 'let', 'mem', 'vec', 'export', 'const', 'type', 'distinct',
-  'test', 'bench', 'fun', 'cl', 'await', 'assert', 'not', 'and', 'or', 'xor', 'orelse', 'if', 'else', 'promote', 'try', 'catch',
-  'match', 'loop', 'alt', 'for', 'while', 'break', 'continue', 'defer', 'errdefer', 'return', 'fatal', 'yield', 'true', 'false', 'null', 'new'];
-
-// What the prelude offers every program by name: its modules and types.
-const PRELUDE_KINDS = new Set(['Module', 'Struct', 'Enum', 'IntEnum', 'Proto', 'TypeDecl', 'Distinct']);
-
-// lex.utu's Tok kinds completion offers nothing in: strings, DSL bodies,
-// comments, and a template's text.
-const QUIET_TOKENS = new Set([5, 6, 7, 8, 9, 10, 11, 12, 13]);
 
 // The name written where one is being typed, for completion's build.
 const PLACEHOLDER = '__utu_completing';
 
 const ENTRY_POINT = "main is the program's entry point: it is not renamed";
-
-// Declarations of values that live in a function: their hover shows the type checked.
-const LOCAL_KINDS = new Set(['Param', 'SelfParam', 'ClosureParam', 'Local', 'Capture', 'ArmBinding', 'Promoted', 'Caught']);
 
 export function createLanguageServer({ utu, hostFor, toKey, toUri, send, listFiles = null, log = () => {} }) {
   const docs = new Map();  // key → { uri, text, version }
@@ -212,76 +177,20 @@ export function createLanguageServer({ utu, hostFor, toKey, toUri, send, listFil
   }
 
   /** Whether the name at a request's position is the program's `main`. */
-  const entryPoint = q => q.program.index.declarations(q.key).some(({ kind, span }) => {
-    const head = kind === 'Main' && /^(?:export\s+)?main\b/.exec(q.text.slice(span.start, span.end));
-    const start = head && span.start + head[0].length - 4;
-    return head && start <= q.offset && q.offset <= start + 4;
-  });
+  const entryPoint = q => q.program.index.entryPoint(q.key, q.offset);
 
   /**
    * The name at a request's position, when renaming it is allowed: it is
    * spelled as a name, and declared in a file the editor can change (not
-   * the standard library's). Else null.
+   * the standard library's): what renaming it changes (see lsp.utu's
+   * q_rename). An import's alias is this file's to rename, whatever it
+   * names; a protocol's member is renamed with the functions implementing it.
+   * Else null.
    */
   function renamed(q) {
     if (q.decl < 0) return null;
-    const { index } = q.program;
-    const name = index.references(q.decl).find(place => place.file === q.key && place.start <= q.offset && q.offset <= place.end);
-    const spelling = name ? q.text.slice(name.start, name.end) : '';
-    if (!/^[A-Za-z_]\w*$/.test(spelling)) return null;
-    // An alias is this file's to rename, whatever it names.
-    if (isAlias(q, name)) return name;
-    // (A protocol's member, with the functions implementing it.)
-    return family(q.program, q.decl).every(d => {
-      const definition = index.definition(d);
-      return definition && uriOf(definition.file) && !definition.file.startsWith('std:');
-    }) ? name : null;
-  }
-
-  /**
-   * The declarations one name is: a protocol's member and the functions
-   * implementing it (`fn P[T].m`), the member first; else `decl` alone.
-   */
-  function family(program, decl) {
-    const links = program.links ??= protocolLinks(program.index);
-    const member = program.index.kind(decl) === 'ProtoMember' ? decl : links.get(decl);
-    if (member == null) return [decl];
-    return [member, ...[...links].filter(([, m]) => m === member).map(([fn]) => fn)];
-  }
-
-  /**
-   * Where `decl`'s family (see family) is named; without the member's own
-   * name and the fields satisfying it (declarations too), unless `includeDeclaration`.
-   */
-  function linkedReferences(program, decl, includeDeclaration = true) {
-    const { index } = program;
-    return family(program, decl).flatMap((d, i) => index.references(d, { includeDeclaration: includeDeclaration || (i > 0 && index.kind(d) !== 'Field') }));
-  }
-
-  /**
-   * Where the name at a request's position (`name`) is written. An import's
-   * alias (`using shapes |Point| …`) is its file's own name for the module
-   * or its type: each place this file spells it so, whatever it resolves
-   * to there (the alias, the type, the module). Any other name: its
-   * references, as it is spelled (not the `&` a module declares its type by).
-   */
-  function occurrences(q, name) {
-    const { index } = q.program;
-    const spelling = q.text.slice(name.start, name.end);
-    const alias = isAlias(q, name);
-    if (alias) {
-      return index.names(q.key)
-        .filter(n => index.text(n.at) === spelling && (n.decl === alias.decl || index.text(index.definition(n.decl) ?? n.at) !== spelling))
-        .map(n => n.at);
-    }
-    return linkedReferences(q.program, q.decl).filter(place => index.text(place) === spelling);
-  }
-
-  /** The import alias (`using m |Point| …`) of `q`'s file that the name at `name` spells, or undefined. */
-  function isAlias(q, name) {
-    const { index } = q.program;
-    const spelling = q.text.slice(name.start, name.end);
-    return index.declarations(q.key).find(d => d.kind === 'Alias' && index.text(index.definition(d.decl) ?? name) === spelling);
+    const found = q.program.index.rename(q.key, q.offset);
+    return found && (found.alias || found.defs.every(d => d && uriOf(d.file) && !d.file.startsWith('std:'))) ? found : null;
   }
 
   /** A place as an LSP location (moved to the document's text, for `q`), or null when no editor can open its file. */
@@ -306,11 +215,8 @@ export function createLanguageServer({ utu, hostFor, toKey, toUri, send, listFil
     const key = item?.data?.entry ?? item?.data?.file ?? toKey(item?.uri);
     if (!key) return null;
     const program = await build(key);
-    const match = program.index.declarations().find(({ decl }) => {
-      const definition = program.index.definition(decl);
-      return definition?.file === item.data?.file && definition.start === item.data?.start;
-    });
-    return match ? { program, decl: match.decl } : null;
+    const decl = program.index.declarationNamed(item.data?.file, item.data?.start);
+    return decl >= 0 ? { program, decl } : null;
   }
 
   const requests = {
@@ -364,18 +270,16 @@ export function createLanguageServer({ utu, hostFor, toKey, toUri, send, listFil
       const q = await at(params);
       if (!q || q.decl < 0) return [];
       const includeDeclaration = params.context?.includeDeclaration ?? true;
-      const here = linkedReferences(q.program, q.decl, includeDeclaration).map(place => location(q.program, place, q)).filter(Boolean);
+      const here = q.program.index.linkedReferences(q.decl, includeDeclaration).map(place => location(q.program, place, q)).filter(Boolean);
       return q.stale ? here : unique([...here, ...(await importers(q, q.decl, null, includeDeclaration)).map(found => found.location)]);
     },
 
     'textDocument/documentHighlight': async params => {
       const q = await at(params);
       if (!q || q.decl < 0) return [];
-      const definitions = family(q.program, q.decl).map(d => q.program.index.definition(d)).filter(Boolean);
       // (A name in a DSL body can be expanded into more than one place of the program: one highlight.)
-      return unique(linkedReferences(q.program, q.decl)
-        .filter(place => place.file === q.key)
-        .map(place => [q.place(place), definitions.some(d => place.start === d.start && place.file === d.file) ? 3 : 2])
+      return unique(q.program.index.highlights(q.key, q.decl)
+        .map(({ at, kind }) => [q.place(at), kind])
         .filter(([place]) => place)
         .map(([place, kind]) => ({ range: range(q.lines, place.start, place.end), kind })));
     },
@@ -383,10 +287,10 @@ export function createLanguageServer({ utu, hostFor, toKey, toUri, send, listFil
     'textDocument/hover': async params => {
       const q = await at(params);
       if (!q || q.decl < 0) return null;
-      const contents = hover(q.program, q.decl, q);
-      if (!contents) return null;
-      const name = q.place(q.program.index.references(q.decl).find(place => place.file === q.key && place.start <= q.offset && q.offset <= place.end));
-      return { contents: { kind: 'markdown', value: contents }, ...(name ? { range: range(q.lines, name.start, name.end) } : {}) };
+      const found = q.program.index.hover(q.key, q.offset);
+      if (!found?.value) return null;
+      const name = q.place(found.name);
+      return { contents: { kind: 'markdown', value: found.value }, ...(name ? { range: range(q.lines, name.start, name.end) } : {}) };
     },
 
     'textDocument/inlayHint': async params => {
@@ -431,7 +335,7 @@ export function createLanguageServer({ utu, hostFor, toKey, toUri, send, listFil
       const q = await at(params);
       if (q?.stale) throw responseError(-32602, 'the file does not parse: rename once it does');
       if (q && entryPoint(q)) throw responseError(-32602, ENTRY_POINT);
-      const name = q && renamed(q);
+      const name = q && renamed(q)?.name;
       return name ? { range: range(q.lines, name.start, name.end), placeholder: q.text.slice(name.start, name.end) } : null;
     },
 
@@ -442,9 +346,10 @@ export function createLanguageServer({ utu, hostFor, toKey, toUri, send, listFil
       // Names resolve past an import not found, but are not checked: a rename could not be.
       const stop = q?.program.diagnostics.find(d => d.kind === 'unknown-import' || d.kind === 'import-cycle');
       if (stop) throw responseError(-32602, `the program does not build (${stop.message}): no rename`);
-      const name = q && renamed(q);
-      if (!name) throw responseError(-32602, 'only a name declared in a file the editor can change is renamed');
-      if (!/^[A-Za-z_][A-Za-z0-9_]*$/.test(params.newName) || KEYWORDS.includes(params.newName)) {
+      const found = q && renamed(q);
+      if (!found) throw responseError(-32602, 'only a name declared in a file the editor can change is renamed');
+      const { name } = found;
+      if (!isNewName(utu, params.newName)) {
         throw responseError(-32602, `'${params.newName}' is not a name`);
       }
       const newName = params.newName;
@@ -457,10 +362,10 @@ export function createLanguageServer({ utu, hostFor, toKey, toUri, send, listFil
         if (!spans.has(place.file)) spans.set(place.file, new Map());
         spans.get(place.file).set(place.start, place.end);
       };
-      for (const place of occurrences(q, name)) add(place, place.file === q.key ? q.text : textOf(q.program, place.file));
+      for (const place of found.occurrences) add(place, place.file === q.key ? q.text : textOf(q.program, place.file));
       // The programs edited: this file's, and each importing the name's file.
       const entries = new Map([[q.key, { text: q.text, before: null }]]);
-      if (!isAlias(q, name)) {
+      if (!found.alias) {
         const found = await importers(q, q.decl, spelling, true, true);
         for (const place of found) add(place, place.text);
         for (const [key, entry] of found.entries) entries.set(key, entry);
@@ -507,7 +412,7 @@ export function createLanguageServer({ utu, hostFor, toKey, toUri, send, listFil
           return `${words} on line ${lineOf(place.file, place.start)}${place.file === file ? '' : ` of ${place.file.split(/[\\/]/).at(-1)}`}`;
         };
         edited.forEach((file, i) => {
-          const now = new Map(bindings(after, file).map(b => [b.at.start, b]));
+          const now = new Map(after.index.bindings(file).map(b => [b.at.start, b]));
           for (const b of was[i]) {
             const n = now.get(moved(file, b.at.start));
             const meant = b.meant && { file: b.meant.file, start: moved(b.meant.file, b.meant.start) };
@@ -522,20 +427,13 @@ export function createLanguageServer({ utu, hostFor, toKey, toUri, send, listFil
     'textDocument/documentSymbol': async params => {
       const q = await at(params);
       if (!q) return [];
-      const { index } = q.program;
       const symbols = new Map();
       const roots = [];
-      for (const { decl, kind, owner, span: whole } of index.declarations(q.key)) {
-        if (!(kind in SYMBOL_KIND)) continue;
-        const declared = index.definition(decl);
-        if (!declared || declared.file !== q.key) continue;
-        const name = q.place(declared), span = q.place(whole, true);
+      for (const { decl, owner, kind, name: text, span: whole, selection } of q.program.index.symbols(q.key)) {
+        const name = q.place(selection), span = q.place(whole, true);
         if (!name || !span) continue;
-        // A module's own type (`struct &`) is known by the module's name.
-        const ownerName = owner >= 0 && index.kind(owner) === 'Module' ? index.definition(owner) : null;
-        const text = index.text(declared) === '&' && ownerName ? index.text(ownerName) : index.text(declared);
         const symbol = {
-          name: text, kind: SYMBOL_KIND[kind],
+          name: text, kind,
           range: range(q.lines, Math.min(span.start, name.start), Math.max(span.end, name.end)),
           selectionRange: range(q.lines, name.start, name.end), children: [],
         };
@@ -557,20 +455,15 @@ export function createLanguageServer({ utu, hostFor, toKey, toUri, send, listFil
     'textDocument/semanticTokens/full': async params => {
       const q = await at(params);
       if (!q) return { data: [] };
-      const { index } = q.program;
-      const declared = new Map();
       const data = [];
       let line = 0, character = 0;
-      for (const { decl, at: written } of index.names(q.key)) {
-        const type = SEMANTIC_TYPES.indexOf(SEMANTIC_KIND[index.kind(decl)]);
+      for (const { at: written, type: name, declaration: modifiers } of q.program.index.semanticTokens(q.key)) {
+        const type = SEMANTIC_TYPES.indexOf(name);
         const place = q.place(written);
-        if (type < 0 || !place) continue;
+        if (!place) continue;
         const start = positionAt(q.lines, place.start);
         const end = positionAt(q.lines, place.end);
         if (end.line !== start.line) continue;
-        if (!declared.has(decl)) declared.set(decl, index.definition(decl));
-        const definition = declared.get(decl);
-        const modifiers = definition && definition.file === q.key && definition.start === written.start ? 1 : 0;
         data.push(start.line - line, start.line === line ? start.character - character : start.character, end.character - start.character, type, modifiers);
         line = start.line;
         character = start.character;
@@ -592,8 +485,7 @@ export function createLanguageServer({ utu, hostFor, toKey, toUri, send, listFil
    */
   async function importers(q, decl, spelling, includeDeclaration, strict = false) {
     // (A protocol's implementations import its file: found from the member's.)
-    const root = family(q.program, decl)[0];
-    const definition = q.program.index.definition(root);
+    const definition = q.program.index.rootDefinition(decl);
     const out = Object.assign([], { entries: new Map() });
     if (!definition || definition.file.startsWith('std:')) return out;
     const disk = await onDisk(definition.file);
@@ -625,15 +517,11 @@ export function createLanguageServer({ utu, hostFor, toKey, toUri, send, listFil
       }
       if (!has) continue;
       out.entries.set(key, { text: textOf(program, key), before: strict ? before(program) : null });
-      const { index } = program;
-      const same = index.declarations(definition.file).find(d => {
-        const p = index.definition(d.decl);
-        return p && p.file === definition.file && p.start === definition.start;
-      });
-      if (!same) continue;
-      for (const place of linkedReferences(program, same.decl, includeDeclaration)) {
+      const same = program.index.declarationNamed(definition.file, definition.start, true);
+      if (same < 0) continue;
+      for (const place of program.index.linkedReferences(same, includeDeclaration, spelling ?? '')) {
         const where = location(program, place);
-        if (where && (spelling == null || index.text(place) === spelling)) out.push({ ...place, location: where, text: textOf(program, place.file) });
+        if (where) out.push({ ...place, location: where, text: textOf(program, place.file) });
       }
     }
     return out;
@@ -658,7 +546,7 @@ export function createLanguageServer({ utu, hostFor, toKey, toUri, send, listFil
       const host = hostFor(key);
       let text = docs.get(key)?.text;
       if (text == null) try { text = await host.readFile(key); } catch { unread.push(key); continue; }
-      const targets = importPaths(String(text)).filter(path => !/^[a-z][\w+.-]+:/i.test(path))
+      const targets = importPaths(utu, String(text)).filter(path => !/^[a-z][\w+.-]+:/i.test(path))
         .map(path => host.resolvePath ? host.resolvePath(key, path) : path);
       for (const target of targets) {
         if (!importedBy.has(target)) importedBy.set(target, new Set());
@@ -672,132 +560,32 @@ export function createLanguageServer({ utu, hostFor, toKey, toUri, send, listFil
   }
 
   /**
-   * Each name of file `key` in `program` (the program the compiler holds):
-   * where it is, and where what it means is named (null for no place).
-   */
-  function bindings(program, key) {
-    const { index } = program;
-    return program.index.names(key).map(n => ({ at: n.at, meant: index.definition(n.decl), kind: index.kind(n.decl) }));
-  }
-
-  /**
    * What a rename checks a program (the one the compiler holds) against
    * after: its `errors`, its `files`, and the bindings of each file an
    * editor can change (`was`, file → bindings).
    */
   function before(program) {
     const files = new Set(program.files.map(f => f.key));
-    const was = new Map([...files].filter(f => !f.startsWith('std:') && uriOf(f)).map(f => [f, bindings(program, f)]));
+    const was = new Map([...files].filter(f => !f.startsWith('std:') && uriOf(f)).map(f => [f, program.index.bindings(f)]));
     return { errors: program.diagnostics.filter(d => d.severity !== 'warning'), files, was };
   }
 
   /**
-   * What may be written at `offset`: after `x.`, the members of x's type (or
-   * of the module x names); elsewhere, the names in scope and the keywords.
-   * The text there rarely parses, so the build is of the text with a name
-   * where the one being typed is (and a `;` after it, when that is needed).
+   * What may be written at `offset` (see lsp.utu's q_completions). The text
+   * there rarely parses, so the build is of the text with a name where the
+   * one being typed is (and a `;` after it, when that is needed).
    */
   async function complete(key, text, offset) {
     // Nothing is written in a comment, a string, or a DSL's body.
-    const token = (await build(key)).index.tokenAt(key, offset);
-    if (token && QUIET_TOKENS.has(token.kind)) return [];
-    let start = offset;
-    while (start > 0 && /[A-Za-z0-9_]/.test(text[start - 1])) start--;
-    // (`r. ` is `r.` too.)
-    let dot = start;
-    while (dot > 0 && /[ \t]/.test(text[dot - 1])) dot--;
-    const member = text[dot - 1] === '.';
+    const start = (await build(key)).index.completionStart(key, offset);
+    if (start < 0) return [];
     let program = null;
     for (const tail of ['', ';', ');', ' }']) {
       const patched = `${text.slice(0, start)}${PLACEHOLDER}${tail}${text.slice(offset)}`;
       program = await build(key, { key, text: patched });
       if (!program.diagnostics.some(d => d.kind === 'parse-error')) break;
     }
-    const { index } = program;
-    const all = index.declarations();
-    const label = decl => { const d = index.definition(decl); return d ? index.text(d) : ''; };
-    const item = (decl, kind) => {
-      const name = label(decl);
-      const span = index.span(decl);
-      // (Spans are the patched text's.)
-      const source = span ? program.files.find(f => f.key === span.file)?.text ?? null : null;
-      const detail = LOCAL_KINDS.has(kind) ? index.type(decl) : source != null ? signature(source.slice(span.start, span.end)) : '';
-      return { label: name, kind: COMPLETION_KIND[kind] ?? 6, ...(detail ? { detail } : {}) };
-    };
-    const items = new Map();
-    const add = (decl, kind) => {
-      const name = label(decl);
-      if (name && name !== PLACEHOLDER && /^[A-Za-z_]\w*$/.test(name) && !items.has(name)) items.set(name, item(decl, kind));
-    };
-    if (member) {
-      // `x?.`: the members of what x holds when it is not null.
-      const optional = text[dot - 2] === '?';
-      let r = dot - 1 - (optional ? 1 : 0);
-      while (r > 0 && /\s/.test(text[r - 1])) r--;
-      const receiver = r > 0 ? index.declarationAt(key, r - 1) : -1;
-      const rkind = receiver >= 0 ? index.kind(receiver) : null;
-      // `M.`: what module M holds. `T.`: a type's variants and functions.
-      // Any other `e.`: the fields of e's type, and its module's methods.
-      const statics = rkind === 'Struct' || rkind === 'Enum' || rkind === 'IntEnum';
-      let owner = rkind === 'Module' || statics ? receiver : index.typeDeclarationOfExpressionBefore(key, r, optional);
-      if (owner < 0 && (LOCAL_KINDS.has(rkind) || rkind === 'Global') && (optional || !index.type(receiver).startsWith('?'))) owner = index.typeDeclaration(receiver);
-      if (owner < 0) return [];
-      const module = rkind === 'Module' ? receiver : moduleOf(index, owner);
-      // A type outside a module has the functions written `fn T.f`: called on a value when they take |self|.
-      const typeName = module < 0 ? label(owner) : null;
-      for (const { decl, kind, owner: o } of all) {
-        // (A std struct's `_` fields are std's own: see data.utu's std_own.)
-        if (kind === 'Field' && label(decl).startsWith('_') && index.span(decl)?.file.startsWith('std:')) continue;
-        if (o === owner && ((kind === 'Field' && !statics) || kind === 'Variant' || kind === 'Fn' || kind === 'Global')) add(decl, kind);
-        // (After the type itself, its methods too, as after a module's type.)
-        else if (typeName && o < 0 && kind === 'Fn' && writtenFor(index, program, decl, typeName) && (statics || isMethod(index, program, decl))) add(decl, kind);
-        else if (module >= 0 && o === module && module !== owner && kind === 'Fn' && (rkind === 'Module' || isMethod(index, program, decl))) add(decl, kind);
-        else if (o === module && rkind === 'Module' && (kind === 'Struct' || kind === 'Enum' || kind === 'TypeDecl' || kind === 'Global')) add(decl, kind);
-      }
-      return [...items.values()];
-    }
-    // The locals of the function the cursor is in, declared before it.
-    const fns = all.filter(d => d.span.file === key && (d.kind === 'Fn' || d.kind === 'Main') && d.span.start <= start && start <= d.span.end);
-    const within = fns.sort((a, b) => (a.span.end - a.span.start) - (b.span.end - b.span.start))[0];
-    // What this file declares, and what the prelude does (imports are named by their alias).
-    const prelude = new Set(program.files.filter(f => f.role === 2).map(f => f.key));
-    for (const { decl, kind, owner, span } of all) {
-      if (span.file !== key && !(prelude.has(span.file) && PRELUDE_KINDS.has(kind))) continue;
-      if (span.file === key && LOCAL_KINDS.has(kind)) {
-        if (within && span.start >= within.span.start && span.start < start) add(decl, kind);
-      } else if (span.file === key ? owner < 0 || index.kind(owner) === 'Module' && !LOCAL_KINDS.has(kind) && kind !== 'Field' && kind !== 'Variant' : owner < 0 && kind !== 'Main') {
-        add(decl, kind);
-      }
-    }
-    for (const word of KEYWORDS) if (!items.has(word)) items.set(word, { label: word, kind: 14 });
-    return [...items.values()];
-  }
-
-  /** What hovering a name shows: its declaration, its type, its doc comment. */
-  function hover(program, decl, q) {
-    const { index } = program;
-    const kind = index.kind(decl);
-    const definition = index.definition(decl);
-    const span = index.span(decl);
-    const text = !span ? null : span.file === q.key ? q.text : textOf(program, span.file);
-    let head;
-    if (LOCAL_KINDS.has(kind)) {
-      const type = index.type(decl);
-      // (A @wat function's body is not checked: its parameters are as written.)
-      head = type || !span || text == null ? `${definition ? index.text(definition) : '?'}${type ? `: ${type}` : ''}` : signature(text.slice(span.start, span.end));
-    } else if (span && text != null) {
-      head = signature(text.slice(span.start, span.end))
-        // A built-in type's representation is the compiler's business.
-        .replace(/\s*=\s*@ir\s*\/\\[\s\S]*$/, '');
-      // A module's own type, `&`, by the module's name.
-      const module = moduleOf(index, decl);
-      const name = module >= 0 ? index.definition(module) : null;
-      if (name) head = head.replace(/(^|[^&\w])&(?![&\w])/g, `$1${index.text(name)}`);
-    }
-    if (!head) return null;
-    const docs = LOCAL_KINDS.has(kind) ? '' : typstToMarkdown(docComments(utu, program.files).declaration(decl));
-    const where = span?.file.startsWith('std:') ? ` · ${span.file}` : '';
-    return renderEditorHover(index.explainAt(q.key, q.offset), { signature: head, kind, where, docs });
+    return program.index.completions(key, start, PLACEHOLDER);
   }
 
   async function notify(message) {
@@ -874,62 +662,6 @@ function unique(locations) {
 }
 
 /**
- * By function implementing a protocol's member (`fn P[T].m`, P resolving
- * to the protocol): that member's declaration.
- */
-function protocolLinks(index) {
-  const links = new Map();
-  const members = new Map();  // protocol → name → member
-  const all = index.declarations();
-  for (const { decl, kind, owner } of all) {
-    const at = kind === 'ProtoMember' && index.definition(decl);
-    if (!at) continue;
-    if (!members.has(owner)) members.set(owner, new Map());
-    members.get(owner).set(index.text(at), decl);
-  }
-  if (!members.size) return links;
-  // The names of protocols, by file, in order.
-  const protocols = new Map();
-  for (const n of index.names(null)) {
-    if (!members.has(n.decl)) continue;
-    if (!protocols.has(n.at.file)) protocols.set(n.at.file, []);
-    protocols.get(n.at.file).push(n);
-  }
-  for (const { decl, kind, span } of all) {
-    const at = kind === 'Fn' && index.definition(decl);
-    if (!at || at.file !== span.file) continue;
-    // The last protocol named in its head, before its own name.
-    let protocol = -1;
-    for (const n of protocols.get(span.file) ?? []) if (n.at.start >= span.start && n.at.start < at.start) protocol = n.decl;
-    const member = members.get(protocol)?.get(index.text(at));
-    if (member != null) links.set(decl, member);
-  }
-  // A struct's field satisfying a getter or setter of a protocol named in
-  // its head (`struct S[P]`, before its first field).
-  const accessor = member => {
-    const span = index.span(member), at = index.definition(member);
-    return /\b(get|set)\b/.test(index.text({ file: at.file, start: span.start, end: at.start }));
-  };
-  const fields = new Map();  // struct → its fields
-  for (const d of all) if (d.kind === 'Field') (fields.get(d.owner) ?? fields.set(d.owner, []).get(d.owner)).push(d);
-  for (const { decl, kind, span } of all) {
-    const at = kind === 'Struct' && index.definition(decl);
-    const own = at && fields.get(decl);
-    if (!own || at.file !== span.file) continue;
-    const end = Math.min(...own.map(f => index.definition(f.decl)?.start ?? span.end));
-    const named = (protocols.get(span.file) ?? []).filter(n => n.at.start >= at.end && n.at.start < end).map(n => n.decl);
-    for (const field of own) {
-      const name = index.definition(field.decl);
-      for (const p of named) {
-        const member = name && members.get(p)?.get(index.text(name));
-        if (member != null && accessor(member)) { links.set(field.decl, member); break; }
-      }
-    }
-  }
-  return links;
-}
-
-/**
  * Offsets between `before` and `after`, one text edited into the other, by
  * the lines they share (in order, the longest such run). toOld (of an
  * offset of `after`) and toNew (of one of `before`) give -1 on a line the
@@ -978,22 +710,6 @@ function shift(before, after) {
   return { toOld: o => move(a, b, toB, o), toNew: (o, clamp) => move(b, a, toA, o, clamp) };
 }
 
-/** The paths of `text`'s `using … from "…"` (not in a comment or another string). */
-function importPaths(text) {
-  // Comments blanked, and strings but for their quotes (each string kept by where it is).
-  const strings = new Map();
-  const plain = text.replace(/\/\/[^\n]*|"(?:[^"\\\n]|\\.)*"/g, (m, at) => {
-    if (m[0] === '/') return ' '.repeat(m.length);
-    strings.set(at, m);
-    return `"${' '.repeat(m.length - 2)}"`;
-  });
-  const paths = [];
-  for (const m of plain.matchAll(/\busing\b[^;"]*?\bfrom\s*"/g)) {
-    try { paths.push(JSON.parse(strings.get(m.index + m[0].length - 1))); } catch {}
-  }
-  return paths;
-}
-
 /** A file's name, without its folder. */
 function nameOf(key) {
   return key.split(/[\\/]/).at(-1);
@@ -1029,46 +745,4 @@ function offsetAt(lines, { line, character }, length = Infinity) {
 
 function range(lines, start, end) {
   return { start: positionAt(lines, start), end: positionAt(lines, end) };
-}
-
-/** A declaration's first line, without its body: `fn area(self: Shape) F64`; an enum's or struct's whole (it has no body). */
-function signature(source) {
-  const text = source.replace(/\/\/[^\n]*/g, '');
-  if (/^\s*(export\s+)?(enum|struct)\b/.test(text)) return collapse(text);
-  let depth = 0;
-  for (let i = 0; i < text.length; i++) {
-    const c = text[i];
-    if (c === '(' || c === '[') depth++;
-    else if (c === ')' || c === ']') depth--;
-    else if (depth === 0 && (c === '{' || c === ';')) return collapse(text.slice(0, i));
-    else if (depth === 0 && c === '=' && text[i + 1] === '>') return collapse(text.slice(0, i));
-  }
-  return collapse(text);
-}
-
-function collapse(text) {
-  const line = text.replace(/\s+/g, ' ').trim();
-  return line.length > 160 ? `${line.slice(0, 157)}...` : line;
-}
-
-
-/** The module a declaration is in, or -1. */
-function moduleOf(index, decl) {
-  let d = decl;
-  while (d >= 0 && index.kind(d) !== 'Module') d = index.owner(d);
-  return d;
-}
-
-/** A function written `fn T.f …` for type name `T`. */
-function writtenFor(index, program, decl, typeName) {
-  const span = index.span(decl);
-  const text = span && (program.files.find(f => f.key === span.file)?.text);
-  return text != null && new RegExp(`^\\s*(export\\s+)?fn\\s+${typeName}\\.`).test(text.slice(span.start, span.end));
-}
-
-/** A function called on a value: `fn &.f |self| …`. */
-function isMethod(index, program, decl) {
-  const span = index.span(decl);
-  const text = span && (program.files.find(f => f.key === span.file)?.text);
-  return text != null && /^\s*(export\s+)?fn\s+[^\s(]*\.[A-Za-z_]\w*\s*\|/.test(text.slice(span.start, span.end));
 }

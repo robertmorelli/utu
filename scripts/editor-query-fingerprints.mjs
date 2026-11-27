@@ -6,8 +6,8 @@ import { createHash } from 'node:crypto';
 import { execFileSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { gzipSync, gunzipSync } from 'node:zlib';
-import { compileFile, loadNodeCompiler } from '../src/selfhost/node.js';
-import { programIndex, renderEditorHover } from '../src/selfhost/query.js';
+import { compileFile, loadNodeTools } from '../src/selfhost/node.js';
+import { programIndex } from '../src/selfhost/query.js';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const BASELINE = path.join(ROOT, 'baselines', 'editor-query-fingerprints.json.gz');
@@ -19,7 +19,7 @@ const place = at => at ? { file: relative(at.file), start: at.start, end: at.end
 const hash = value => createHash('sha256').update(JSON.stringify(value)).digest('hex');
 const files = execFileSync('git', ['ls-files', 'examples/*.utu', 'examples/**/*.utu', 'benchmarks/*.utu', 'benchmarks/**/*.utu', 'baselines/corpus/*.utu'], { cwd: ROOT, encoding: 'utf8' })
   .split('\n').filter(file => file && (!only || file.includes(only)) && !file.includes('/node_modules/'));
-const utu = await loadNodeCompiler();
+const utu = await loadNodeTools();
 const results = {};
 for (const entry of files) {
   const built = await compileFile(utu, path.join(ROOT, entry), { root: ROOT, target: 'analysis' });
@@ -36,7 +36,7 @@ for (const entry of files) {
     return {
       at: place(at), declaration: place(index.definition(decl)),
       references: index.references(decl).map(place),
-      hover: renderEditorHover(explain),
+      hover: index.explainHover(at.file, at.start),
       explain: explain && { type: explain.type, expectedType: explain.expectedType, wasmType: explain.wasmType,
         callTarget: explain.callTarget >= 0 ? place(index.definition(explain.callTarget)) : null, field: explain.field, captures: explain.captures.length,
         conversions: explain.conversions.map(co => [co.from, co.to, co.kind]), effects: explain.effects.labels },

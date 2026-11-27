@@ -1,1 +1,4 @@
 tools.utu
+query.utu
+docs.utu
+lsp.utu

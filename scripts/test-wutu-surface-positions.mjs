@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { compileFile, loadNodeCompiler } from '../src/selfhost/node.js';
+import { compileFile, loadNodeTools } from '../src/selfhost/node.js';
 import { programIndex } from '../src/selfhost/query.js';
 import { highlighter } from '../src/selfhost/highlight.js';
 
@@ -15,7 +15,7 @@ for (const [kind, line, column] of [['unknown-field', 9, 15], ['unknown-variable
 }
 
 const entry = path.join(root, 'examples/wutu-components/main.utu');
-const utu = await loadNodeCompiler();
+const utu = await loadNodeTools();
 const built = await compileFile(utu, entry, { root, target: 'analysis' });
 assert.equal(built.diagnostics.filter(d => d.severity === 'error').length, 0);
 const index = programIndex(utu, built.files);

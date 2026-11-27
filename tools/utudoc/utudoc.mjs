@@ -8,7 +8,7 @@
 // variants, and methods) go into one Typst document: each with its
 // signature, colored as the compiler reads it (keywords, types, functions,
 // strings) and with the names it uses linked to their declarations, then
-// its doc comment, which is Typst already (src/selfhost/docs.js). A file's
+// its doc comment, which is Typst already (selfhost/tools/docs.utu). A file's
 // `//!` comment opens its section; a later `//!` block is set where it is.
 // `typst compile` makes the PDF; without typst, the .typ is written for later.
 //
@@ -20,10 +20,9 @@ import fs from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
 import { compile } from '../../src/selfhost/compiler.js';
-import { loadNodeCompiler, nodeHost } from '../../src/selfhost/node.js';
-import { programIndex } from '../../src/selfhost/query.js';
+import { loadNodeTools, nodeHost } from '../../src/selfhost/node.js';
+import { docComments, programIndex } from '../../src/selfhost/query.js';
 import { highlighter } from '../../src/selfhost/highlight.js';
-import { docComments } from '../../src/selfhost/docs.js';
 
 // The level a doc comment's `= Heading` takes: below any declaration's.
 const DOC_HEADING = 5;
@@ -71,7 +70,7 @@ async function main() {
     entries.push(...entries.splice(from).sort().filter(entry => !entries.includes(entry)));
   }
 
-  const utu = await loadNodeCompiler();
+  const utu = await loadNodeTools();
   const sections = new Map();  // file key → its section's Typst
   const labels = new Map();    // `${file}\0${start}` → label
   const label = (file, start) => {

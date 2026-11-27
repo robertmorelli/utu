@@ -1,458 +1,99 @@
 // src/selfhost/query.js — what names mean, for an editor.
 //
 // After loadProgram, the compiler's tables say what declaration each name
-// resolves to (node_decl), and where each declaration is (decl_node). Read
-// straight from its memories: go to definition and find references cost a
-// pass over the nodes, with no build.
+// resolves to, and where each declaration is: the tools (dist/utu-tools.wasm,
+// loadNodeTools) answer from them (selfhost/tools/query.utu, lsp.utu,
+// docs.utu), in JSON. Places are { file (key), start, end }, UTF-16 offsets
+// in the file's text.
 
-const COMMENT = 9;  // lex.utu's Tok.Comment
-
-// The characters of a WAT identifier after its `$`.
-const WAT_ID = /[0-9A-Za-z!#$%&'*+\-./:<=>?@\\^_`|~]/;
-
-// The words a declaration begins with, before what it names.
-const DECLARING = new Set(['export', 'mod', 'struct', 'tag', 'enum', 'proto', 'fn', 'type', 'distinct', 'let', 'const', 'mem', 'vec', 'using']);
-
-/** Queries over the program loaded last (`files` is what loadProgram returned). */
+/** Queries over the program loaded last (`files` is what loadProgram returned), with the tools' exports. */
 export function programIndex(utu, files) {
-  const view = (mem, Type) => new Type(mem.buffer);
-  const first = view(utu.node_first, Int32Array);
-  const last = view(utu.node_last, Int32Array);
-  const tokStart = view(utu.tok_start, Int32Array);
-  const tokEnd = view(utu.tok_end, Int32Array);
-  const tokKind = view(utu.tok_kind, Uint8Array);
-  const nodeDecl = view(utu.node_decl, Int32Array);
-  const declNode = view(utu.decl_node, Int32Array);
-  const declOwner = view(utu.decl_owner, Int32Array);
-  const count = utu.node_count();
-  const units = new Map();
-
-  const fileOf = byte => {
-    for (let f = files.length - 1; f >= 0; f--) if (files[f].offset <= byte) return byte < files[f].offset + files[f].bytes.length ? files[f] : null;
-    return null;
-  };
-  // A byte of `src` as a UTF-16 offset in its file's text.
-  const toUnits = (file, byte) => {
-    let table = units.get(file);
-    if (!table) {
-      table = new Int32Array(file.bytes.length + 1);
-      let u = 0;
-      for (let b = 0; b < file.bytes.length;) {
-        const c = file.bytes[b];
-        const n = c < 0x80 ? 1 : c < 0xe0 ? 2 : c < 0xf0 ? 3 : 4;
-        for (let k = 0; k < n; k++) table[b + k] = u;
-        b += n;
-        u += n === 4 ? 2 : 1;
-      }
-      table[file.bytes.length] = u;
-      units.set(file, table);
-    }
-    return table[byte - file.offset];
-  };
-  const placed = new Array(count);
-  const place = node => {
-    if (node >= 0 && node < count && placed[node] !== undefined) return placed[node];
-    const start = tokStart[first[node]];
-    const file = fileOf(start);
-    const at = file ? { file: file.key, start: toUnits(file, start), end: toUnits(file, tokEnd[last[node] - 1]) } : null;
-    if (node >= 0 && node < count) placed[node] = at;
-    return at;
-  };
-  // By file key: its nodes with tokens, made when first asked.
-  let fileNodes = null;
-  const nodesOf = key => {
-    if (!fileNodes) {
-      fileNodes = new Map();
-      for (let n = 0; n < count; n++) {
-        if (first[n] >= last[n]) continue;
-        const at = place(n);
-        if (!at) continue;
-        if (!fileNodes.has(at.file)) fileNodes.set(at.file, []);
-        fileNodes.get(at.file).push(n);
-      }
-    }
-    return fileNodes.get(key) ?? [];
-  };
-  // By declaration: the names resolving to it, made when first asked.
-  let usesOf = null;
-  const uses = decl => {
-    if (!usesOf) {
-      usesOf = new Map();
-      for (let n = 0; n < count; n++) {
-        if (!named(n)) continue;
-        if (!usesOf.has(nodeDecl[n])) usesOf.set(nodeDecl[n], []);
-        usesOf.get(nodeDecl[n]).push(n);
-      }
-    }
-    return usesOf.get(decl) ?? [];
-  };
-  // By declaration: the first name inside it that resolves to it (its own
-  // name), or -1. One pass over the nodes, made when first asked.
-  let namingNodes = null;
-  const naming = () => {
-    if (namingNodes) return namingNodes;
-    namingNodes = new Int32Array(utu.decl_count()).fill(-1);
-    for (let n = 0; n < count; n++) {
-      const d = nodeDecl[n];
-      if (d < 0 || d >= namingNodes.length || !named(n) || declNode[d] < 0) continue;
-      const s = tokStart[first[n]];
-      if (s < tokStart[first[declNode[d]]] || s >= tokEnd[last[declNode[d]] - 1]) continue;
-      const best = namingNodes[d];
-      if (best < 0 || s < tokStart[first[best]]) namingNodes[d] = n;
-    }
-    return namingNodes;
-  };
-  const named = n => nodeDecl[n] >= 0 && first[n] < last[n] && last[n] - first[n] === 1;
-  // A @wat function's parameters, used in its text as `$x`: by declaration,
-  // the places of those names (after the `$`). Found when first asked.
-  let watPlaces = null;
-  const watUses = () => {
-    if (watPlaces) return watPlaces;
-    watPlaces = new Map();
-    const src = new Uint8Array(utu.src.buffer);
-    for (let k = 0, n = utu.wat_count?.() ?? 0; k < n; k++) {
-      const fnNode = utu.wat_function(k);
-      let fn = -1;
-      for (let d = 0, count = utu.decl_count(); d < count && fn < 0; d++) if (declNode[d] === fnNode) fn = d;
-      const params = new Map();
-      for (let d = 0, count = utu.decl_count(); d < count; d++) {
-        if (declOwner[d] !== fn || utu.decl_kind_name(d) !== 'Param') continue;
-        const at = place(naming()[d] >= 0 ? naming()[d] : declNode[d]);
-        if (at) params.set(files.find(f => f.key === at.file)?.text.slice(at.start, at.end), d);
-      }
-      const start = utu.wat_text_start(k);
-      const end = utu.wat_text_end(k);
-      const file = fileOf(start);
-      if (!file || !params.size) continue;
-      for (let b = start; b < end; b++) {
-        const c = src[b];
-        // Comments: `;; …` to the line's end, `(; … ;)` nested.
-        if (c === 59 && src[b + 1] === 59) { while (b < end && src[b] !== 10) b++; continue; }
-        if (c === 40 && src[b + 1] === 59) {
-          let depth = 0;
-          for (; b < end; b++) {
-            if (src[b] === 40 && src[b + 1] === 59) { depth++; b++; } else if (src[b] === 59 && src[b + 1] === 41) { depth--; b++; if (!depth) break; }
-          }
-          continue;
-        }
-        if (c !== 36) continue;
-        let e = b + 1;
-        while (e < end && WAT_ID.test(String.fromCharCode(src[e]))) e++;
-        const decl = params.get(new TextDecoder().decode(src.subarray(b + 1, e)));
-        if (decl !== undefined) {
-          if (!watPlaces.has(decl)) watPlaces.set(decl, []);
-          watPlaces.get(decl).push({ file: file.key, start: toUnits(file, b + 1), end: toUnits(file, e) });
-        }
-        b = e - 1;
-      }
-    }
-    return watPlaces;
-  };
-  // A declaration with no name node resolving to it (`struct &:`): the
-  // first token after its keywords, when that is a name or `&`.
-  const decoder = new TextDecoder();
-  const nameToken = node => {
-    for (let t = first[node]; t < last[node]; t++) {
-      if (tokKind[t] === COMMENT) continue;
-      const file = fileOf(tokStart[t]);
-      if (!file) return null;
-      const text = decoder.decode(file.bytes.subarray(tokStart[t] - file.offset, tokEnd[t] - file.offset));
-      if (DECLARING.has(text)) continue;
-      if (text !== '&' && !/^[A-Za-z_]\w*$/.test(text)) return null;
-      return { file: file.key, start: toUnits(file, tokStart[t]), end: toUnits(file, tokEnd[t]) };
-    }
-    return null;
-  };
-
-  const nodeKind = view(utu.node_kind, Uint8Array);
-  const bytePlace = (start, end) => {
-    if (start < 0 || end < start) return null;
-    const file = fileOf(start);
-    return file && end <= file.offset + file.bytes.length
-      ? { file: file.key, start: toUnits(file, start), end: toUnits(file, end) } : null;
-  };
-  const inside = (at, key, offset) => at?.file === key && at.start <= offset && offset <= at.end;
-  const nodeAt = (key, offset, typed = false) => {
-    let best = -1, width = Infinity;
-    for (const n of nodesOf(key)) {
-      const at = place(n);
-      if (!inside(at, key, offset)) continue;
-      const size = at.end - at.start;
-      if (size < width && !(typed && !utu.node_type(n))) { best = n; width = size; }
-    }
-    return best;
-  };
-  let callCache;
-  const calls = () => callCache ??= (() => {
-    const out = [];
-    for (let k = 0; k < (utu.edge_count?.() ?? 0); k++) {
-      const from = utu.edge_from_decl(k);
-      let site = bytePlace(utu.edge_site_start(k), utu.edge_site_end(k));
-      // The checker's current call is the site of a call it makes, not of an
-      // operator or of a function checked while it waits: a site outside the
-      // caller is none.
-      const caller = from >= 0 && declNode[from] >= 0 ? place(declNode[from]) : null;
-      if (site && caller && !(site.file === caller.file && caller.start <= site.start && site.end <= caller.end)) site = null;
-      out.push({ from, to: utu.edge_to_decl(k), site });
-    }
-    return out;
-  })();
-  let coercionCache;
-  const coercions = () => coercionCache ??= (() => {
-    const out = [];
-    for (let k = 0; k < (utu.coercion_count?.() ?? 0); k++) {
-      const node = utu.coercion_node(k);
-      if (node < 0 || node >= count || first[node] >= last[node]) continue;
-      out.push({ node, at: place(node), from: utu.coercion_from_text(k), to: utu.coercion_to_text(k), kind: utu.coercion_kind(k) });
-    }
-    return out;
-  })();
-  let fromCache;
-  const callsFrom = () => fromCache ??= (() => {
-    const out = new Map();
-    for (const edge of calls()) {
-      if (!out.has(edge.from)) out.set(edge.from, []);
-      out.get(edge.from).push(edge);
-    }
-    return out;
-  })();
-  const effectCache = new Map();
-  const effectsOf = decl => {
-    if (effectCache.has(decl)) return effectCache.get(decl);
-    const seen = new Set();
-    const visit = d => {
-      if (d < 0 || seen.has(d)) return 0;
-      seen.add(d);
-      let mask = utu.decl_effects?.(d) ?? 0;
-      for (const edge of callsFrom().get(d) ?? []) mask |= visit(edge.to);
-      return mask;
-    };
-    const mask = visit(decl);
-    const result = { mask, labels: ['await', 'host', 'throws', 'traps'].filter((_, k) => mask & 1 << k) };
-    effectCache.set(decl, result);
-    return result;
-  };
-  const callItem = (index, decl) => {
-    if (decl < 0 || decl >= utu.decl_count()) return null;
-    const span = index.span(decl), selection = index.definition(decl);
-    if (!span || !selection) return null;
-    return { decl, name: index.text(selection), kind: index.kind(decl), span, selection, effects: effectsOf(decl) };
-  };
+  if (!utu.query_open) throw new Error('programIndex needs the tools (loadNodeTools): the compiler has no queries');
+  utu.query_open(files.map(f => f.key).join('\n'));
+  const ids = new Map(files.map((f, i) => [f.key, i]));
+  const id = key => key == null ? -1 : ids.get(key) ?? -2;
+  const json = text => JSON.parse(text);
 
   return {
     /** Where node `n` is: its file key and UTF-16 offsets, or null (a node of no file). */
-    at: place,
+    at: n => json(utu.query_at(n)),
     /** The declaration the name at `offset` (UTF-16) of file `key` resolves to, or -1. */
-    declarationAt(key, offset) {
-      for (const n of nodesOf(key)) {
-        if (!named(n)) continue;
-        const at = place(n);
-        if (at && at.file === key && at.start <= offset && offset <= at.end) return nodeDecl[n];
-      }
-      for (const [decl, places] of watUses()) {
-        // (On its `$` too.)
-        if (places.some(at => at.file === key && at.start - 1 <= offset && offset <= at.end)) return decl;
-      }
-      return -1;
-    },
+    declarationAt: (key, offset) => utu.query_declaration_at(id(key), offset),
     /** Where declaration `decl` names what it declares. */
-    definition(decl) {
-      const owner = declNode[decl];
-      if (owner < 0) return null;
-      const best = naming()[decl];
-      return best >= 0 ? place(best) : nameToken(owner) ?? place(owner);
-    },
+    definition: decl => json(utu.query_definition(decl)),
     /** Every name resolving to `decl`, the declaring one first when `includeDeclaration`. */
-    references(decl, { includeDeclaration = true } = {}) {
-      const definition = this.definition(decl);
-      const out = [];
-      for (const n of uses(decl)) {
-        const at = place(n);
-        if (!at) continue;
-        const declaring = definition && at.file === definition.file && at.start === definition.start;
-        if (declaring && !includeDeclaration) continue;
-        if (declaring) out.unshift(at); else out.push(at);
-      }
-      return [...out, ...watUses().get(decl) ?? []];
-    },
-    /** Where the whole of declaration `decl` is (its node), or null. */
-    span(decl) {
-      return declNode[decl] >= 0 ? place(declNode[decl]) : null;
-    },
+    references: (decl, { includeDeclaration = true } = {}) => json(utu.query_references(decl, includeDeclaration ? 1 : 0)),
     /** What declaration `decl` declares: `Fn`, `Struct`, `Local`, … (resolve.utu's Decl). */
-    kind(decl) {
-      return utu.decl_kind_name(decl);
-    },
-    /** The declaration `decl` is part of (module, struct, enum, function), or -1. */
-    owner(decl) {
-      return declOwner[decl];
-    },
-    /** A local's or parameter's type as the last build checked it, or ''. */
-    type(decl) {
-      return utu.decl_checked_type(decl);
-    },
-    /** The declaration of a local's type (what `x.` names the members of), or -1. */
-    typeDeclaration(decl) {
-      return utu.decl_checked_type_decl(decl);
-    },
-    /**
-     * The declaration of the type of the expression of file `key` that ends
-     * at `offset` (the widest that has one; through `?` when `throughNull`),
-     * or -1: what `e.` there names the members of.
-     */
-    typeDeclarationOfExpressionBefore(key, offset, throughNull = false) {
-      const ending = [];
-      for (const n of nodesOf(key)) {
-        const at = place(n);
-        if (at && at.file === key && at.end === offset) ending.push([at.start, n]);
-      }
-      ending.sort((a, b) => a[0] - b[0]);
-      for (const [, n] of ending) {
-        const d = utu.node_type_decl(n, throughNull ? 1 : 0);
-        if (d >= 0) return d;
-      }
-      return -1;
-    },
+    kind: decl => utu.decl_kind_name(decl),
     /** Every declaration made in file `key` (in every file, for null), each with its kind and owner. */
-    declarations(key = null) {
-      const out = [];
-      for (let d = 0, n = utu.decl_count(); d < n; d++) {
-        if (declNode[d] < 0) continue;
-        const at = place(declNode[d]);
-        if (at && (key == null || at.file === key)) out.push({ decl: d, kind: utu.decl_kind_name(d), owner: declOwner[d], span: at });
-      }
-      return out;
-    },
+    declarations: (key = null) => json(utu.query_declarations(id(key))),
     /** Every name in file `key` (in every file, for null) that resolves, with its declaration, in source order. */
-    names(key) {
-      const out = [];
-      for (const n of key == null ? Array.from({ length: count }, (_, n) => n) : nodesOf(key)) {
-        if (!named(n)) continue;
-        const at = place(n);
-        if (at && (key == null || at.file === key)) out.push({ decl: nodeDecl[n], at });
-      }
-      for (const [decl, places] of watUses()) for (const at of places) if (key == null || at.file === key) out.push({ decl, at });
-      // A name node may wrap another of the same token: each place once.
-      out.sort((a, b) => a.at.file < b.at.file ? -1 : a.at.file > b.at.file ? 1 : a.at.start - b.at.start);
-      return out.filter((name, i) => i === 0 || name.at.start !== out[i - 1].at.start || name.at.file !== out[i - 1].at.file);
-    },
+    names: key => json(utu.query_names(id(key))),
     /** The smallest typed syntax at a cursor, with facts from the checker. */
-    explainAt(key, offset) {
-      const node = nodeAt(key, offset, true);
-      if (node < 0) return null;
-      const at = place(node);
-      const name = nodeAt(key, offset);
-      const declaration = name >= 0 ? nodeDecl[name] : -1;
-      const siteCalls = calls().filter(edge => edge.site && inside(edge.site, key, offset));
-      const callTarget = siteCalls.sort((a, b) => (a.site.end - a.site.start) - (b.site.end - b.site.start))[0]?.to ?? -1;
-      const owner = utu.node_field_owner?.(node) ?? -1;
-      const captures = [];
-      for (let k = 0, n = utu.closure_capture_count?.(node) ?? 0; k < n; k++) captures.push(utu.closure_capture_decl(node, k));
-      const trace = [];
-      if (declaration >= 0) {
-        const definition = this.definition(declaration);
-        trace.push({ kind: 'binding', decl: declaration, at: definition, type: this.type(declaration) });
-      }
-      if (callTarget >= 0) trace.push({ kind: 'call result', decl: callTarget, at: this.definition(callTarget) });
-      return {
-        node, at, kind: utu.node_kind_name(nodeKind[node]), type: utu.node_type(node),
-        expectedType: utu.node_expected_type?.(node) || '', declaration, callTarget,
-        field: owner >= 0 ? { owner, index: utu.node_field_index(node) } : null,
-        conversions: coercions().filter(c => c.node === node || inside(c.at, key, offset)),
-        captures, effects: declaration >= 0 ? effectsOf(declaration) : callTarget >= 0 ? effectsOf(callTarget) : { mask: 0, labels: [] },
-        wasmType: utu.node_wasm_type?.(node) || '', trace,
-      };
-    },
+    explainAt: (key, offset) => json(utu.query_explain(id(key), offset)),
+    /** Markdown for X-Ray at a cursor: the type there and the checker's facts, or null. */
+    explainHover: (key, offset) => utu.query_explain_hover(id(key), offset) || null,
     /** Binding and callee facts behind the type at a cursor. */
     typeTrace(key, offset) { return this.explainAt(key, offset)?.trace ?? []; },
     /** Type, capture, conversion, and effect annotations for one file. */
-    inlayHints(key) {
-      const hints = [];
-      for (let d = 0; d < utu.decl_count(); d++) {
-        if (utu.decl_kind_name(d) !== 'Local') continue;
-        const definition = this.definition(d), span = this.span(d), type = this.type(d);
-        if (!definition || !span || definition.file !== key || !type) continue;
-        const head = this.text({ file: key, start: definition.end, end: span.end });
-        if (!/^\s*:/.test(head)) hints.push({ position: definition.end, label: `: ${type}`, kind: 'type', at: definition });
-      }
-      for (const n of nodesOf(key)) {
-        if (utu.node_kind_name(nodeKind[n]) !== 'closure_expr') continue;
-        const at = place(n);
-        if (at?.file !== key) continue;
-        const captures = [];
-        for (let k = 0, length = utu.closure_capture_count(n); k < length; k++) {
-          const d = utu.closure_capture_decl(n, k), definition = this.definition(d);
-          if (definition) captures.push(this.text(definition));
-        }
-        if (captures.length) hints.push({ position: at.end, label: ` captures ${captures.join(', ')}`, kind: 'capture', at });
-      }
-      for (const co of coercions()) if (co.at?.file === key) hints.push({ position: co.at.end, label: ` → ${co.to}`, kind: 'conversion', at: co.at });
-      for (let d = 0; d < utu.decl_count(); d++) {
-        if (declNode[d] < 0 || !['Fn', 'Main'].includes(this.kind(d))) continue;
-        const definition = this.definition(d);
-        if (definition?.file !== key) continue;
-        const effect = effectsOf(d);
-        if (effect.mask)
-          hints.push({ position: definition.end, label: ` !${effect.labels.join(', ')}`, kind: 'effect', at: definition });
-      }
-      return hints.sort((a, b) => a.position - b.position);
-    },
-    /** Direct and transitive effects of a declaration. */
-    effects(decl) { return effectsOf(decl); },
+    inlayHints: key => json(utu.query_inlay_hints(id(key))),
     /** Function containing the name at the cursor. */
-    prepareCallHierarchy(key, offset) {
-      let decl = this.declarationAt(key, offset);
-      // A name no node resolves to (`main`): the declaration it names.
-      if (decl < 0) decl = this.declarations(key).find(d => inside(this.definition(d.decl), key, offset))?.decl ?? -1;
-      const item = callItem(this, decl);
-      return item && ['Fn', 'Main', 'ProtoMember'].includes(item.kind) ? [item] : [];
-    },
-    incomingCalls(decl) {
-      const groups = new Map();
-      for (const edge of calls()) if (edge.to === decl && edge.from >= 0) {
-        if (!groups.has(edge.from)) groups.set(edge.from, []);
-        if (edge.site) groups.get(edge.from).push(edge.site);
-      }
-      return [...groups].flatMap(([from, sites]) => { const item = callItem(this, from); return item ? [{ from: item, sites }] : []; });
-    },
-    outgoingCalls(decl) {
-      const groups = new Map();
-      for (const edge of calls()) if (edge.from === decl && edge.to >= 0) {
-        if (!groups.has(edge.to)) groups.set(edge.to, []);
-        if (edge.site) groups.get(edge.to).push(edge.site);
-      }
-      return [...groups].flatMap(([to, sites]) => { const item = callItem(this, to); return item ? [{ to: item, sites }] : []; });
-    },
-    /** The token of file `key` that `offset` (UTF-16) is inside: { kind (lex.utu's Tok), start, end }, or null. */
-    tokenAt(key, offset) {
-      const f = files.findIndex(file => file.key === key);
-      if (f < 0) return null;
-      for (let t = utu.file_first_token(f), end = utu.file_end_token(f); t < end; t++) {
-        const start = toUnits(files[f], tokStart[t]);
-        if (start >= offset) return null;
-        const stop = toUnits(files[f], tokEnd[t]);
-        if (offset < stop || (offset === stop && tokKind[t] === COMMENT)) return { kind: tokKind[t], start, end: stop };
-      }
-      return null;
-    },
+    prepareCallHierarchy: (key, offset) => json(utu.query_prepare_calls(id(key), offset)),
+    incomingCalls: decl => json(utu.query_incoming_calls(decl)),
+    outgoingCalls: decl => json(utu.query_outgoing_calls(decl)),
     /** The text of a place. */
     text(at) {
-      const file = files.find(f => f.key === at.file);
+      const file = files[ids.get(at.file)];
       return file ? file.text.slice(at.start, at.end) : '';
     },
+
+    // The language server's (see lsp.utu).
+    /** What hovering the name at a cursor shows: { value (Markdown), name (its place) }, or null. */
+    hover: (key, offset) => json(utu.query_hover(id(key), offset)),
+    /** Where `decl`, and the protocol member or functions one name with it, are named (spelled `spelling`, when given). */
+    linkedReferences: (decl, includeDeclaration = true, spelling = '') => json(utu.query_linked_references(decl, includeDeclaration ? 1 : 0, spelling)),
+    /** Where the first of `decl`'s family (a protocol's member, or `decl`) is named. */
+    rootDefinition: decl => json(utu.query_root_definition(decl)),
+    /** The places of file `key` naming `decl`'s family: { at, kind } (3 declared, 2 read). */
+    highlights: (key, decl) => json(utu.query_highlights(id(key), decl)),
+    /** Renaming the name at a cursor: { name, alias, defs, occurrences }, or null. */
+    rename: (key, offset) => json(utu.query_rename(id(key), offset)),
+    /** Whether the name at a cursor is the program's `main`. */
+    entryPoint: (key, offset) => utu.query_entry_point(id(key), offset) === 1,
+    /** Each name of file `key`: { at, meant (where what it means is named), kind }. */
+    bindings: key => json(utu.query_bindings(id(key))),
+    /** The declaration named at `start` of file `key` (declared there, when `own`), or -1. */
+    declarationNamed: (key, start, own = false) => utu.query_declaration_named(id(key), start, own ? 1 : 0),
+    /** The outline of file `key`: { decl, owner, kind (SymbolKind), name, span, selection }. */
+    symbols: key => json(utu.query_symbols(id(key))),
+    /** The names of file `key` an editor colors: { at, type, declaration }. */
+    semanticTokens: key => json(utu.query_semantic(id(key))),
+    /** Where the name typed at a cursor starts, or -1 where nothing is written. */
+    completionStart: (key, offset) => utu.query_completion_start(id(key), offset),
+    /** What may be written at `start` of file `key`, with `placeholder` written there: LSP completion items. */
+    completions: (key, start, placeholder) => json(utu.query_completions(id(key), start, placeholder)),
   };
 }
 
-/** Markdown for hover and editor X-Ray, from one query result. */
-export function renderEditorHover(explanation, { signature = '', kind = '', where = '', docs = '' } = {}) {
-  const heading = signature ? `\`\`\`utu\n${signature}\n\`\`\`` : explanation?.type ? `\`\`\`utu\n${explanation.type}\n\`\`\`` : '';
-  if (!heading) return null;
-  const label = kind ? `\n*${kind.replace(/([a-z])([A-Z])/g, '$1 $2').toLowerCase()}*${where}` : '';
-  const facts = [];
-  if (explanation?.expectedType && explanation.expectedType !== explanation.type) facts.push(`Expected: \`${explanation.expectedType}\``);
-  if (explanation?.conversions?.length) facts.push(`Conversion: ${explanation.conversions.map(c => `\`${c.from}\` → \`${c.to}\``).join(', ')}`);
-  if (explanation?.captures?.length) facts.push(`Captures: ${explanation.captures.length}`);
-  if (explanation?.effects?.labels?.length) facts.push(`Effects: ${explanation.effects.labels.join(', ')}`);
-  if (explanation?.wasmType) facts.push(`Wasm: \`${explanation.wasmType}\``);
-  return heading + label + (facts.length ? `\n\n${facts.join(' · ')}` : '') + (docs ? `\n\n---\n\n${docs}` : '');
+/**
+ * Doc comments over the program the tools hold (`files` as the build
+ * returned them): declaration(decl) and file(key), each the Typst text or
+ * '', and sections(key), the file's other `//!` blocks ({ start, text }).
+ */
+export function docComments(utu, files) {
+  utu.query_open(files.map(f => f.key).join('\n'));
+  const ids = new Map(files.map((f, i) => [f.key, i]));
+  return {
+    declaration: decl => utu.query_doc_declaration(decl),
+    file: key => ids.has(key) ? utu.query_doc_file(ids.get(key)) : '',
+    sections: key => ids.has(key) ? JSON.parse(utu.query_doc_sections(ids.get(key))) : [],
+  };
 }
+
+/** The paths of `text`'s `using … from "…"` (not in a comment or another string). */
+export function importPaths(utu, text) {
+  return JSON.parse(utu.query_import_paths(text)).flatMap(literal => { try { return [JSON.parse(literal)]; } catch { return []; } });
+}
+
+/** Whether a rename may give the name `name`: spelled as one, and no keyword. */
+export const isNewName = (utu, name) => utu.query_new_name(name) === 1;

@@ -7,3 +7,46 @@
 
     /// 1: this module is utu-tools.wasm.
     fn tools_version() I32 => 1
+
+    // ── the language server's analysis, and doc comments ──
+
+    // What names mean, for an editor (selfhost/tools/query.utu, lsp.utu,
+    // docs.utu; src/selfhost/query.js asks). A file is its index in the
+    // host's `files`; an offset a UTF-16 one in its text; answers are JSON.
+
+    /// The program built last is the one asked about: `keys`, its files' keys, a line each.
+    fn query_open(keys: Str) Void => q_open(keys)
+    fn query_at(node: I32) Str => q_place_json(q_place(node))
+    fn query_declaration_at(file: I32, offset: I32) I32 => q_declaration_at(file, offset)
+    fn query_definition(decl: I32) Str => q_place_json(q_definition(decl))
+    fn query_references(decl: I32, include: I32) Str => q_places_json(q_references(decl, include != 0))
+    fn query_declarations(file: I32) Str => q_declarations(file)
+    fn query_names(file: I32) Str => q_names_json(file)
+    fn query_explain(file: I32, offset: I32) Str => q_explain(file, offset)
+    /// The explanation's hover: its type and facts ("" for none).
+    fn query_explain_hover(file: I32, offset: I32) Str => q_render_hover(file, offset, "", "", "", "")
+    fn query_inlay_hints(file: I32) Str => q_inlay_hints(file)
+    fn query_prepare_calls(file: I32, offset: I32) Str => q_prepare_calls(file, offset)
+    fn query_incoming_calls(decl: I32) Str => q_calls_of(decl, true)
+    fn query_outgoing_calls(decl: I32) Str => q_calls_of(decl, false)
+
+    // The language server's.
+    fn query_hover(file: I32, offset: I32) Str => q_hover(file, offset)
+    fn query_linked_references(decl: I32, include: I32, spelling: Str) Str => q_places_json(q_linked(decl, include != 0, spelling))
+    fn query_root_definition(decl: I32) Str => q_place_json(q_definition(q_family(decl)[0]))
+    fn query_highlights(file: I32, decl: I32) Str => q_highlights(file, decl)
+    fn query_rename(file: I32, offset: I32) Str => q_rename(file, offset)
+    fn query_new_name(name: Str) I32 => if q_new_name(name) { 1 } else { 0 }
+    fn query_entry_point(file: I32, offset: I32) I32 => if q_entry_point(file, offset) { 1 } else { 0 }
+    fn query_bindings(file: I32) Str => q_bindings(file)
+    fn query_declaration_named(file: I32, start: I32, own: I32) I32 => q_declaration_named(file, start, own != 0)
+    fn query_symbols(file: I32) Str => q_symbols(file)
+    fn query_semantic(file: I32) Str => q_semantic(file)
+    fn query_completion_start(file: I32, offset: I32) I32 => q_completion_start(file, offset)
+    fn query_completions(file: I32, start: I32, placeholder: Str) Str => q_completions(file, start, placeholder)
+    fn query_import_paths(text: Str) Str => q_import_paths(text)
+
+    // Doc comments.
+    fn query_doc_declaration(decl: I32) Str => q_doc_declaration(decl)
+    fn query_doc_file(file: I32) Str => q_doc_file(file)
+    fn query_doc_sections(file: I32) Str => q_doc_sections(file)

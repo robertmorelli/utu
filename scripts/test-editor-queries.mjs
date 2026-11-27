@@ -1,9 +1,9 @@
 // Query exports used by editor hover, inlays, and call hierarchy.
 import assert from 'node:assert/strict';
-import { compileFile, loadNodeCompiler } from '../src/selfhost/node.js';
-import { programIndex, renderEditorHover } from '../src/selfhost/query.js';
+import { compileFile, loadNodeTools } from '../src/selfhost/node.js';
+import { programIndex } from '../src/selfhost/query.js';
 
-const utu = await loadNodeCompiler();
+const utu = await loadNodeTools();
 const built = await compileFile(utu, 'examples/closures.utu', { root: process.cwd() });
 assert.ok(built.wasm);
 assert.equal(built.diagnostics.length, 0);
@@ -51,7 +51,7 @@ const explained = index.explainAt(source.key, source.text.lastIndexOf('double'))
 assert.equal(explained.type, 'fun(I32) I32');
 assert.equal(explained.expectedType, 'cl(I32) I32');
 assert.equal(explained.conversions[0].kind, 4);
-assert.match(renderEditorHover(explained), /Conversion:/);
+assert.match(index.explainHover(source.key, source.text.lastIndexOf('double')), /Conversion:/);
 assert.equal(index.typeTrace(source.key, source.text.lastIndexOf('double'))[0].kind, 'binding');
 const hints = index.inlayHints(source.key);
 assert.ok(hints.some(hint => hint.kind === 'capture'));

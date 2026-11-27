@@ -1,0 +1,1165 @@
+//! = Queries
+//!
+//! What names mean, for an editor: the language server (src/selfhost/lsp.js)
+//! and the tools that read a program (src/selfhost/query.js asks these).
+//! After a build, the compiler's tables say what declaration each name
+//! resolves to (@node_decl), and where each declaration is (@decl_node):
+//! go to definition and find references cost a pass over the nodes, with
+//! no build.
+//!
+//! A place is one of the host's files and UTF-16 offsets in its text, as an
+//! editor counts them. Answers go to the host as JSON, a place as
+//! `{"file": key, "start": s, "end": e}` (null for none). What is asked of
+//! the whole program is made when first asked, until the host opens the
+//! next program (@q_open).
+
+/// A place: a file of the host's (-1 for none) and UTF-16 offsets in its text.
+struct QPlace:
+    | file: I32
+    | start: I32
+    | end_: I32
+
+fn q_nowhere() QPlace => QPlace { file: -1, start: 0, end_: 0 }
+
+/// The host's files (the first of the compiler's, in its order): their keys, and as JSON.
+let q_keys: Array[Str] = Array[Str].new(0, "")
+let q_key_json: Array[Str] = Array[Str].new(0, "")
+let q_nfiles: I32 = 0
+/// By file: its text, once asked (`q_text_made`).
+let q_texts: Array[Str] = Array[Str].new(0, "")
+vec q_text_made: I32
+/// By file: where its bytes' UTF-16 offsets begin in `q_units` (one past its last byte's too), or -1.
+vec q_unit_at: I32
+vec q_units: I32
+/// By node: its place's file (-2 until asked, -1 for none), start, and end.
+vec q_pf: I32
+vec q_ps: I32
+vec q_pe: I32
+/// By file: its nodes with tokens, `q_fn[q_fn_at[f] ..< q_fn_at[f + 1]]` (empty until asked).
+vec q_fn_at: I32
+vec q_fn: I32
+/// By declaration: the names resolving to it, `q_use[q_use_at[d] ..< q_use_at[d + 1]]`.
+vec q_use_at: I32
+vec q_use: I32
+/// By declaration: its own name (the first name inside it resolving to it), or -1.
+vec q_naming: I32
+let q_naming_made: Bool = false
+
+/// The program the compiler holds is the host's next one: `keys`, its files' keys, a line each.
+fn q_open(keys: Str) Void {
+    q_keys = keys.split("\n")
+    q_nfiles = q_keys.len()
+    q_key_json = Array[Str].new(q_nfiles, "")
+    q_texts = Array[Str].new(q_nfiles, "")
+    q_text_made.clear()
+    q_unit_at.clear()
+    for (0 ..< q_nfiles) |f| {
+        q_key_json[f] = q_json(q_keys[f])
+        q_text_made.push(0)
+        q_unit_at.push(-1)
+    }
+    q_units.clear()
+    let count = node_kind.len()
+    q_pf.resize(count)
+    q_ps.resize(count)
+    q_pe.resize(count)
+    for (0 ..< count) |n| { q_pf[n] = -2 }
+    q_fn_at.clear()
+    q_fn.clear()
+    q_use_at.clear()
+    q_use.clear()
+    q_naming_made = false
+    q_wat_made = false
+    q_calls_made = false
+    q_links_made = false
+    q_eff.clear()
+    for (0 ..< decl_kind.len()) |d| { q_eff.push(-1) }
+}
+
+//! == Text and places
+
+/// A file's text.
+fn q_text(f: I32) Str {
+    if q_text_made[f] == 0 {
+        q_texts[f] = bytes_text(file_start[f], file_end[f])
+        q_text_made[f] = 1
+    }
+    return q_texts[f]
+}
+
+/// The text of a place ("" for none).
+fn q_slice(p: QPlace) Str => if p.file < 0 or p.end_ <= p.start { "" } else { q_text(p.file).slice(p.start, p.end_) }
+
+/// Where file f's UTF-16 offsets begin in `q_units`: by each byte's lead, as a
+/// character of 1 to 4 bytes (4: two code units).
+fn q_units_of(f: I32) I32 {
+    if q_unit_at[f] >= 0 { return q_unit_at[f] }
+    let base = q_units.len()
+    let start = file_start[f]
+    let size = file_end[f] - start
+    q_units.resize(base + size + 4)
+    let u = 0
+    let b = 0
+    while (b < size) {
+        let c = src[start + b]
+        let n = if c < 128 { 1 } else if c < 224 { 2 } else if c < 240 { 3 } else { 4 }
+        for (0 ..< n) |k| { q_units[base + b + k] = u }
+        b += n
+        u += if n == 4 { 2 } else { 1 }
+    }
+    q_units[base + size] = u
+    q_unit_at[f] = base
+    return base
+}
+
+/// A byte of `src` as a UTF-16 offset in file f's text.
+fn q_unit(f: I32, byte: I32) I32 => q_units[q_units_of(f) + byte - file_start[f]]
+
+/// The host's file a byte of `src` is in, or -1.
+fn q_file_of(byte: I32) I32 {
+    let f = q_nfiles - 1
+    while (f >= 0) {
+        if file_start[f] <= byte { return if byte < file_end[f] { f } else { -1 } }
+        f -= 1
+    }
+    return -1
+}
+
+/// Node n's place made (see `q_pf`): its file, or -1.
+fn q_placed(n: I32) I32 {
+    if q_pf[n] == -2 {
+        let start = tok_start[node_first[n]]
+        let f = q_file_of(start)
+        q_pf[n] = f
+        if f >= 0 {
+            q_ps[n] = q_unit(f, start)
+            q_pe[n] = q_unit(f, tok_end[node_last[n] - 1])
+        }
+    }
+    return q_pf[n]
+}
+
+/// Where node n is.
+fn q_place(n: I32) QPlace {
+    if n < 0 or n >= q_pf.len() or q_placed(n) < 0 { return q_nowhere() }
+    return QPlace { file: q_pf[n], start: q_ps[n], end_: q_pe[n] }
+}
+
+/// Bytes `start ..< end_` of `src`, as a place (none unless one file holds them).
+fn q_byte_place(start: I32, end_: I32) QPlace {
+    if start < 0 or end_ < start { return q_nowhere() }
+    let f = q_file_of(start)
+    if f < 0 or end_ > file_end[f] { return q_nowhere() }
+    return QPlace { file: f, start: q_unit(f, start), end_: q_unit(f, end_) }
+}
+
+/// Whether `offset` of file f is in a place (at either end too).
+fn q_inside(p: QPlace, f: I32, offset: I32) Bool => p.file >= 0 and p.file == f and p.start <= offset and offset <= p.end_
+
+fn q_same(a: QPlace, b: QPlace) Bool => a.file >= 0 and a.file == b.file and a.start == b.start
+
+/// A name: one token, resolving to a declaration.
+fn q_named(n: I32) Bool => node_decl[n] >= 0 and node_first[n] < node_last[n] and node_last[n] - node_first[n] == 1
+
+/// The nodes with tokens of each file (see `q_fn_at`).
+fn q_file_nodes() Void {
+    if q_fn_at.len() > 0 { return }
+    for (0 ..< q_nfiles + 1) |f| { q_fn_at.push(0) }
+    let count = node_kind.len()
+    for (0 ..< count) |n| {
+        if node_first[n] < node_last[n] and q_placed(n) >= 0 { q_fn_at[q_pf[n] + 1] += 1 }
+    }
+    for (0 ..< q_nfiles) |f| { q_fn_at[f + 1] += q_fn_at[f] }
+    q_fn.resize(q_fn_at[q_nfiles])
+    let at = Array[I32].new(q_nfiles, 0)
+    for (0 ..< q_nfiles) |f| { at[f] = q_fn_at[f] }
+    for (0 ..< count) |n| {
+        if node_first[n] < node_last[n] and q_pf[n] >= 0 {
+            q_fn[at[q_pf[n]]] = n
+            at[q_pf[n]] += 1
+        }
+    }
+}
+
+/// The names resolving to each declaration (see `q_use_at`).
+fn q_uses() Void {
+    if q_use_at.len() > 0 { return }
+    let decls = decl_kind.len()
+    for (0 ..< decls + 1) |d| { q_use_at.push(0) }
+    let count = node_kind.len()
+    for (0 ..< count) |n| {
+        if q_named(n) and node_decl[n] < decls { q_use_at[node_decl[n] + 1] += 1 }
+    }
+    for (0 ..< decls) |d| { q_use_at[d + 1] += q_use_at[d] }
+    q_use.resize(q_use_at[decls])
+    let at = Array[I32].new(decls, 0)
+    for (0 ..< decls) |d| { at[d] = q_use_at[d] }
+    for (0 ..< count) |n| {
+        if q_named(n) and node_decl[n] < decls {
+            q_use[at[node_decl[n]]] = n
+            at[node_decl[n]] += 1
+        }
+    }
+}
+
+/// Each declaration's own name (see `q_naming`).
+fn q_namings() Void {
+    if q_naming_made { return }
+    q_naming_made = true
+    let decls = decl_kind.len()
+    q_naming.clear()
+    for (0 ..< decls) |d| { q_naming.push(-1) }
+    for (0 ..< node_kind.len()) |n| {
+        let d = node_decl[n]
+        if d < 0 or d >= decls or not q_named(n) or decl_node[d] < 0 { continue }
+        let s = tok_start[node_first[n]]
+        let owner = decl_node[d]
+        if s < tok_start[node_first[owner]] or s >= tok_end[node_last[owner] - 1] { continue }
+        let best = q_naming[d]
+        if best < 0 or s < tok_start[node_first[best]] { q_naming[d] = n }
+    }
+}
+
+//! == @wat parameters
+//!
+//! A @wat function's parameters, used in its text as `$x`: by declaration,
+//! the places of those names (after the `$`), in the order found.
+
+let q_wat_made: Bool = false
+/// Each place found: its declaration and place.
+vec q_wat_decl: I32
+vec q_wat_f: I32
+vec q_wat_s: I32
+vec q_wat_e: I32
+/// The declarations, in the order first found.
+vec q_wat_order: I32
+
+/// A character of a WAT identifier after its `$`.
+fn q_wat_id(c: I32) Bool => is_word_code(c) or c == 33 or (c >= 35 and c <= 39) or c == 42 or c == 43 or c == 45 or c == 46
+    or c == 47 or c == 58 or (c >= 60 and c <= 64) or c == 92 or c == 94 or c == 96 or c == 124 or c == 126
+
+fn q_wat() Void {
+    if q_wat_made { return }
+    q_wat_made = true
+    q_wat_decl.clear()
+    q_wat_f.clear()
+    q_wat_s.clear()
+    q_wat_e.clear()
+    q_wat_order.clear()
+    q_namings()
+    let decls = decl_kind.len()
+    for (0 ..< find_wat()) |k| {
+        let fn_node = wat_function_of(wat_site[k])
+        let fn_decl = -1
+        for (0 ..< decls) |d| { if fn_decl < 0 and decl_node[d] == fn_node { fn_decl = d } }
+        // Its parameters by name (a name given twice: the last).
+        let names = Pile[Str].new()
+        let params = Pile[I32].new()
+        for (0 ..< decls) |d| {
+            if decl_owner[d] != fn_decl or not decl_is(d, Decl.Param) { continue }
+            let at = q_place(if q_naming[d] >= 0 { q_naming[d] } else { decl_node[d] })
+            if at.file < 0 { continue }
+            let name = q_slice(at)
+            let i = q_find_str(names, name)
+            if i >= 0 { params[i] = d } else {
+                names.push(name)
+                params.push(d)
+            }
+        }
+        let start = dsl_inner_start(wat_site[k])
+        let end_ = dsl_inner_end(wat_site[k])
+        let file = q_file_of(start)
+        if file < 0 or names.len() == 0 { continue }
+        let b = start
+        while (b < end_) {
+            let c = src[b]
+            // Comments: `;; …` to the line's end, `(; … ;)` nested.
+            if c == 59 and src[b + 1] == 59 {
+                while (b < end_ and src[b] != 10) { b += 1 }
+                b += 1
+                continue
+            }
+            if c == 40 and src[b + 1] == 59 {
+                let depth = 0
+                while (b < end_) {
+                    if src[b] == 40 and src[b + 1] == 59 { depth += 1; b += 1 }
+                    else if src[b] == 59 and src[b + 1] == 41 {
+                        depth -= 1
+                        b += 1
+                        if depth == 0 { break }
+                    }
+                    b += 1
+                }
+                b += 1
+                continue
+            }
+            if c != 36 { b += 1; continue }
+            let e = b + 1
+            while (e < end_ and q_wat_id(src[e])) { e += 1 }
+            let i = q_find_str(names, bytes_text(b + 1, e))
+            if i >= 0 {
+                let d = params[i]
+                let seen = false
+                for (0 ..< q_wat_order.len()) |j| { if q_wat_order[j] == d { seen = true } }
+                if not seen { q_wat_order.push(d) }
+                q_wat_decl.push(d)
+                q_wat_f.push(file)
+                q_wat_s.push(q_unit(file, b + 1))
+                q_wat_e.push(q_unit(file, e))
+            }
+            b = e
+        }
+    }
+}
+
+/// Where `s` is in `names`, or -1.
+fn q_find_str(names: Pile[Str], s: Str) I32 {
+    for (0 ..< names.len()) |i| { if names[i] == s { return i } }
+    return -1
+}
+
+fn q_wat_place(k: I32) QPlace => QPlace { file: q_wat_f[k], start: q_wat_s[k], end_: q_wat_e[k] }
+
+//! == Declarations
+
+/// The words a declaration begins with, before what it names.
+fn q_declaring(s: Str) Bool => s == "export" or s == "mod" or s == "struct" or s == "tag" or s == "enum" or s == "proto"
+    or s == "fn" or s == "type" or s == "distinct" or s == "let" or s == "const" or s == "mem" or s == "vec" or s == "using"
+
+/// Whether `s` is spelled as a name.
+fn q_is_name(s: Str) Bool {
+    if s.len() == 0 { return false }
+    let c = s.get(0)
+    if not ((c >= 65 and c <= 90) or (c >= 97 and c <= 122) or c == 95) { return false }
+    for (1 ..< s.len()) |i| { if not is_word_code(s.get(i)) { return false } }
+    return true
+}
+
+/// A declaration with no name node resolving to it (`struct &:`): the
+/// first token after its keywords, when that is a name or `&`.
+fn q_name_token(node: I32) QPlace {
+    for (node_first[node] ..< node_last[node]) |t| {
+        if tok_kind[t] == Tok.Comment.i32() { continue }
+        let f = q_file_of(tok_start[t])
+        if f < 0 { return q_nowhere() }
+        let text = bytes_text(tok_start[t], tok_end[t])
+        if q_declaring(text) { continue }
+        if text != "&" and not q_is_name(text) { return q_nowhere() }
+        return QPlace { file: f, start: q_unit(f, tok_start[t]), end_: q_unit(f, tok_end[t]) }
+    }
+    return q_nowhere()
+}
+
+/// Where declaration d names what it declares.
+fn q_definition(d: I32) QPlace {
+    if d < 0 or d >= decl_kind.len() { return q_nowhere() }
+    let owner = decl_node[d]
+    if owner < 0 { return q_nowhere() }
+    q_namings()
+    if q_naming[d] >= 0 { return q_place(q_naming[d]) }
+    let token = q_name_token(owner)
+    return if token.file >= 0 { token } else { q_place(owner) }
+}
+
+/// Where the whole of declaration d is.
+fn q_span(d: I32) QPlace => if d < 0 or d >= decl_kind.len() or decl_node[d] < 0 { q_nowhere() } else { q_place(decl_node[d]) }
+
+fn q_kind(d: I32) Decl => Decl(decl_kind[d])
+
+fn q_kind_name(d: I32) Str => decl_kind_text(Decl(decl_kind[d]))
+
+/// The text a declaration's name is written with ("" for none).
+fn q_label(d: I32) Str => q_slice(q_definition(d))
+
+/// A local or a parameter: its hover shows the type checked.
+fn q_local(k: Decl) Bool => k == Decl.Param or k == Decl.SelfParam or k == Decl.ClosureParam or k == Decl.Local
+    or k == Decl.Capture or k == Decl.ArmBinding or k == Decl.Promoted or k == Decl.Caught
+
+/// Every name resolving to d (the declaring one first when `include`, else
+/// without it), then its @wat places.
+fn q_references(d: I32, include: Bool) Pile[QPlace] {
+    let out = Pile[QPlace].new()
+    if d < 0 or d >= decl_kind.len() { return out }
+    let definition = q_definition(d)
+    q_uses()
+    let declaring = Pile[QPlace].new()
+    let rest = Pile[QPlace].new()
+    for (q_use_at[d] ..< q_use_at[d + 1]) |k| {
+        let at = q_place(q_use[k])
+        if at.file < 0 { continue }
+        if q_same(at, definition) and at.file == definition.file {
+            if include { declaring.push(at) }
+        } else { rest.push(at) }
+    }
+    // (Each declaring one before the others, the last first.)
+    let k = declaring.len() - 1
+    while (k >= 0) { out.push(declaring[k]); k -= 1 }
+    for (0 ..< rest.len()) |i| { out.push(rest[i]) }
+    q_wat()
+    for (0 ..< q_wat_decl.len()) |i| { if q_wat_decl[i] == d { out.push(q_wat_place(i)) } }
+    return out
+}
+
+/// The declaration the name at `offset` of file f resolves to, or -1.
+fn q_declaration_at(f: I32, offset: I32) I32 {
+    if f < 0 { return -1 }
+    q_file_nodes()
+    for (q_fn_at[f] ..< q_fn_at[f + 1]) |k| {
+        let n = q_fn[k]
+        if q_named(n) and q_inside(q_place(n), f, offset) { return node_decl[n] }
+    }
+    q_wat()
+    for (0 ..< q_wat_order.len()) |j| {
+        let d = q_wat_order[j]
+        for (0 ..< q_wat_decl.len()) |i| {
+            // (On its `$` too.)
+            if q_wat_decl[i] == d and q_wat_f[i] == f and q_wat_s[i] - 1 <= offset and offset <= q_wat_e[i] { return d }
+        }
+    }
+    return -1
+}
+
+/// The smallest node of file f at `offset` (with a type, when `typed`), or -1.
+fn q_node_at(f: I32, offset: I32, typed: Bool) I32 {
+    if f < 0 { return -1 }
+    q_file_nodes()
+    let best = -1
+    let width = 2147483647
+    for (q_fn_at[f] ..< q_fn_at[f + 1]) |k| {
+        let n = q_fn[k]
+        let at = q_place(n)
+        if not q_inside(at, f, offset) { continue }
+        let size = at.end_ - at.start
+        if size < width and not (typed and node_type(n) == "") {
+            best = n
+            width = size
+        }
+    }
+    return best
+}
+
+/// Declaration d is one the host's place-taking lists include: it has a node, in a file of the host's.
+fn q_declared(d: I32) Bool => decl_node[d] >= 0 and q_place(decl_node[d]).file >= 0
+
+/// The declaration of the type of the expression of file f that ends at
+/// `offset` (the widest that has one; through `?` when `through_null`), or -1.
+fn q_type_before(f: I32, offset: I32, through_null: Bool) I32 {
+    if f < 0 { return -1 }
+    q_file_nodes()
+    let best = -1
+    let from = 2147483647
+    for (q_fn_at[f] ..< q_fn_at[f + 1]) |k| {
+        let n = q_fn[k]
+        let at = q_place(n)
+        if at.end_ != offset or at.start >= from { continue }
+        if node_type_decl(n, if through_null { 1 } else { 0 }) >= 0 {
+            best = node_type_decl(n, if through_null { 1 } else { 0 })
+            from = at.start
+        }
+    }
+    return best
+}
+
+/// The module a declaration is in, or -1.
+fn q_module_of(decl: I32) I32 {
+    let d = decl
+    while (d >= 0 and q_kind(d) != Decl.Module) { d = decl_owner[d] }
+    return d
+}
+
+//! == Calls, conversions, effects
+
+let q_calls_made: Bool = false
+/// Each call edge: from and to (declarations), and its site (file -1 for none).
+vec q_call_from: I32
+vec q_call_to: I32
+vec q_call_f: I32
+vec q_call_s: I32
+vec q_call_e: I32
+/// Each conversion: its index in the compiler's, its node.
+vec q_co: I32
+/// By declaration: its effects (-1 until asked).
+vec q_eff: I32
+/// By declaration: the calls it makes (see @q_calls).
+vec q_out_at: I32
+vec q_out: I32
+
+fn q_calls() Void {
+    if q_calls_made { return }
+    q_calls_made = true
+    q_call_from.clear()
+    q_call_to.clear()
+    q_call_f.clear()
+    q_call_s.clear()
+    q_call_e.clear()
+    for (0 ..< edge_from.len()) |k| {
+        let from = edge_from_decl(k)
+        let site = q_byte_place(edge_site_start(k), edge_site_end(k))
+        // The checker's current call is the site of a call it makes, not of an
+        // operator or of a function checked while it waits: a site outside the
+        // caller is none.
+        let caller = if from >= 0 and from < decl_kind.len() and decl_node[from] >= 0 { q_place(decl_node[from]) } else { q_nowhere() }
+        if site.file >= 0 and caller.file >= 0 and not (site.file == caller.file and caller.start <= site.start and site.end_ <= caller.end_) { site = q_nowhere() }
+        q_call_from.push(from)
+        q_call_to.push(edge_to_decl(k))
+        q_call_f.push(site.file)
+        q_call_s.push(site.start)
+        q_call_e.push(site.end_)
+    }
+    // By declaration: the calls it makes, `q_out[q_out_at[d] ..< q_out_at[d + 1]]`.
+    let decls = decl_kind.len()
+    q_out_at.clear()
+    for (0 ..< decls + 1) |d| { q_out_at.push(0) }
+    for (0 ..< q_call_from.len()) |k| { if q_call_from[k] >= 0 and q_call_from[k] < decls { q_out_at[q_call_from[k] + 1] += 1 } }
+    for (0 ..< decls) |d| { q_out_at[d + 1] += q_out_at[d] }
+    q_out.resize(q_out_at[decls])
+    let at = Array[I32].new(decls, 0)
+    for (0 ..< decls) |d| { at[d] = q_out_at[d] }
+    for (0 ..< q_call_from.len()) |k| {
+        let from = q_call_from[k]
+        if from >= 0 and from < decls {
+            q_out[at[from]] = k
+            at[from] += 1
+        }
+    }
+    q_co.clear()
+    for (0 ..< co_node.len()) |k| {
+        let node = co_node[k]
+        if node < 0 or node >= node_kind.len() or node_first[node] >= node_last[node] { continue }
+        q_co.push(k)
+    }
+}
+
+fn q_call_site(k: I32) QPlace => QPlace { file: q_call_f[k], start: q_call_s[k], end_: q_call_e[k] }
+
+/// The effects of a declaration and of all it calls (await=1, host=2, throws=4, traps=8).
+fn q_effects(decl: I32) I32 {
+    if decl < 0 { return 0 }
+    if decl < q_eff.len() and q_eff[decl] >= 0 { return q_eff[decl] }
+    q_calls()
+    let seen = Array[I32].new(decl_kind.len(), 0)
+    let todo = Pile[I32].new()
+    todo.push(decl)
+    let mask = 0
+    while (todo.len() > 0) {
+        let d = todo.pop()
+        if d < 0 or d >= seen.len() or seen[d] == 1 { continue }
+        seen[d] = 1
+        mask = mask | decl_effects(d)
+        for (q_out_at[d] ..< q_out_at[d + 1]) |k| { todo.push(q_call_to[q_out[k]]) }
+    }
+    if decl < q_eff.len() { q_eff[decl] = mask }
+    return mask
+}
+
+/// The effects' names, as JSON strings.
+fn q_effect_labels(mask: I32) Str {
+    let out = ""
+    if mask & 1 != 0 { out = q_comma(out) + "\"await\"" }
+    if mask & 2 != 0 { out = q_comma(out) + "\"host\"" }
+    if mask & 4 != 0 { out = q_comma(out) + "\"throws\"" }
+    if mask & 8 != 0 { out = q_comma(out) + "\"traps\"" }
+    return out
+}
+
+/// The effects' names, as text: `await, traps`.
+fn q_effect_words(mask: I32) Str {
+    let out = ""
+    if mask & 1 != 0 { out = q_join(out, ", ", "await") }
+    if mask & 2 != 0 { out = q_join(out, ", ", "host") }
+    if mask & 4 != 0 { out = q_join(out, ", ", "throws") }
+    if mask & 8 != 0 { out = q_join(out, ", ", "traps") }
+    return out
+}
+
+fn q_effects_json(mask: I32) Str => "{\"mask\":" + mask.str() + ",\"labels\":[" + q_effect_labels(mask) + "]}"
+
+/// A function of the call hierarchy, as JSON (or "" when it has no place).
+fn q_call_item(d: I32) Str {
+    if d < 0 or d >= decl_kind.len() { return "" }
+    let span = q_span(d)
+    let selection = q_definition(d)
+    if span.file < 0 or selection.file < 0 { return "" }
+    return "{\"decl\":" + d.str() + ",\"name\":" + q_json(q_slice(selection)) + ",\"kind\":" + q_json(q_kind_name(d))
+        + ",\"span\":" + q_place_json(span) + ",\"selection\":" + q_place_json(selection) + ",\"effects\":" + q_effects_json(q_effects(d)) + "}"
+}
+
+/// The callers of d (`incoming`), or what d calls: each with its call sites.
+fn q_calls_of(d: I32, incoming: Bool) Str {
+    q_calls()
+    let others = Pile[I32].new()
+    for (0 ..< q_call_from.len()) |k| {
+        let other = if incoming { q_call_from[k] } else { q_call_to[k] }
+        let here = if incoming { q_call_to[k] } else { q_call_from[k] }
+        if here == d and other >= 0 and q_find_i32(others, other) < 0 { others.push(other) }
+    }
+    let out = ""
+    for (0 ..< others.len()) |i| {
+        let other = others[i]
+        let item = q_call_item(other)
+        if item == "" { continue }
+        let sites = ""
+        for (0 ..< q_call_from.len()) |k| {
+            let o = if incoming { q_call_from[k] } else { q_call_to[k] }
+            let h = if incoming { q_call_to[k] } else { q_call_from[k] }
+            if h == d and o == other and q_call_f[k] >= 0 { sites = q_comma(sites) + q_place_json(q_call_site(k)) }
+        }
+        out = q_comma(out) + "{\"" + (if incoming { "from" } else { "to" }) + "\":" + item + ",\"sites\":[" + sites + "]}"
+    }
+    return "[" + out + "]"
+}
+
+fn q_find_i32(xs: Pile[I32], x: I32) I32 {
+    for (0 ..< xs.len()) |i| { if xs[i] == x { return i } }
+    return -1
+}
+
+/// The function containing the name at `offset` of file f, as the call hierarchy's items.
+fn q_prepare_calls(f: I32, offset: I32) Str {
+    let d = q_declaration_at(f, offset)
+    // A name no node resolves to (`main`): the declaration it names.
+    if d < 0 and f >= 0 {
+        for (0 ..< decl_kind.len()) |e| {
+            if d < 0 and q_declared(e) and q_place(decl_node[e]).file == f and q_inside(q_definition(e), f, offset) { d = e }
+        }
+    }
+    let item = q_call_item(d)
+    if item == "" or not (q_kind(d) == Decl.Fn or q_kind(d) == Decl.Main or q_kind(d) == Decl.ProtoMember) { return "[]" }
+    return "[" + item + "]"
+}
+
+//! == What is at a cursor
+
+/// The smallest typed syntax at a cursor, with facts from the checker, as JSON (null for none).
+fn q_explain(f: I32, offset: I32) Str {
+    let node = q_node_at(f, offset, true)
+    if node < 0 { return "null" }
+    let name = q_node_at(f, offset, false)
+    let declaration = if name >= 0 { node_decl[name] } else { -1 }
+    let target = q_call_target(f, offset)
+    let owner = node_field_owner(node)
+    let captures = ""
+    for (0 ..< closure_capture_count(node)) |k| { captures = q_comma(captures) + closure_capture_decl(node, k).str() }
+    let trace = ""
+    if declaration >= 0 {
+        trace = "{\"kind\":\"binding\",\"decl\":" + declaration.str() + ",\"at\":" + q_place_json(q_definition(declaration))
+            + ",\"type\":" + q_json(decl_checked_type(declaration)) + "}"
+    }
+    if target >= 0 { trace = q_comma(trace) + "{\"kind\":\"call result\",\"decl\":" + target.str() + ",\"at\":" + q_place_json(q_definition(target)) + "}" }
+    let effects = if declaration >= 0 { q_effects(declaration) } else if target >= 0 { q_effects(target) } else { 0 }
+    let field = if owner >= 0 { "{\"owner\":" + owner.str() + ",\"index\":" + node_field_index(node).str() + "}" } else { "null" }
+    return "{\"node\":" + node.str() + ",\"at\":" + q_place_json(q_place(node)) + ",\"kind\":" + q_json(node_kind_name(node_kind[node]))
+        + ",\"type\":" + q_json(node_type(node)) + ",\"expectedType\":" + q_json(node_expected_type(node))
+        + ",\"declaration\":" + declaration.str() + ",\"callTarget\":" + target.str() + ",\"field\":" + field
+        + ",\"conversions\":[" + q_conversions_json(node, f, offset) + "],\"captures\":[" + captures + "],\"effects\":" + q_effects_json(effects)
+        + ",\"wasmType\":" + q_json(node_wasm_type(node)) + ",\"trace\":[" + trace + "]}"
+}
+
+/// What the call whose site is smallest around `offset` of file f calls, or -1.
+fn q_call_target(f: I32, offset: I32) I32 {
+    q_calls()
+    let target = -1
+    let width = 2147483647
+    for (0 ..< q_call_from.len()) |k| {
+        let site = q_call_site(k)
+        if site.file < 0 or not q_inside(site, f, offset) { continue }
+        if site.end_ - site.start < width {
+            width = site.end_ - site.start
+            target = q_call_to[k]
+        }
+    }
+    return target
+}
+
+/// The conversions made at node n, or around `offset` of file f.
+fn q_conversions_json(n: I32, f: I32, offset: I32) Str {
+    q_calls()
+    let out = ""
+    for (0 ..< q_co.len()) |i| {
+        let k = q_co[i]
+        let at = q_place(co_node[k])
+        if co_node[k] == n or q_inside(at, f, offset) { out = q_comma(out) + q_conversion_json(k) }
+    }
+    return out
+}
+
+fn q_conversion_json(k: I32) Str => "{\"node\":" + co_node[k].str() + ",\"at\":" + q_place_json(q_place(co_node[k])) + ",\"from\":"
+    + q_json(type_text(co_from[k])) + ",\"to\":" + q_json(type_text(co_to[k])) + ",\"kind\":" + co_kind[k].str() + "}"
+
+/// Markdown for hover: the declaration's signature (or else the typed
+/// syntax's type), its kind, where it is, the checker's facts, and its doc comment.
+fn q_render_hover(f: I32, offset: I32, signature: Str, kind: Str, where: Str, docs: Str) Str {
+    let node = q_node_at(f, offset, true)
+    let type = if node >= 0 { node_type(node) } else { "" }
+    let shown = if signature != "" { signature } else { type }
+    if shown == "" { return "" }
+    let heading = "```utu\n" + shown + "\n```"
+    let label = if kind != "" { "\n*" + q_spaced(kind).to_lower() + "*" + where } else { "" }
+    let facts = ""
+    if node >= 0 {
+        let expected = node_expected_type(node)
+        if expected != "" and expected != type { facts = q_join(facts, " · ", "Expected: `" + expected + "`") }
+        q_calls()
+        let conversions = ""
+        for (0 ..< q_co.len()) |i| {
+            let k = q_co[i]
+            if co_node[k] == node or q_inside(q_place(co_node[k]), f, offset) {
+                conversions = q_join(conversions, ", ", "`" + type_text(co_from[k]) + "` → `" + type_text(co_to[k]) + "`")
+            }
+        }
+        if conversions != "" { facts = q_join(facts, " · ", "Conversion: " + conversions) }
+        if closure_capture_count(node) > 0 { facts = q_join(facts, " · ", "Captures: " + closure_capture_count(node).str()) }
+        let name = q_node_at(f, offset, false)
+        let declaration = if name >= 0 { node_decl[name] } else { -1 }
+        let target = q_call_target(f, offset)
+        let effects = if declaration >= 0 { q_effects(declaration) } else if target >= 0 { q_effects(target) } else { 0 }
+        if effects != 0 { facts = q_join(facts, " · ", "Effects: " + q_effect_words(effects)) }
+        let wasm = node_wasm_type(node)
+        if wasm != "" { facts = q_join(facts, " · ", "Wasm: `" + wasm + "`") }
+    }
+    return heading + label + (if facts != "" { "\n\n" + facts } else { "" }) + (if docs != "" { "\n\n---\n\n" + docs } else { "" })
+}
+
+/// `ArmBinding` as `Arm Binding`: a space before each capital after a small letter.
+fn q_spaced(kind: Str) Str {
+    let out = ""
+    let i = 0
+    while (i < kind.len()) {
+        let c = kind.get(i)
+        if c >= 97 and c <= 122 and i + 1 < kind.len() and kind.get(i + 1) >= 65 and kind.get(i + 1) <= 90 {
+            out = out + kind.slice(i, i + 1) + " " + kind.slice(i + 1, i + 2)
+            i += 2
+        } else {
+            out = out + kind.slice(i, i + 1)
+            i += 1
+        }
+    }
+    return out
+}
+
+/// What hovering the name at `offset` of file f shows, and the name, as JSON.
+fn q_hover(f: I32, offset: I32) Str {
+    let d = q_declaration_at(f, offset)
+    if d < 0 { return "null" }
+    let kind = q_kind(d)
+    let definition = q_definition(d)
+    let span = q_span(d)
+    let head = ""
+    if q_local(kind) {
+        let type = decl_checked_type(d)
+        // (A @wat function's body is not checked: its parameters are as written.)
+        head = if type != "" or span.file < 0 {
+            (if definition.file >= 0 { q_slice(definition) } else { "?" }) + (if type != "" { ": " + type } else { "" })
+        } else { q_signature(q_slice(span)) }
+    } else if span.file >= 0 {
+        // A built-in type's representation is the compiler's business.
+        head = q_without_ir(q_signature(q_slice(span)))
+        // A module's own type, `&`, by the module's name.
+        let module = q_module_of(d)
+        let name = if module >= 0 { q_definition(module) } else { q_nowhere() }
+        if name.file >= 0 { head = q_amp_named(head, q_slice(name)) }
+    }
+    if head == "" { return "null" }
+    let docs = if q_local(kind) { "" } else { q_typst_markdown(q_doc_declaration(d)) }
+    let where = if span.file >= 0 and q_keys[span.file].starts_with("std:") { " · " + q_keys[span.file] } else { "" }
+    let value = q_render_hover(f, offset, head, q_kind_name(d), where, docs)
+    let name = "null"
+    let refs = q_references(d, true)
+    for (0 ..< refs.len()) |i| {
+        let p = refs[i]
+        if name == "null" and q_inside(p, f, offset) { name = q_place_json(p) }
+    }
+    return "{\"value\":" + (if value == "" { "null" } else { q_json(value) }) + ",\"name\":" + name + "}"
+}
+
+/// A signature without what follows `= @ir /\` (a built-in type's IR).
+fn q_without_ir(s: Str) Str {
+    let i = 0
+    while (i < s.len()) {
+        if s.get(i) == 61 {
+            let j = q_skip_space(s, i + 1)
+            if s.slice(j, j + 3) == "@ir" {
+                j = q_skip_space(s, j + 3)
+                if s.slice(j, j + 2) == "/\\" {
+                    let start = i
+                    while (start > 0 and q_space(s.get(start - 1))) { start -= 1 }
+                    return s.slice(0, start)
+                }
+            }
+        }
+        i += 1
+    }
+    return s
+}
+
+/// Each `&` standing alone (not by another `&` or a word character) as `name`.
+fn q_amp_named(s: Str, name: Str) Str {
+    let out = ""
+    let from = 0
+    for (0 ..< s.len()) |i| {
+        if s.get(i) != 38 { continue }
+        if i > 0 and (s.get(i - 1) == 38 or is_word_code(s.get(i - 1))) { continue }
+        if i + 1 < s.len() and (s.get(i + 1) == 38 or is_word_code(s.get(i + 1))) { continue }
+        out = out + s.slice(from, i) + name
+        from = i + 1
+    }
+    return out + s.slice(from, s.len())
+}
+
+/// Type, capture, conversion, and effect annotations for file f, as JSON, by position.
+fn q_inlay_hints(f: I32) Str {
+    let positions = Pile[I32].new()
+    let hints = Pile[Str].new()
+    if f >= 0 {
+        for (0 ..< decl_kind.len()) |d| {
+            if q_kind(d) != Decl.Local { continue }
+            let definition = q_definition(d)
+            let span = q_span(d)
+            let type = decl_checked_type(d)
+            if definition.file < 0 or span.file < 0 or definition.file != f or type == "" { continue }
+            let head = q_slice(QPlace { file: f, start: definition.end_, end_: span.end_ })
+            let j = q_skip_space(head, 0)
+            if j < head.len() and head.get(j) == 58 { continue }
+            positions.push(definition.end_)
+            hints.push(q_hint(definition.end_, ": " + type, "type", definition))
+        }
+        q_file_nodes()
+        for (q_fn_at[f] ..< q_fn_at[f + 1]) |k| {
+            let n = q_fn[k]
+            if not is_kind(n, Node.Closure_expr) { continue }
+            let at = q_place(n)
+            let captures = ""
+            for (0 ..< closure_capture_count(n)) |c| {
+                let definition = q_definition(closure_capture_decl(n, c))
+                if definition.file >= 0 { captures = q_join(captures, ", ", q_slice(definition)) }
+            }
+            if captures != "" {
+                positions.push(at.end_)
+                hints.push(q_hint(at.end_, " captures " + captures, "capture", at))
+            }
+        }
+        q_calls()
+        for (0 ..< q_co.len()) |i| {
+            let k = q_co[i]
+            let at = q_place(co_node[k])
+            if at.file != f { continue }
+            positions.push(at.end_)
+            hints.push(q_hint(at.end_, " → " + type_text(co_to[k]), "conversion", at))
+        }
+        for (0 ..< decl_kind.len()) |d| {
+            if decl_node[d] < 0 or not (q_kind(d) == Decl.Fn or q_kind(d) == Decl.Main) { continue }
+            let definition = q_definition(d)
+            if definition.file != f { continue }
+            let mask = q_effects(d)
+            if mask != 0 {
+                positions.push(definition.end_)
+                hints.push(q_hint(definition.end_, " !" + q_effect_words(mask), "effect", definition))
+            }
+        }
+    }
+    let order = q_sort(positions.finish(), Array[I32].new(hints.len(), 0))
+    let out = ""
+    for (0 ..< order.len()) |i| { out = q_comma(out) + hints[order[i]] }
+    return "[" + out + "]"
+}
+
+fn q_hint(position: I32, label: Str, kind: Str, at: QPlace) Str => "{\"position\":" + position.str() + ",\"label\":" + q_json(label)
+    + ",\"kind\":\"" + kind + "\",\"at\":" + q_place_json(at) + "}"
+
+/// The token of file f that `offset` is inside (or a comment it ends), or -1.
+fn q_token_at(f: I32, offset: I32) I32 {
+    if f < 0 { return -1 }
+    for (file_tok[f] ..< file_tok_end[f]) |t| {
+        let start = q_unit(f, tok_start[t])
+        if start >= offset { return -1 }
+        let stop = q_unit(f, tok_end[t])
+        if offset < stop or (offset == stop and tok_kind[t] == Tok.Comment.i32()) { return t }
+    }
+    return -1
+}
+
+//! == Lists of a file's
+
+/// Every declaration made in file f (in every file, for -1), each with its kind and owner, as JSON.
+fn q_declarations(f: I32) Str {
+    let out = ""
+    for (0 ..< decl_kind.len()) |d| {
+        if decl_node[d] < 0 { continue }
+        let at = q_place(decl_node[d])
+        if at.file < 0 or (f != -1 and at.file != f) { continue }
+        out = q_comma(out) + "{\"decl\":" + d.str() + ",\"kind\":" + q_json(q_kind_name(d)) + ",\"owner\":" + decl_owner[d].str()
+            + ",\"span\":" + q_place_json(at) + "}"
+    }
+    return "[" + out + "]"
+}
+
+/// Every name in file f (every file, for -1) that resolves, with its
+/// declaration, in order (by file, then place; each place once).
+fn q_names(f: I32) Pile[I32] {
+    let decls = Pile[I32].new()
+    let places = Pile[QPlace].new()
+    q_name_places = Pile[QPlace].new()
+    if f < -1 { return decls }
+    if f >= 0 {
+        q_file_nodes()
+        for (q_fn_at[f] ..< q_fn_at[f + 1]) |k| {
+            let n = q_fn[k]
+            if q_named(n) { decls.push(node_decl[n]); places.push(q_place(n)) }
+        }
+    } else {
+        for (0 ..< node_kind.len()) |n| {
+            if q_named(n) and q_place(n).file >= 0 { decls.push(node_decl[n]); places.push(q_place(n)) }
+        }
+    }
+    q_wat()
+    for (0 ..< q_wat_order.len()) |j| {
+        let d = q_wat_order[j]
+        for (0 ..< q_wat_decl.len()) |i| {
+            if q_wat_decl[i] == d and (f == -1 or q_wat_f[i] == f) { decls.push(d); places.push(q_wat_place(i)) }
+        }
+    }
+    let files = Array[I32].new(places.len(), 0)
+    let starts = Array[I32].new(places.len(), 0)
+    for (0 ..< places.len()) |i| {
+        files[i] = places[i].file
+        starts[i] = places[i].start
+    }
+    let order = q_sort(starts, files)
+    q_name_places = Pile[QPlace].new()
+    let out = Pile[I32].new()
+    for (0 ..< order.len()) |i| {
+        let k = order[i]
+        if i > 0 and starts[k] == starts[order[i - 1]] and files[k] == files[order[i - 1]] { continue }
+        out.push(decls[k])
+        q_name_places.push(places[k])
+    }
+    return out
+}
+
+/// The places of the names @q_names gave last, one each.
+let q_name_places: Pile[QPlace] = Pile[QPlace].new()
+
+fn q_names_json(f: I32) Str {
+    let decls = q_names(f)
+    let out = ""
+    for (0 ..< decls.len()) |i| { out = q_comma(out) + "{\"decl\":" + decls[i].str() + ",\"at\":" + q_place_json(q_name_places[i]) + "}" }
+    return "[" + out + "]"
+}
+
+/// The order of `keys` (then `firsts` before them), each tie as it was: by halves.
+fn q_sort(keys: Array[I32], firsts: Array[I32]) Array[I32] {
+    let n = keys.len()
+    let order = Array[I32].new(n, 0)
+    for (0 ..< n) |i| { order[i] = i }
+    let other = Array[I32].new(n, 0)
+    let width = 1
+    while (width < n) {
+        let lo = 0
+        while (lo < n) {
+            let mid = if lo + width < n { lo + width } else { n }
+            let hi = if lo + 2 * width < n { lo + 2 * width } else { n }
+            let a = lo
+            let b = mid
+            for (lo ..< hi) |k| {
+                let take_a = a < mid and (b >= hi or firsts[order[a]] < firsts[order[b]]
+                    or (firsts[order[a]] == firsts[order[b]] and keys[order[a]] <= keys[order[b]]))
+                if take_a { other[k] = order[a]; a += 1 } else { other[k] = order[b]; b += 1 }
+            }
+            lo = hi
+        }
+        for (0 ..< n) |i| { order[i] = other[i] }
+        width = width * 2
+    }
+    return order
+}
+
+//! == JSON
+
+/// A string as JSON.
+fn q_json(s: Str) Str {
+    let out = "\""
+    let from = 0
+    for (0 ..< s.len()) |i| {
+        let c = s.get(i)
+        if c >= 32 and c != 34 and c != 92 { continue }
+        out = out + s.slice(from, i) + (if c == 34 { "\\\"" } else if c == 92 { "\\\\" } else if c == 10 { "\\n" }
+            else if c == 13 { "\\r" } else if c == 9 { "\\t" } else { "\\u" + q_hex4(c) })
+        from = i + 1
+    }
+    return out + s.slice(from, s.len()) + "\""
+}
+
+fn q_hex4(c: I32) Str {
+    let digits = "0123456789abcdef"
+    let out = ""
+    for (0 ..< 4) |k| {
+        let d = (c >> ((3 - k) * 4)) & 15
+        out = out + digits.slice(d, d + 1)
+    }
+    return out
+}
+
+fn q_place_json(p: QPlace) Str => if p.file < 0 { "null" }
+    else { "{\"file\":" + q_key_json[p.file] + ",\"start\":" + p.start.str() + ",\"end\":" + p.end_.str() + "}" }
+
+fn q_places_json(places: Pile[QPlace]) Str {
+    let out = ""
+    for (0 ..< places.len()) |i| { out = q_comma(out) + q_place_json(places[i]) }
+    return "[" + out + "]"
+}
+
+/// A list's text so far, with a comma when it has an item.
+fn q_comma(s: Str) Str => if s == "" { s } else { s + "," }
+
+/// `s`, then `sep` and `part` (no `sep` when `s` is empty).
+fn q_join(s: Str, sep: Str, part: Str) Str => if s == "" { part } else { s + sep + part }
+
+//! == Text
+
+/// White space, as JavaScript's `\s` has it.
+fn q_space(c: I32) Bool => (c >= 9 and c <= 13) or c == 32 or c == 160 or c == 5760 or (c >= 8192 and c <= 8202)
+    or c == 8232 or c == 8233 or c == 8239 or c == 8287 or c == 12288 or c == 65279
+
+fn q_skip_space(s: Str, from: I32) I32 {
+    let i = from
+    while (i < s.len() and q_space(s.get(i))) { i += 1 }
+    return i
+}
+
+/// Whether `part` is written at `at` of `s`.
+fn q_at(s: Str, at: I32, part: Str) Bool => at >= 0 and at + part.len() <= s.len() and s.slice(at, at + part.len()) == part
+
+/// Each run of white space one space, the ends trimmed, and cut at 160.
+fn q_collapse(text: Str) Str {
+    let out = ""
+    let i = q_skip_space(text, 0)
+    let from = i
+    while (i < text.len()) {
+        if q_space(text.get(i)) {
+            let j = q_skip_space(text, i)
+            out = out + text.slice(from, i) + (if j < text.len() { " " } else { "" })
+            i = j
+            from = j
+        } else { i += 1 }
+    }
+    out = out + text.slice(from, text.len())
+    return if out.len() > 160 { out.slice(0, 157) + "..." } else { out }
+}
+
+/// Past `^\s*(export\s+)?` and the word `word` (with `\s+` after it, when
+/// `spaced`) of `s`: where what follows starts, or -1.
+fn q_after_head(s: Str, word: Str, spaced: Bool) I32 {
+    let i = q_skip_space(s, 0)
+    if q_at(s, i, "export") and i + 6 < s.len() and q_space(s.get(i + 6)) {
+        let j = q_skip_space(s, i + 6)
+        if q_at(s, j, word) {
+            let k = j + word.len()
+            if not spaced { return k }
+            if k < s.len() and q_space(s.get(k)) { return q_skip_space(s, k) }
+        }
+    }
+    if q_at(s, i, word) {
+        let k = i + word.len()
+        if not spaced { return k }
+        if k < s.len() and q_space(s.get(k)) { return q_skip_space(s, k) }
+    }
+    return -1
+}
+
+/// A declaration's first line, without its body: `fn area(self: Shape) F64`;
+/// an enum's or struct's whole (it has no body).
+fn q_signature(source: Str) Str {
+    // Its `//` comments out.
+    let text = ""
+    let from = 0
+    let i = 0
+    while (i < source.len()) {
+        if source.get(i) == 47 and i + 1 < source.len() and source.get(i + 1) == 47 {
+            text = text + source.slice(from, i)
+            while (i < source.len() and source.get(i) != 10) { i += 1 }
+            from = i
+        } else { i += 1 }
+    }
+    text = text + source.slice(from, source.len())
+    for (["enum", "struct"]) |word| {
+        let k = q_after_head(text, word, false)
+        if k >= 0 and (k >= text.len() or not is_word_code(text.get(k))) { return q_collapse(text) }
+    }
+    let depth = 0
+    for (0 ..< text.len()) |j| {
+        let c = text.get(j)
+        if c == 40 or c == 91 { depth += 1 }
+        else if c == 41 or c == 93 { depth -= 1 }
+        else if depth == 0 and (c == 123 or c == 59) { return q_collapse(text.slice(0, j)) }
+        else if depth == 0 and c == 61 and j + 1 < text.len() and text.get(j + 1) == 62 { return q_collapse(text.slice(0, j)) }
+    }
+    return q_collapse(text)
+}
+
+/// A function written `fn T.f …`, for type name `type`.
+fn q_written_for(d: I32, type: Str) Bool {
+    let span = q_span(d)
+    if span.file < 0 { return false }
+    let text = q_slice(span)
+    let k = q_after_head(text, "fn", true)
+    return k >= 0 and q_at(text, k, type + ".")
+}
+
+/// A function called on a value: `fn &.f |self| …`.
+fn q_is_method(d: I32) Bool {
+    let span = q_span(d)
+    if span.file < 0 { return false }
+    let text = q_slice(span)
+    let k = q_after_head(text, "fn", true)
+    if k < 0 { return false }
+    let run = k
+    while (run < text.len() and not q_space(text.get(run)) and text.get(run) != 40) { run += 1 }
+    for (k ..< run) |j| {
+        if text.get(j) != 46 or j + 1 >= text.len() { continue }
+        let c = text.get(j + 1)
+        if not ((c >= 65 and c <= 90) or (c >= 97 and c <= 122) or c == 95) { continue }
+        let e = j + 2
+        while (e < text.len() and is_word_code(text.get(e))) { e += 1 }
+        e = q_skip_space(text, e)
+        if e < text.len() and text.get(e) == 124 { return true }
+    }
+    return false
+}
+
+//! == Piles
+
+/// A growing array (std:Buffer's, which the compiler cannot name: its own
+/// `Buffer` is a struct): `p[i]`, `p[i] = v`, `push`, `pop`, `finish`.
+mod Pile[T] {
+    struct &:
+        | values: Array[T]
+        | length: I32
+
+    fn &.new() & {
+        return &{ values: [], length: 0 }
+    }
+
+    fn &.push |self| (value: T) Void {
+        if self.length == self.values.len() {
+            let grown = Array[T].new(if self.length == 0 { 8 } else { self.length * 2 }, value)
+            grown.copy_from(0, self.values, 0, self.length)
+            self.values = grown
+        }
+        self.values[self.length] = value
+        self.length += 1
+    }
+
+    fn &.len |self| () I32 => self.length
+
+    fn &.get_index |self| (i: I32) T => self.values[i]
+
+    fn &.set_index |self| (i: I32, value: T) Void { self.values[i] = value }
+
+    /// The last value, removed.
+    fn &.pop |self| () T {
+        self.length -= 1
+        return self.values[self.length]
+    }
+
+    fn &.finish |self| () Array[T] => self.values.slice(0, self.length)
+}

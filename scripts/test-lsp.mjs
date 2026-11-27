@@ -7,7 +7,7 @@ import fs from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
-import { loadNodeCompiler, nodeHost, utuFiles } from '../src/selfhost/node.js';
+import { loadNodeTools, nodeHost, utuFiles } from '../src/selfhost/node.js';
 import { createLanguageServer } from '../src/selfhost/lsp.js';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
@@ -56,7 +56,7 @@ try {
   const sent = [];
   const host = nodeHost({ root: dir });
   const server = createLanguageServer({
-    utu: await loadNodeCompiler(), hostFor: () => host, send: message => sent.push(message),
+    utu: await loadNodeTools(), hostFor: () => host, send: message => sent.push(message),
     toKey: uri => fileURLToPath(uri), toUri: key => key.startsWith('std:') ? null : pathToFileURL(key).href,
   });
   let id = 0;
@@ -205,7 +205,7 @@ try {
   {
     const out = [];
     const fresh = createLanguageServer({
-      utu: await loadNodeCompiler(), hostFor: () => host, send: message => out.push(message),
+      utu: await loadNodeTools(), hostFor: () => host, send: message => out.push(message),
       toKey: uri => uri.startsWith('file:') ? fileURLToPath(uri) : uri, toUri: key => key.startsWith('std:') ? null : pathToFileURL(key).href,
     });
     const call = async (method, params) => {
@@ -416,7 +416,7 @@ try {
     // (As `utu lsp` lists them.)
     const listFiles = async dirs => utuFiles(dirs);
     const server = createLanguageServer({
-      utu: await loadNodeCompiler(), hostFor: () => host, send: message => out.push(message), listFiles,
+      utu: await loadNodeTools(), hostFor: () => host, send: message => out.push(message), listFiles,
       toKey: uri => fileURLToPath(uri), toUri: key => key.startsWith('std:') ? null : pathToFileURL(key).href,
     });
     const call = async (method, params) => {

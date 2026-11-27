@@ -1,0 +1,310 @@
+//! = Doc comments
+//!
+//!   //! What this file is: Typst markup, at the top of the file.
+//!
+//!   /// Adds `n` to the point's *x*. See @Point.
+//!   fn add(p: Point, n: I32) I32 { … }
+//!
+//! A declaration's doc comment is the `///` lines just before it (nothing
+//! between them and it but space); a file's is its leading `//!` lines, and
+//! a later `//!` block goes on with it there (a section of the file).
+//! The text after the marker is Typst markup (`*strong*`, `_emphasis_`,
+//! `` `code` ``, `- lists`, `$math$`, `#link(…)[…]`), which tools/utudoc
+//! typesets as it is and the editor shows as Markdown (@q_typst_markdown).
+//! They are read from the compiler's tokens (comments are tokens), so a
+//! `///` inside a string is never one. Files are the host's (see @q_open).
+
+/// A token's text.
+fn qd_text(t: I32) Str => bytes_text(tok_start[t], tok_end[t])
+
+/// The host's file a token is in, or -1.
+fn qd_file_of_token(t: I32) I32 {
+    for (0 ..< q_nfiles) |f| { if file_tok[f] <= t and t < file_tok_end[f] { return f } }
+    return -1
+}
+
+/// Only space, and one line break at most, between two places of `src`.
+fn qd_adjacent(from: I32, to: I32) Bool {
+    let between = bytes_text(from, to)
+    let breaks = 0
+    for (0 ..< between.len()) |i| {
+        let c = between.get(i)
+        if not q_space(c) { return false }
+        if c == 10 { breaks += 1 }
+    }
+    return breaks <= 1
+}
+
+/// The comments' lines, each without its marker (and one space after it).
+fn qd_lines(tokens: Pile[I32], marker: Str) Str {
+    let out = ""
+    for (0 ..< tokens.len()) |i| {
+        let line = qd_text(tokens[i]).slice(marker.len(), 2147483647)
+        let text = if line.len() > 0 and line.get(0) == 32 { line.slice(1, line.len()) } else { line }
+        out = if i == 0 { text } else { out + "\n" + text }
+    }
+    return out
+}
+
+fn qd_comment(t: I32) Bool => tok_kind[t] == Tok.Comment.i32()
+
+/// The `///` comment of a declaration.
+fn q_doc_declaration(decl: I32) Str {
+    let node = decl_node[decl]
+    if node < 0 { return "" }
+    let t = node_first[node]
+    let file = qd_file_of_token(t)
+    if file < 0 { return "" }
+    let first = file_tok[file]
+    // A field or variant is written after its `|`.
+    if t > first and qd_text(t - 1) == "|" { t -= 1 }
+    let found = Pile[I32].new()
+    let after = tok_start[t]
+    t -= 1
+    while (t >= first and qd_comment(t)) {
+        let comment = qd_text(t)
+        if not comment.starts_with("///") or comment.starts_with("////") or not qd_adjacent(tok_end[t], after) { break }
+        found.push(t)
+        after = tok_start[t]
+        t -= 1
+    }
+    // (Found last first.)
+    let ordered = Pile[I32].new()
+    let k = found.len() - 1
+    while (k >= 0) { ordered.push(found[k]); k -= 1 }
+    return qd_lines(ordered, "///")
+}
+
+/// A file's leading `//!` comment.
+fn q_doc_file(file: I32) Str {
+    if file < 0 { return "" }
+    let found = Pile[I32].new()
+    let t = file_tok[file]
+    while (t < file_tok_end[file] and qd_comment(t)) {
+        if qd_text(t).starts_with("//!") { found.push(t) } else if found.len() > 0 { break }
+        t += 1
+    }
+    return qd_lines(found, "//!")
+}
+
+/// A file's other `//!` blocks, each going on with its doc where it is, as
+/// JSON: `{"start": s, "text": t}` (s in the file's text), in order.
+fn q_doc_sections(file: I32) Str {
+    if file < 0 { return "[]" }
+    let blocks = Pile[Pile[I32]].new()
+    let last = -1
+    for (file_tok[file] ..< file_tok_end[file]) |t| {
+        if not qd_comment(t) or not qd_text(t).starts_with("//!") { continue }
+        if last >= 0 and last == t - 1 and qd_adjacent(tok_end[last], tok_start[t]) { blocks[blocks.len() - 1].push(t) }
+        else {
+            let block = Pile[I32].new()
+            block.push(t)
+            blocks.push(block)
+        }
+        last = t
+    }
+    let out = ""
+    for (0 ..< blocks.len()) |i| {
+        let block = blocks[i]
+        // (The leading block is the file's own.)
+        if i == 0 and block[0] == file_tok[file] { continue }
+        out = q_comma(out) + "{\"start\":" + q_unit(file, tok_start[block[0]]).str() + ",\"text\":" + q_json(qd_lines(block, "//!")) + "}"
+    }
+    return "[" + out + "]"
+}
+
+//! == Typst as Markdown
+
+/// Typst markup, as Markdown shows most of it: strong, emphasis, headings,
+/// lists, links, and math (as code). Code spans and blocks are left as they are.
+fn q_typst_markdown(typst: Str) Str {
+    let out = ""
+    let fenced = false
+    let lines = typst.split("\n")
+    for (0 ..< lines.len()) |k| {
+        let line = lines[k]
+        let converted = line
+        if q_at(line, q_skip_space(line, 0), "```") { fenced = not fenced }
+        else if not fenced {
+            // Code spans (`` `…` ``) as they are; the text between converted.
+            converted = ""
+            let from = 0
+            let open = qd_index(line, 96, 0)
+            while (open >= 0) {
+                let close = qd_index(line, 96, open + 1)
+                if close < 0 { break }
+                converted = converted + qd_convert(line.slice(from, open)) + line.slice(open, close + 1)
+                from = close + 1
+                open = qd_index(line, 96, from)
+            }
+            converted = converted + qd_convert(line.slice(from, line.len()))
+        }
+        out = if k == 0 { converted } else { out + "\n" + converted }
+    }
+    return out
+}
+
+/// Where code unit `c` is in `s` at or after `from`, or -1.
+fn qd_index(s: Str, c: I32, from: I32) I32 {
+    for (from ..< s.len()) |i| { if s.get(i) == c { return i } }
+    return -1
+}
+
+fn qd_word(c: I32) Bool => is_word_code(c)
+
+/// Code unit i of `s`, or -1 past its ends.
+fn qd_at(s: Str, i: I32) I32 => if i < 0 or i >= s.len() { -1 } else { s.get(i) }
+
+/// One piece of a line outside code spans, converted.
+fn qd_convert(piece: Str) Str {
+    // An escaped character (`\*`) is itself: kept aside from the rest.
+    let s = ""
+    let from = 0
+    let i = 0
+    while (i < piece.len()) {
+        let c = qd_at(piece, i + 1)
+        if piece.get(i) == 92 and c >= 0 and c != 10 and c != 13 and c != 8232 and c != 8233 {
+            s = s + piece.slice(from, i) + Str.from_code_point(57344) + c.str() + Str.from_code_point(57345)
+            i += 2
+            from = i
+        } else { i += 1 }
+    }
+    s = s + piece.slice(from, piece.len())
+    s = s.replace("<", "&lt;")
+    // `= Heading`
+    let level = 0
+    while (level < s.len() and s.get(level) == 61) { level += 1 }
+    if level > 0 and qd_at(s, level) == 32 { s = "#".repeat(level) + s.slice(level, s.len()) }
+    // `+ item`
+    let lead = q_skip_space(s, 0)
+    if qd_at(s, lead) == 43 and qd_at(s, lead + 1) == 32 { s = s.slice(0, lead) + "1. " + s.slice(lead + 2, s.len()) }
+    s = qd_links(s, true)
+    s = qd_links(s, false)
+    s = qd_math(s)
+    s = qd_marked(s, 42, "**")
+    s = qd_marked(s, 95, "*")
+    s = qd_references(s)
+    return qd_unescape(s)
+}
+
+/// `#link("url")[text]` as `[text](url)` (`texts`), or `#link("url")` as `<url>`.
+fn qd_links(s: Str, texts: Bool) Str {
+    let out = ""
+    let from = 0
+    let i = 0
+    while (i < s.len()) {
+        if q_at(s, i, "#link(\"") {
+            let quote = qd_index(s, 34, i + 7)
+            if quote >= 0 and qd_at(s, quote + 1) == 41 {
+                let url = s.slice(i + 7, quote)
+                if texts and qd_at(s, quote + 2) == 91 {
+                    let close = qd_index(s, 93, quote + 3)
+                    if close >= 0 {
+                        out = out + s.slice(from, i) + "[" + s.slice(quote + 3, close) + "](" + url + ")"
+                        i = close + 1
+                        from = i
+                        continue
+                    }
+                }
+                if not texts {
+                    out = out + s.slice(from, i) + "<" + url + ">"
+                    i = quote + 2
+                    from = i
+                    continue
+                }
+            }
+        }
+        i += 1
+    }
+    return out + s.slice(from, s.len())
+}
+
+/// `$math$` as code.
+fn qd_math(s: Str) Str {
+    let out = ""
+    let from = 0
+    let i = 0
+    while (i < s.len()) {
+        if s.get(i) == 36 {
+            let close = qd_index(s, 36, i + 1)
+            if close > i + 1 {
+                out = out + s.slice(from, i) + "`" + s.slice(i + 1, close) + "`"
+                i = close + 1
+                from = i
+                continue
+            }
+        }
+        i += 1
+    }
+    return out + s.slice(from, s.len())
+}
+
+/// Text between two `mark`s (`*strong*`, `_emphasis_`), not inside a word,
+/// as between two `with`s. A `*`'s neighbours are not `*` either.
+fn qd_marked(s: Str, mark: I32, with: Str) Str {
+    let out = ""
+    let from = 0
+    let i = 0
+    let star = mark == 42
+    while (i < s.len()) {
+        // `(^|[^\w*])` at i, then the mark.
+        let open = if i == 0 and s.get(0) == mark { 0 }
+            else if qd_at(s, i + 1) == mark and not qd_word(s.get(i)) and not (star and s.get(i) == 42) { i + 1 } else { -1 }
+        if open >= 0 {
+            let close = qd_index(s, mark, open + 1)
+            let after = qd_at(s, close + 1)
+            if close > open + 1 and (after < 0 or (not qd_word(after) and not (star and after == 42))) {
+                out = out + s.slice(from, open) + with + s.slice(open + 1, close) + with
+                i = close + 1
+                from = i
+                continue
+            }
+        }
+        i += 1
+    }
+    return out + s.slice(from, s.len())
+}
+
+/// `@Name`, a reference, as code (an address's `@` is not one).
+fn qd_references(s: Str) Str {
+    let out = ""
+    let from = 0
+    let i = 0
+    while (i < s.len()) {
+        let at = if i == 0 and s.get(0) == 64 { 0 }
+            else if qd_at(s, i + 1) == 64 and not qd_word(s.get(i)) and s.get(i) != 64 { i + 1 } else { -1 }
+        let c = qd_at(s, at + 1)
+        if at >= 0 and ((c >= 65 and c <= 90) or (c >= 97 and c <= 122) or c == 95) {
+            let e = at + 2
+            while (e < s.len() and qd_word(s.get(e))) { e += 1 }
+            out = out + s.slice(from, at) + "`" + s.slice(at + 1, e) + "`"
+            i = e
+            from = i
+            continue
+        }
+        i += 1
+    }
+    return out + s.slice(from, s.len())
+}
+
+/// The characters kept aside (see @qd_convert), escaped again.
+fn qd_unescape(s: Str) Str {
+    let out = ""
+    let from = 0
+    let i = 0
+    while (i < s.len()) {
+        if s.get(i) == 57344 {
+            let e = i + 1
+            let n = 0
+            while (e < s.len() and s.get(e) >= 48 and s.get(e) <= 57) { n = n * 10 + s.get(e) - 48; e += 1 }
+            if e > i + 1 and qd_at(s, e) == 57345 {
+                out = out + s.slice(from, i) + "\\" + Str.from_code_point(n)
+                i = e + 1
+                from = i
+                continue
+            }
+        }
+        i += 1
+    }
+    return out + s.slice(from, s.len())
+}

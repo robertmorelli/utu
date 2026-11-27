@@ -1,0 +1,559 @@
+//! = The language server's answers
+//!
+//! What src/selfhost/lsp.js asks of the program the compiler holds, beyond
+//! queries.utu's: protocols' members and the functions implementing them,
+//! renames, completion, the outline, semantic tokens. The server keeps the
+//! documents, the builds, and what an editor's protocol says (lines and
+//! columns, URIs).
+
+/// LSP's SymbolKind for the declarations an outline shows (0: not shown).
+fn q_symbol_kind(k: Decl) I32 => match k {
+    Decl.Module, Decl.Foreign => 2,
+    Decl.Struct => 23,
+    Decl.Enum, Decl.IntEnum => 10,
+    Decl.Variant => 22,
+    Decl.Field => 8,
+    Decl.Proto => 11,
+    Decl.ProtoMember => 6,
+    Decl.TypeDecl, Decl.Distinct => 5,
+    Decl.Fn, Decl.Main => 12,
+    Decl.Global => 13,
+    Decl.Mem => 18,
+    ~> 0,
+}
+
+/// LSP's CompletionItemKind.
+fn q_completion_kind(k: Decl) I32 => match k {
+    Decl.Module, Decl.Foreign, Decl.Alias => 9,
+    Decl.ModuleParam => 25,
+    Decl.Struct => 22,
+    Decl.Enum, Decl.IntEnum => 13,
+    Decl.Variant => 20,
+    Decl.Field => 5,
+    Decl.Proto => 8,
+    Decl.ProtoMember => 2,
+    Decl.TypeDecl, Decl.Distinct => 7,
+    Decl.Fn, Decl.Main => 3,
+    ~> 6,
+}
+
+/// A declaration's kind as an editor's semantic tokens name it ("" for none).
+fn q_semantic_type(k: Decl) Str => match k {
+    Decl.Module, Decl.Foreign => "namespace",
+    Decl.ModuleParam => "typeParameter",
+    Decl.Struct => "struct",
+    Decl.Enum, Decl.IntEnum => "enum",
+    Decl.Variant => "enumMember",
+    Decl.Field => "property",
+    Decl.Proto => "interface",
+    Decl.ProtoMember => "method",
+    Decl.TypeDecl, Decl.Distinct, Decl.Alias => "type",
+    Decl.Fn, Decl.Main => "function",
+    Decl.Param, Decl.SelfParam, Decl.ClosureParam => "parameter",
+    Decl.Ambiguous => "",
+    ~> "variable",
+}
+
+/// The words completion offers, and no rename gives.
+fn q_keywords() Array[Str] => ["mod", "using", "struct", "proto", "enum", "fn", "let", "mem", "vec", "export", "const", "type", "distinct",
+    "test", "bench", "fun", "cl", "await", "assert", "not", "and", "or", "xor", "orelse", "if", "else", "promote", "try", "catch",
+    "match", "loop", "alt", "for", "while", "break", "continue", "defer", "errdefer", "return", "fatal", "yield", "true", "false", "null", "new"]
+
+/// Whether a rename may give the name `s`: spelled as one, and no keyword.
+fn q_new_name(s: Str) Bool {
+    if not q_is_name(s) { return false }
+    let words = q_keywords()
+    for (0 ..< words.len()) |i| { if words[i] == s { return false } }
+    return true
+}
+
+/// The declarations with a place (`declarations()` in query.js), in order.
+fn q_all() Pile[I32] {
+    let out = Pile[I32].new()
+    for (0 ..< decl_kind.len()) |d| { if q_declared(d) { out.push(d) } }
+    return out
+}
+
+//! == Protocols
+
+let q_links_made: Bool = false
+/// By declaration: the protocol member it implements (`fn P[T].m`, P
+/// resolving to the protocol; or a struct's field satisfying a getter or
+/// setter of a protocol in its head), or -1; and each link, in the order made.
+vec q_link: I32
+vec q_link_from: I32
+vec q_link_to: I32
+
+fn q_add_link(d: I32, member: I32) Void {
+    q_link[d] = member
+    q_link_from.push(d)
+    q_link_to.push(member)
+}
+
+fn q_links() Void {
+    if q_links_made { return }
+    q_links_made = true
+    q_link.clear()
+    q_link_from.clear()
+    q_link_to.clear()
+    for (0 ..< decl_kind.len()) |d| { q_link.push(-1) }
+    let all = q_all()
+    let members = Pile[I32].new()
+    for (0 ..< all.len()) |i| {
+        let d = all[i]
+        if q_kind(d) == Decl.ProtoMember and q_definition(d).file >= 0 { members.push(d) }
+    }
+    if members.len() == 0 { return }
+    // The names of protocols, in order.
+    let names = q_names(-1)
+    let protocols = Pile[I32].new()
+    let places = Pile[QPlace].new()
+    for (0 ..< names.len()) |i| {
+        let d = names[i]
+        let is_protocol = false
+        for (0 ..< members.len()) |m| { if decl_owner[members[m]] == d { is_protocol = true } }
+        if is_protocol {
+            protocols.push(d)
+            places.push(q_name_places[i])
+        }
+    }
+    for (0 ..< all.len()) |i| {
+        let d = all[i]
+        let at = if q_kind(d) == Decl.Fn { q_definition(d) } else { q_nowhere() }
+        let span = q_span(d)
+        if at.file < 0 or at.file != span.file { continue }
+        // The last protocol named in its head, before its own name.
+        let protocol = -1
+        for (0 ..< protocols.len()) |p| {
+            let n = places[p]
+            if n.file == span.file and n.start >= span.start and n.start < at.start { protocol = protocols[p] }
+        }
+        let member = q_member(members, protocol, q_slice(at))
+        if member >= 0 { q_add_link(d, member) }
+    }
+    for (0 ..< all.len()) |i| {
+        let d = all[i]
+        let at = if q_kind(d) == Decl.Struct { q_definition(d) } else { q_nowhere() }
+        let span = q_span(d)
+        if at.file < 0 { continue }
+        let own = Pile[I32].new()
+        for (0 ..< all.len()) |j| { if q_kind(all[j]) == Decl.Field and decl_owner[all[j]] == d { own.push(all[j]) } }
+        if own.len() == 0 or at.file != span.file { continue }
+        // Named in its head: after its name, before its first field.
+        let end_ = 2147483647
+        for (0 ..< own.len()) |j| {
+            let name = q_definition(own[j])
+            let start = if name.file >= 0 { name.start } else { span.end_ }
+            if start < end_ { end_ = start }
+        }
+        let named = Pile[I32].new()
+        for (0 ..< protocols.len()) |p| {
+            let n = places[p]
+            if n.file == span.file and n.start >= at.end_ and n.start < end_ { named.push(protocols[p]) }
+        }
+        for (0 ..< own.len()) |j| {
+            let name = q_definition(own[j])
+            if name.file < 0 { continue }
+            for (0 ..< named.len()) |p| {
+                let member = q_member(members, named[p], q_slice(name))
+                if member >= 0 and q_accessor(member) {
+                    q_add_link(own[j], member)
+                    break
+                }
+            }
+        }
+    }
+}
+
+/// Protocol p's member named `name` (the last so named), or -1.
+fn q_member(members: Pile[I32], p: I32, name: Str) I32 {
+    let found = -1
+    for (0 ..< members.len()) |m| {
+        if decl_owner[members[m]] == p and q_label(members[m]) == name { found = members[m] }
+    }
+    return found
+}
+
+/// A protocol's getter or setter: `get` or `set` before its name.
+fn q_accessor(member: I32) Bool {
+    let span = q_span(member)
+    let at = q_definition(member)
+    let head = q_slice(QPlace { file: at.file, start: span.start, end_: at.start })
+    return q_has_word(head, "get") or q_has_word(head, "set")
+}
+
+/// Whether `word` is in `s`, a word of its own.
+fn q_has_word(s: Str, word: Str) Bool {
+    let i = s.index_of(word, 0)
+    while (i >= 0) {
+        let before = if i > 0 { s.get(i - 1) } else { 32 }
+        let after = if i + word.len() < s.len() { s.get(i + word.len()) } else { 32 }
+        if not is_word_code(before) and not is_word_code(after) { return true }
+        i = s.index_of(word, i + 1)
+    }
+    return false
+}
+
+/// The declarations one name is: a protocol's member and the functions
+/// implementing it, the member first; else `d` alone.
+fn q_family(d: I32) Pile[I32] {
+    q_links()
+    let out = Pile[I32].new()
+    let member = if q_kind(d) == Decl.ProtoMember { d } else { q_link[d] }
+    if member < 0 {
+        out.push(d)
+        return out
+    }
+    out.push(member)
+    for (0 ..< q_link_from.len()) |k| { if q_link_to[k] == member { out.push(q_link_from[k]) } }
+    return out
+}
+
+/// Where d's family is named (see @q_family), spelled `spelling` (any, for
+/// ""); without the member's own name and the fields satisfying it
+/// (declarations too), unless `include`.
+fn q_linked(d: I32, include: Bool, spelling: Str) Pile[QPlace] {
+    let out = Pile[QPlace].new()
+    if d < 0 or d >= decl_kind.len() { return out }
+    let family = q_family(d)
+    for (0 ..< family.len()) |i| {
+        let e = family[i]
+        let refs = q_references(e, include or (i > 0 and q_kind(e) != Decl.Field))
+        for (0 ..< refs.len()) |k| { if spelling == "" or q_slice(refs[k]) == spelling { out.push(refs[k]) } }
+    }
+    return out
+}
+
+//! == Renaming
+
+/// The import alias (`using m |Point| …`) of file f spelled `spelling`
+/// (one with no place: any), or -1.
+fn q_alias(f: I32, spelling: Str) I32 {
+    for (0 ..< decl_kind.len()) |d| {
+        if not q_declared(d) or q_place(decl_node[d]).file != f or q_kind(d) != Decl.Alias { continue }
+        let definition = q_definition(d)
+        if definition.file < 0 or q_slice(definition) == spelling { return d }
+    }
+    return -1
+}
+
+/// The name at `offset` of file f, its place among d's references, or none.
+fn q_name_at(d: I32, f: I32, offset: I32) QPlace {
+    let refs = q_references(d, true)
+    for (0 ..< refs.len()) |k| { if q_inside(refs[k], f, offset) { return refs[k] } }
+    return q_nowhere()
+}
+
+/// What renaming the name at `offset` of file f changes, as JSON: the
+/// name, whether it is an import's alias, where its family is declared,
+/// and each place renamed (an alias: where this file spells it so,
+/// whatever it resolves to there; else its references, as spelled). Null
+/// when it is not spelled as a name.
+fn q_rename(f: I32, offset: I32) Str {
+    let d = q_declaration_at(f, offset)
+    if d < 0 { return "null" }
+    let name = q_name_at(d, f, offset)
+    let spelling = q_slice(name)
+    if name.file < 0 or not q_is_name(spelling) { return "null" }
+    let alias = q_alias(f, spelling)
+    let defs = ""
+    let places = Pile[QPlace].new()
+    if alias >= 0 {
+        let decls = q_names(f)
+        let at = q_name_places
+        for (0 ..< decls.len()) |i| {
+            if q_slice(at[i]) != spelling { continue }
+            let definition = q_definition(decls[i])
+            if decls[i] == alias or q_slice(if definition.file >= 0 { definition } else { at[i] }) != spelling { places.push(at[i]) }
+        }
+    } else {
+        let family = q_family(d)
+        for (0 ..< family.len()) |i| { defs = q_comma(defs) + q_place_json(q_definition(family[i])) }
+        places = q_linked(d, true, spelling)
+    }
+    return "{\"name\":" + q_place_json(name) + ",\"alias\":" + (if alias >= 0 { "true" } else { "false" }) + ",\"defs\":[" + defs
+        + "],\"occurrences\":" + q_places_json(places) + "}"
+}
+
+/// Whether the name at `offset` of file f is the program's `main`.
+fn q_entry_point(f: I32, offset: I32) Bool {
+    for (0 ..< decl_kind.len()) |d| {
+        if not q_declared(d) or q_kind(d) != Decl.Main { continue }
+        let span = q_place(decl_node[d])
+        if span.file != f { continue }
+        let text = q_slice(span)
+        let at = -1
+        if q_at(text, 0, "export") and 6 < text.len() and q_space(text.get(6)) { at = q_skip_space(text, 6) }
+        if at < 0 or not q_at(text, at, "main") { at = 0 }
+        if q_at(text, at, "main") and (at + 4 >= text.len() or not is_word_code(text.get(at + 4))) {
+            let start = span.start + at
+            if start <= offset and offset <= start + 4 { return true }
+        }
+    }
+    return false
+}
+
+/// Each name of file f: where it is, where what it means is named, and its kind, as JSON.
+fn q_bindings(f: I32) Str {
+    let decls = q_names(f)
+    let at = q_name_places
+    let out = ""
+    for (0 ..< decls.len()) |i| {
+        out = q_comma(out) + "{\"at\":" + q_place_json(at[i]) + ",\"meant\":" + q_place_json(q_definition(decls[i])) + ",\"kind\":"
+            + q_json(q_kind_name(decls[i])) + "}"
+    }
+    return "[" + out + "]"
+}
+
+/// The declaration whose name is at `start` of file f (declared in f, when `own`), or -1.
+fn q_declaration_named(f: I32, start: I32, own: Bool) I32 {
+    for (0 ..< decl_kind.len()) |d| {
+        if not q_declared(d) or (own and q_place(decl_node[d]).file != f) { continue }
+        let definition = q_definition(d)
+        if definition.file == f and definition.file >= 0 and definition.start == start { return d }
+    }
+    return -1
+}
+
+//! == A file's lists
+
+/// The places in file f naming d's family, as JSON: each with 3 where it is declared, else 2.
+fn q_highlights(f: I32, d: I32) Str {
+    let family = q_family(d)
+    let definitions = Pile[QPlace].new()
+    for (0 ..< family.len()) |i| { definitions.push(q_definition(family[i])) }
+    let places = q_linked(d, true, "")
+    let out = ""
+    for (0 ..< places.len()) |i| {
+        let p = places[i]
+        if p.file != f { continue }
+        let kind = 2
+        for (0 ..< definitions.len()) |k| { if definitions[k].file == p.file and definitions[k].start == p.start { kind = 3 } }
+        out = q_comma(out) + "{\"at\":" + q_place_json(p) + ",\"kind\":" + kind.str() + "}"
+    }
+    return "[" + out + "]"
+}
+
+/// The outline of file f, as JSON: each declaration it shows, with its owner,
+/// SymbolKind, name (a module's own type, `&`, by the module's), place, and name's place.
+fn q_symbols(f: I32) Str {
+    let out = ""
+    for (0 ..< decl_kind.len()) |d| {
+        if not q_declared(d) or q_place(decl_node[d]).file != f or q_symbol_kind(q_kind(d)) == 0 { continue }
+        let declared = q_definition(d)
+        if declared.file != f { continue }
+        let owner = decl_owner[d]
+        let name = q_slice(declared)
+        if name == "&" and owner >= 0 and q_kind(owner) == Decl.Module and q_definition(owner).file >= 0 { name = q_label(owner) }
+        out = q_comma(out) + "{\"decl\":" + d.str() + ",\"owner\":" + owner.str() + ",\"kind\":" + q_symbol_kind(q_kind(d)).str()
+            + ",\"name\":" + q_json(name) + ",\"span\":" + q_place_json(q_place(decl_node[d])) + ",\"selection\":" + q_place_json(declared) + "}"
+    }
+    return "[" + out + "]"
+}
+
+/// The names of file f an editor colors, as JSON: each with its semantic
+/// token type, and whether it is where its declaration is named.
+fn q_semantic(f: I32) Str {
+    let decls = q_names(f)
+    let at = q_name_places
+    let out = ""
+    for (0 ..< decls.len()) |i| {
+        let d = decls[i]
+        let type = q_semantic_type(q_kind(d))
+        if type == "" { continue }
+        let declaring = q_same(q_definition(d), at[i]) and q_definition(d).file == f
+        out = q_comma(out) + "{\"at\":" + q_place_json(at[i]) + ",\"type\":\"" + type + "\",\"declaration\":" + (if declaring { "1" } else { "0" }) + "}"
+    }
+    return "[" + out + "]"
+}
+
+//! == Completion
+
+/// Where the name being typed at `offset` of file f starts, or -1 where
+/// nothing is written: in a comment, a string, a DSL's body, a template's text.
+fn q_completion_start(f: I32, offset: I32) I32 {
+    if f < 0 { return -1 }
+    let t = q_token_at(f, offset)
+    if t >= 0 and tok_kind[t] >= Tok.String.i32() and tok_kind[t] <= Tok.TemplateTail.i32() { return -1 }
+    let text = q_text(f)
+    let start = offset
+    while (start > 0 and start <= text.len() and is_word_code(text.get(start - 1))) { start -= 1 }
+    return start
+}
+
+/// What may be written at `start` of file f, where `placeholder` is written
+/// for the name being typed, as JSON: after `x.`, the members of x's type (or
+/// of the module x names); elsewhere, the names in scope and the keywords.
+fn q_completions(f: I32, start: I32, placeholder: Str) Str {
+    let text = q_text(f)
+    let all = q_all()
+    let labels = Pile[Str].new()
+    let items = Pile[Str].new()
+    let dot = start
+    while (dot > 0 and (qd_at(text, dot - 1) == 32 or qd_at(text, dot - 1) == 9)) { dot -= 1 }
+    if qd_at(text, dot - 1) == 46 {
+        // `x?.`: the members of what x holds when it is not null.
+        let optional = qd_at(text, dot - 2) == 63
+        let r = dot - 1 - (if optional { 1 } else { 0 })
+        while (r > 0 and q_space(text.get(r - 1))) { r -= 1 }
+        let receiver = if r > 0 { q_declaration_at(f, r - 1) } else { -1 }
+        let rkind = if receiver >= 0 { q_kind(receiver) } else { Decl.Ambiguous }
+        let module_ = receiver >= 0 and rkind == Decl.Module
+        // `M.`: what module M holds. `T.`: a type's variants and functions.
+        // Any other `e.`: the fields of e's type, and its module's methods.
+        let statics = receiver >= 0 and (rkind == Decl.Struct or rkind == Decl.Enum or rkind == Decl.IntEnum)
+        let owner = if module_ or statics { receiver } else { q_type_before(f, r, optional) }
+        if owner < 0 and receiver >= 0 and (q_local(rkind) or rkind == Decl.Global) and (optional or not decl_checked_type(receiver).starts_with("?")) {
+            owner = decl_checked_type_decl(receiver)
+        }
+        if owner < 0 { return "[]" }
+        let module = if module_ { receiver } else { q_module_of(owner) }
+        // A type outside a module has the functions written `fn T.f`: called on a value when they take |self|.
+        let type_name = if module < 0 { q_label(owner) } else { "" }
+        for (0 ..< all.len()) |i| {
+            let d = all[i]
+            let kind = q_kind(d)
+            let o = decl_owner[d]
+            // (A std struct's `_` fields are std's own: see data.utu's std_own.)
+            if kind == Decl.Field and q_label(d).starts_with("_") and q_keys[q_span(d).file].starts_with("std:") { continue }
+            if o == owner and ((kind == Decl.Field and not statics) or kind == Decl.Variant or kind == Decl.Fn or kind == Decl.Global) {
+                q_complete_add(labels, items, d, placeholder)
+            } else if type_name != "" and o < 0 and kind == Decl.Fn and q_written_for(d, type_name) and (statics or q_is_method(d)) {
+                // (After the type itself, its methods too, as after a module's type.)
+                q_complete_add(labels, items, d, placeholder)
+            } else if module >= 0 and o == module and module != owner and kind == Decl.Fn and (module_ or q_is_method(d)) {
+                q_complete_add(labels, items, d, placeholder)
+            } else if o == module and module_ and (kind == Decl.Struct or kind == Decl.Enum or kind == Decl.TypeDecl or kind == Decl.Global) {
+                q_complete_add(labels, items, d, placeholder)
+            }
+        }
+        return q_items_json(items)
+    }
+    // The locals of the function the cursor is in, declared before it.
+    let within = -1
+    let width = 2147483647
+    for (0 ..< all.len()) |i| {
+        let d = all[i]
+        let span = q_span(d)
+        if span.file == f and (q_kind(d) == Decl.Fn or q_kind(d) == Decl.Main) and span.start <= start and start <= span.end_ and span.end_ - span.start < width {
+            within = d
+            width = span.end_ - span.start
+        }
+    }
+    let inside = if within >= 0 { q_span(within) } else { q_nowhere() }
+    // What this file declares, and what the prelude does (imports are named by their alias).
+    for (0 ..< all.len()) |i| {
+        let d = all[i]
+        let kind = q_kind(d)
+        let owner = decl_owner[d]
+        let span = q_span(d)
+        let prelude = file_role[span.file] == FileRole.Prelude.i32() and (kind == Decl.Module or kind == Decl.Struct or kind == Decl.Enum
+            or kind == Decl.IntEnum or kind == Decl.Proto or kind == Decl.TypeDecl or kind == Decl.Distinct)
+        if span.file != f and not prelude { continue }
+        if span.file == f and q_local(kind) {
+            if within >= 0 and span.start >= inside.start and span.start < start { q_complete_add(labels, items, d, placeholder) }
+        } else if (if span.file == f { owner < 0 or (q_kind(owner) == Decl.Module and kind != Decl.Field and kind != Decl.Variant) } else { owner < 0 and kind != Decl.Main }) {
+            q_complete_add(labels, items, d, placeholder)
+        }
+    }
+    let words = q_keywords()
+    for (0 ..< words.len()) |i| {
+        if q_find_str(labels, words[i]) < 0 {
+            labels.push(words[i])
+            items.push("{\"label\":" + q_json(words[i]) + ",\"kind\":14}")
+        }
+    }
+    return q_items_json(items)
+}
+
+/// Declaration d as a completion, once by its name.
+fn q_complete_add(labels: Pile[Str], items: Pile[Str], d: I32, placeholder: Str) Void {
+    let name = q_label(d)
+    if name == "" or name == placeholder or not q_is_name(name) or q_find_str(labels, name) >= 0 { return }
+    let kind = q_kind(d)
+    let span = q_span(d)
+    let detail = if q_local(kind) { decl_checked_type(d) } else if span.file >= 0 { q_signature(q_slice(span)) } else { "" }
+    labels.push(name)
+    items.push("{\"label\":" + q_json(name) + ",\"kind\":" + q_completion_kind(kind).str() + (if detail != "" { ",\"detail\":" + q_json(detail) } else { "" }) + "}")
+}
+
+fn q_items_json(items: Pile[Str]) Str {
+    let out = ""
+    for (0 ..< items.len()) |i| { out = q_comma(out) + items[i] }
+    return "[" + out + "]"
+}
+
+//! == Imports on disk
+
+/// The string literals of `text`'s `using … from "…"` (not in a comment or
+/// another string), as written, as JSON: what a file not built imports.
+fn q_import_paths(text: Str) Str {
+    // Comments blanked, and strings but for their quotes (each string kept by where it is).
+    let n = text.len()
+    let blank = Array[I32].new(n, 0)
+    let string_end = Array[I32].new(n, -1)
+    let i = 0
+    while (i < n) {
+        let c = text.get(i)
+        if c == 47 and qd_at(text, i + 1) == 47 {
+            while (i < n and text.get(i) != 10) { blank[i] = 1; i += 1 }
+            continue
+        }
+        if c == 34 {
+            let j = i + 1
+            let closed = -1
+            while (j < n and closed < 0) {
+                let d = text.get(j)
+                if d == 34 { closed = j }
+                else if d == 92 and j + 1 < n and text.get(j + 1) != 10 and text.get(j + 1) != 13 and text.get(j + 1) != 8232 and text.get(j + 1) != 8233 { j += 2 }
+                else if d == 92 or d == 10 { j = n }
+                else { j += 1 }
+            }
+            if closed >= 0 {
+                string_end[i] = closed + 1
+                for (i + 1 ..< closed) |k| { blank[k] = 1 }
+                i = closed + 1
+                continue
+            }
+        }
+        i += 1
+    }
+    let out = ""
+    let at = 0
+    while (at + 5 <= n) {
+        let quote = q_using_at(text, blank, at)
+        if quote >= 0 {
+            if string_end[quote] >= 0 { out = q_comma(out) + q_json(text.slice(quote, string_end[quote])) }
+            at = quote + 1
+        } else { at += 1 }
+    }
+    return "[" + out + "]"
+}
+
+/// Code unit i of `text` with what is blanked a space.
+fn q_plain(text: Str, blank: Array[I32], i: I32) I32 => if i < 0 or i >= text.len() { -1 } else if blank[i] == 1 { 32 } else { text.get(i) }
+
+fn q_plain_word(text: Str, blank: Array[I32], i: I32) Bool => q_plain(text, blank, i) >= 0 and is_word_code(q_plain(text, blank, i))
+
+/// `\busing\b[^;"]*?\bfrom\s*"` at `at` of the text with `blank` blanked:
+/// where its `"` is, or -1.
+fn q_using_at(text: Str, blank: Array[I32], at: I32) I32 {
+    let word = "using"
+    for (0 ..< 5) |k| { if q_plain(text, blank, at + k) != word.get(k) { return -1 } }
+    if q_plain_word(text, blank, at - 1) or q_plain_word(text, blank, at + 5) { return -1 }
+    let p = at + 5
+    let from = "from"
+    while (p < text.len()) {
+        let matched = not q_plain_word(text, blank, p - 1)
+        for (0 ..< 4) |k| { if q_plain(text, blank, p + k) != from.get(k) { matched = false } }
+        if matched {
+            let e = p + 4
+            while (e < text.len() and q_space(q_plain(text, blank, e))) { e += 1 }
+            if q_plain(text, blank, e) == 34 { return e }
+        }
+        let c = q_plain(text, blank, p)
+        if c == 59 or c == 34 { return -1 }
+        p += 1
+    }
+    return -1
+}

@@ -71,10 +71,10 @@ async function buildChunks({ lazy, files, outDir, stdlib, optimize, safe }) {
 /** buildBrowserApp with the self-hosted compiler: its module, glue, and loader. */
 async function buildWithSelfhost({ entry, outDir, stdlib, optimize, safe = true, chunk = false, compiled, externalCss = false }) {
   const started = performance.now();
-  const { compileFile, loadNodeCompiler } = await import('../../src/selfhost/node.js');
+  const { compileFile, loadNodeTools } = await import('../../src/selfhost/node.js');
   const { glueSource, loaderSource } = await import('../../src/selfhost/loader.js');
   const { formatDiagnostics: format } = await import('../../src/selfhost/format.js');
-  const utu = await loadNodeCompiler();
+  const utu = await loadNodeTools();
   // externalCss: the CSS ships as its own file, app.HASH.css (report.cssName), for the page to link.
   const result = compiled ?? await compileFile(utu, path.resolve(entry), { optimize, safe, externalCss, ...(stdlib ? { stdlib } : {}) });
   // Warnings alone never fail a build.

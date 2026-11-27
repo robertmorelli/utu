@@ -42,15 +42,16 @@ const WORKER_TTY = process.env.UTU_WORKER_TTY;
 delete process.env.UTU_WORKER_TTY;
 
 // A command that builds needs the compiler: it compiles (off this thread)
-// from here, as what drives it loads. loadNodeCompiler still checks it was
-// built from selfhost/ as it is.
+// from here, as what drives it loads. It is the tools' build of it
+// (dist/utu-tools.wasm), whose queries color a mistake as the build read
+// it; loadNodeTools still checks it was built from selfhost/ as it is.
 // `utu FILE.utu …` runs it: `utu run FILE.utu …` (still accepted) spelled short.
 if (process.argv[2]?.endsWith('.utu')) process.argv.splice(2, 0, 'run');
 const COMPILING = ['check', 'run', 'test', 'bench', 'build', 'build-exe'].includes(process.argv[2]) ? compileEarly() : null;
 
 function compileEarly() {
   try {
-    const bytes = readFileSync(path.join(ROOT, 'dist', 'utu.wasm'));
+    const bytes = readFileSync(path.join(ROOT, 'dist', 'utu-tools.wasm'));
     return WebAssembly.compile(bytes, { builtins: ['js-string'], importedStringConstants: "'" }).catch(() => null);
   } catch { return null; }
 }
@@ -83,7 +84,7 @@ async function main() {
   }
   if (command === 'grep') return grepCommand(process.argv.slice(3));
   const commands = { check, run, test, bench, build, 'build-exe': buildExe };
-  const [{ MODES }, { loadNodeCompiler }] = await Promise.all([import('../src/selfhost/compiler.js'), selfhost()]);
+  const [{ MODES }, { loadNodeTools }] = await Promise.all([import('../src/selfhost/compiler.js'), selfhost()]);
   // (Own names only: `utu constructor` is no command.)
   if (!Object.hasOwn(commands, command)) {
     const near = closest(command, [...Object.keys(commands), 'lsp', 'grep', ...VIEW_COMMANDS]);
@@ -184,7 +185,7 @@ async function main() {
   const asked = ours.includes('--source-map');
   if (asked && !safe) fail(`No source map in ${mode}`, 'source-map', ['The unsafe modes keep none; -O small, fast, or debug do.']);
   try {
-    await commands[command](file, { optimize, safe, out, argv, mode, title, port, noPrerender, sourceMap: mode === 'debug' || asked, blame: ours.includes('--blame'), luge: ours.includes('--luge'), target, profile, interval, utu: await loadNodeCompiler({ module: COMPILING }) });
+    await commands[command](file, { optimize, safe, out, argv, mode, title, port, noPrerender, sourceMap: mode === 'debug' || asked, blame: ours.includes('--blame'), luge: ours.includes('--luge'), target, profile, interval, utu: await loadNodeTools({ module: COMPILING }) });
   } catch (error) {
     // A place build cannot write (-o somewhere read-only, or under a file).
     if (!FS_REASONS[error?.code] || !error.path) throw error;
@@ -256,8 +257,8 @@ async function viewCommand(command, given) {
   try { stat = await fs.stat(file); } catch {}
   if (!stat) fail(`No file ${files[0]}`, 'file-not-found');
   if (stat.isDirectory()) fail(`${files[0]} is a directory`, 'not-a-file');
-  const { compileFile, loadNodeCompiler } = await selfhost();
-  const utu = await loadNodeCompiler();
+  const { compileFile, loadNodeTools } = await selfhost();
+  const utu = await loadNodeTools();
   let built;
   try {
     built = await compileFile(utu, file, {
@@ -843,7 +844,7 @@ async function buildDirectory(from) {
 /** The language server (src/selfhost/lsp.js), speaking LSP's framing on stdin and stdout. */
 async function lsp() {
   const { createLanguageServer } = await import('../src/selfhost/lsp.js');
-  const { loadNodeCompiler, nodeHost, utuFiles } = await import('../src/selfhost/node.js');
+  const { loadNodeTools, nodeHost, utuFiles } = await import('../src/selfhost/node.js');
   const { fileURLToPath, pathToFileURL } = await import('node:url');
   const { existsSync } = await import('node:fs');
   const hosts = new Map();
@@ -852,7 +853,7 @@ async function lsp() {
     process.stdout.write(Buffer.concat([Buffer.from(`Content-Length: ${body.length}\r\n\r\n`), body]));
   };
   const server = createLanguageServer({
-    utu: await loadNodeCompiler(),
+    utu: await loadNodeTools(),
     // One host per directory: packages resolve from where the program is.
     hostFor: key => {
       const root = key.startsWith('std:') ? process.cwd() : path.dirname(key);
@@ -915,7 +916,7 @@ async function lsp() {
  */
 async function grepCommand(args) {
   const { grep } = await import('../src/selfhost/grep.js');
-  const { loadNodeCompiler, nodeHost } = await import('../src/selfhost/node.js');
+  const { loadNodeTools, nodeHost } = await import('../src/selfhost/node.js');
   const where = {};
   let references = null;
   let json = false;
@@ -973,7 +974,7 @@ async function grepCommand(args) {
     if (!hosts.has(root)) hosts.set(root, nodeHost({ root }));
     return hosts.get(root);
   };
-  const { matches, texts, error, skipped = [], unmatched = [] } = await grep(await loadNodeCompiler(), entries, hostFor, { pattern, where, references });
+  const { matches, texts, error, skipped = [], unmatched = [] } = await grep(await loadNodeTools(), entries, hostFor, { pattern, where, references });
   if (error) {
     console.error(error);
     process.exit(2);

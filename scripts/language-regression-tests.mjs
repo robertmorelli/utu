@@ -3,7 +3,7 @@
 import fs from 'node:fs/promises';
 import path from 'node:path';
 import { compileAndInstantiate, testTmp, withTempUtu } from './test-harness.mjs';
-import { compileFile, instantiateNode, loadNodeCompiler } from '../src/selfhost/node.js';
+import { compileFile, instantiateNode, loadNodeTools } from '../src/selfhost/node.js';
 import { programIndex } from '../src/selfhost/query.js';
 import { printWat } from '../src/selfhost/wat.js';
 
@@ -402,7 +402,7 @@ export function registerLanguageRegressionTests({ test, assert, assertEq, assert
     const compiler = await makeCompiler({ ROOT, target: 'analysis' });
     const source = 'lib { fn run() I32 { let xs = [1, 2]; let s = 0; for (xs) |x| { s += x; }; xs each |y| { s += y; }; return s; } }';
     await withTempUtu(ROOT, 'loop_hints.utu', source, async (file) => {
-      const utu = await loadNodeCompiler();
+      const utu = await loadNodeTools();
       const { files } = await compileFile(utu, file, { root: ROOT });
       const hints = programIndex(utu, files).inlayHints(file);
       const hinted = hints.map(hint => source.slice(0, hint.position).match(/let (\w+)$/)?.[1]);

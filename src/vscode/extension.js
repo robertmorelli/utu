@@ -188,8 +188,9 @@ export function deactivate() {
 }
 
 /**
- * Everything comes from the self-hosted compiler (dist/utu.wasm), which
- * holds one program at a time. A document's program is built for its tests,
+ * Everything comes from the self-hosted compiler as the tools build it
+ * (dist/utu-tools.wasm: the compiler and its queries), which holds one
+ * program at a time. A document's program is built for its tests,
  * for its exports and for analysis (every function checked, the last build):
  * diagnostics come from all three, and hover, inlay hints, definitions,
  * references, the call hierarchy, the X-Ray, the syntax tree and the graphs
@@ -206,8 +207,8 @@ export function createCompilerService(output = null) {
     const read = name => vscode.workspace.fs.readFile(vscode.Uri.joinPath(dist, name));
     const [api, wasm, spec] = await Promise.all([
       import(vscode.Uri.joinPath(dist, 'selfhost', 'utu.js').toString()),
-      read('utu.wasm'),
-      read('utu.host.json').then(bytes => JSON.parse(decoder.decode(bytes))),
+      read('utu-tools.wasm'),
+      read('utu-tools.host.json').then(bytes => JSON.parse(decoder.decode(bytes))),
     ]);
     const utu = await api.loadCompiler(wasm, spec);
     const host = {
