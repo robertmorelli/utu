@@ -117,7 +117,7 @@ fn check_match(node: I32, expect: I32, cx: Cx) I32 {
     let c = next_sibling(scrutinee)
     let count = 0
     while (c >= 0) {
-        count += 1
+        count += if is_kind(c, Node.Match_arm) { child_count(c) - 1 } else { 1 }
         c = next_sibling(c)
     }
     arm_table(count)
@@ -125,41 +125,48 @@ fn check_match(node: I32, expect: I32, cx: Cx) I32 {
     while (c >= 0) {
         if is_kind(c, Node.Match_default) { default_ = c }
         else if is_kind(c, Node.Match_arm) {
-            pattern_fault = -1
-            let v = pattern_value(first_child(c), st)
-            let fault = pattern_fault
-            if fault >= 0 { faulted = true }
-            if fault == 4 {
-                let name = last_child(first_child(c))
-                // (An unknown `m.Tag` was reported where it was resolved.)
-                let other = node_decl[name]
-                if decl_is(other, Decl.Variant) and decl_owner[other] == ty_decl(st) {
-                    // Another instance's variant.
-                    let by = node_alias[first_child(first_child(c))]
-                    report2(Diag.TypeMismatch, first_child(c), -1, st, named(decl_owner[other], if decl_is(by, Decl.Alias) { alias_instance(by) } else { 0 }))
-                } else if not reported_within(first_child(c)) {
-                    report2(Diag.UnknownVariant, c, word_of(name), st, -1)
-                    suggest_member(ty_decl(st), name, Space.Member)
+            // (`A, B => e`: an entry for each, of one arm; a mistake is said at its pattern.)
+            let lit = first_child(c)
+            let at = if next_sibling(lit) == last_child(c) { c } else { lit }
+            while (lit != last_child(c)) {
+                pattern_fault = -1
+                let v = pattern_value(lit, st)
+                let fault = pattern_fault
+                if fault >= 0 { faulted = true }
+                if fault == 4 {
+                    let name = last_child(lit)
+                    // (An unknown `m.Tag` was reported where it was resolved.)
+                    let other = node_decl[name]
+                    if decl_is(other, Decl.Variant) and decl_owner[other] == ty_decl(st) {
+                        // Another instance's variant.
+                        let by = node_alias[first_child(lit)]
+                        report2(Diag.TypeMismatch, lit, -1, st, named(decl_owner[other], if decl_is(by, Decl.Alias) { alias_instance(by) } else { 0 }))
+                    } else if not reported_within(lit) {
+                        report2(Diag.UnknownVariant, at, word_of(name), st, -1)
+                        suggest_member(ty_decl(st), name, Space.Member)
+                    }
+                    unknown_arm = true
+                } else if fault >= 0 {
+                    report2(Diag.MatchPattern, at, -1, fault, st)
+                    in_instance(cx.inst)
+                } else {
+                    // Reported once for each arm before with the value, there.
+                    let slot = arm_slot(v)
+                    let k = arm_slots[slot]
+                    while (k >= 0) {
+                        report(Diag.DuplicatePattern, at, -1)
+                        diag_place(Extra.Related, first_child(arm_nodes[k]), "first here")
+                        k = arm_same[k]
+                    }
+                    if arm_slots[slot] < 0 { arm_slots[slot] = arm_nodes.len() } else { arm_same[arm_slot_last[slot]] = arm_nodes.len() }
+                    arm_slot_last[slot] = arm_nodes.len()
+                    arm_same.resize(arm_nodes.len() + 1)
+                    arm_same[arm_nodes.len()] = -1
+                    arm_nodes.push(c)
+                    arm_values.push(v)
                 }
-                unknown_arm = true
-            } else if fault >= 0 {
-                report2(Diag.MatchPattern, c, -1, fault, st)
-                in_instance(cx.inst)
-            } else {
-                // Reported once for each arm before with the value, there.
-                let slot = arm_slot(v)
-                let k = arm_slots[slot]
-                while (k >= 0) {
-                    report(Diag.DuplicatePattern, c, -1)
-                    diag_place(Extra.Related, first_child(arm_nodes[k]), "first here")
-                    k = arm_same[k]
-                }
-                if arm_slots[slot] < 0 { arm_slots[slot] = arm_nodes.len() } else { arm_same[arm_slot_last[slot]] = arm_nodes.len() }
-                arm_slot_last[slot] = arm_nodes.len()
-                arm_same.resize(arm_nodes.len() + 1)
-                arm_same[arm_nodes.len()] = -1
-                arm_nodes.push(c)
-                arm_values.push(v)
+                lit = next_sibling(lit)
+                at = lit
             }
         }
         c = next_sibling(c)
@@ -171,7 +178,7 @@ fn check_match(node: I32, expect: I32, cx: Cx) I32 {
     let want_t = expect
     if expect < 0 and not looping {
         let from = join_nodes.len()
-        for (first_arm ..< last_arm) |k| { join_nodes.push(last_child(arm_nodes[k])) }
+        for (first_arm ..< last_arm) |k| { if k == first_arm or arm_nodes[k] != arm_nodes[k - 1] { join_nodes.push(last_child(arm_nodes[k])) } }
         if default_ >= 0 { join_nodes.push(last_child(default_)) }
         want_t = branch_join(from, cx)
     }
@@ -260,7 +267,7 @@ fn dispatch(s: I32, st: I32, first: I32, last: I32, default_: I32, expect: I32, 
     // (The first arm with a value takes it.)
     let k = last - 1
     while (k >= first) {
-        w_aux[targets + (arm_values[k] - lo).i32()] = labels[k - first]
+        w_aux[targets + (arm_values[k] - lo).i32()] = labels[arm_head(k, first) - first]
         k -= 1
     }
     w_aux.push(def)
@@ -281,6 +288,8 @@ fn dispatch(s: I32, st: I32, first: I32, last: I32, default_: I32, expect: I32, 
     let lm = loop_matches.len()
     if in_loop { for ([s, lo.i32(), span, n, copies, def, labels[0], first, -1]) |x| { loop_matches.push(x) } }
     for (0 ..< total) |p| {
+        // (An arm's later patterns take its first one's block.)
+        if arm_head(first + p % n, first) != first + p % n { continue }
         // Close arm p's block, then its code.
         w_node(Op.Block, vt_none, labels[p], 0, marks[total - 1 - p])
         if in_loop { loop_matches[lm + 8] = p }
@@ -296,6 +305,14 @@ fn dispatch(s: I32, st: I32, first: I32, last: I32, default_: I32, expect: I32, 
     let result = if t >= 0 { t } else { ty_never() }
     w_node(Op.Block, repr(result), end_, 0, m_end)
     return result
+}
+
+/// Entry k's arm's first entry (`A, B => e` is an entry for each pattern,
+/// together from `first` on).
+fn arm_head(k: I32, first: I32) I32 {
+    let h = k
+    while (h > first and arm_nodes[h - 1] == arm_nodes[k]) { h -= 1 }
+    return h
 }
 
 /// An arm's expression as the match's value (or dropped in a loop match).
@@ -337,33 +354,46 @@ fn arm_chain(s: I32, st: I32, first: I32, last: I32, default_: I32, expect: I32,
     // A loop, not a recursion: a match may have thousands of arms. By arm:
     // its mark, its else's mark, and its type (-1 when never); each `if` is
     // closed after the arms past it, innermost first.
-    let n = last - first
+    let n = 0
+    for (first ..< last) |k| { if arm_head(k, first) == k { n += 1 } }
     let ms = Array[I32].new(n, 0)
     let mes = Array[I32].new(n, 0)
     let ts = Array[I32].new(n, 0)
+    let nodes = Array[I32].new(n, 0)
     let exp = expect
-    for (first ..< last) |k| {
-        ms[k - first] = w_mark()
+    let i = 0
+    let k = first
+    while (k < last) {
+        ms[i] = w_mark()
+        // `A, B => e`: either value.
         push_pattern_test(s, st, arm_values[k])
+        while (k + 1 < last and arm_nodes[k + 1] == arm_nodes[k]) {
+            k += 1
+            push_pattern_test(s, st, arm_values[k])
+            w_node(Op.Plain, vt_i32, 114, 0, ms[i])
+        }
         let mt = w_mark()
         let t = arm_body(arm_nodes[k], if in_loop { ty_void() } else { exp }, cx, in_loop, show_call)
         if in_loop { w_leaf(Op.Br, vt_unreachable, loop_break[loop_break.len() - 1], 0) }
         let tt = if t >= 0 { t } else { ty_never() }
         w_node(Op.Seq, repr(tt), 0, 0, mt)
-        mes[k - first] = w_mark()
-        ts[k - first] = t
+        mes[i] = w_mark()
+        ts[i] = t
+        nodes[i] = arm_nodes[k]
         if t >= 0 { exp = t }
+        i += 1
+        k += 1
     }
     let m = w_mark()
     let t = default_body(default_, if in_loop { ty_void() } else { exp }, cx, in_loop, show_call)
     if in_loop and default_ >= 0 { w_leaf(Op.Br, vt_unreachable, loop_break[loop_break.len() - 1], 0) }
     let result = if t >= 0 { t } else { ty_never() }
     w_node(Op.Seq, repr(result), 0, 0, m)
-    let i = n
+    i = n
     while (i > 0) {
         i -= 1
         let ti = ts[i]
-        if ti >= 0 and not in_loop { coerce(result, ti, arm_nodes[first + i]) }
+        if ti >= 0 and not in_loop { coerce(result, ti, nodes[i]) }
         if ti >= 0 { result = ti }
         w_node(Op.Seq, repr(result), 0, 0, mes[i])
         w_node(Op.If, repr(result), new_label(), 0, ms[i])
@@ -465,6 +495,7 @@ fn lm_target(lm: I32, v: I32) I32 {
         for (0 ..< n) |a| { if arm < 0 and arm_values[first + a] == v.i64() { arm = a } }
     }
     if arm < 0 { return loop_matches[lm + 5] }
+    arm = arm_head(first + arm, first) - first
     let at = loop_matches[lm + 8]
     let copy = at / n
     if arm <= at % n { copy += 1 }

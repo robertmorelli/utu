@@ -487,7 +487,8 @@ fn diag_text(i: I32) Str {
         },
         Diag.DuplicateDeclaration => if a >= 5 and a <= 9 { a - 5 } else if a >= 1 and a <= 3 { a + 4 } else { 8 },
         Diag.DuplicatePattern => {
-            x = node_text(first_child(node))
+            // (At an arm, or at its pattern when it has several.)
+            x = node_text(if is_kind(node, Node.Alt_arm) or is_kind(node, Node.Match_arm) { first_child(node) } else { node })
             if a == 1 { 0 } else { 1 }
         },
         Diag.TupleLet => {

@@ -69,6 +69,17 @@ function inCaptures(line) {
   return (line.replace(/"(?:[^"\\]|\\.)*"/g, '').match(/\|/g)?.length ?? 0) % 2 === 1;
 }
 
+// An arm's pattern: `Dot`, `Shape.Dot`, `-1`, `'a'`.
+const PATTERN = String.raw`(?:-?[\w.]+|'(?:\\.|[^'\\])+')`;
+const PATTERNS = new RegExp(`^${PATTERN}(?:\\s*,\\s*${PATTERN})*$`);
+const MORE_PATTERNS = new RegExp(`(?:\\s*${PATTERN}\\s*,)*\\s*${PATTERN}\\s*=>`, 'y');
+
+/** A `,` between an arm's patterns (`A, B => e`), `line` so far, `rest` after it: it stays on its line. */
+function betweenPatterns(line, rest) {
+  MORE_PATTERNS.lastIndex = 0;
+  return PATTERNS.test(line.trim()) && MORE_PATTERNS.test(rest);
+}
+
 /** Collapse whitespace outside string literals. */
 function compactExpression(value) {
   let result = '', quoted = false, escaped = false;
@@ -206,7 +217,7 @@ class BodyFormatter {
         flush();
       } else if (c === '\n' && parens === 0 && current.trim() && endsLine(current, text.slice(i + 1), code)) {
         flush();
-      } else if (c === ',' && code && braces.at(-1) === parens && !inCaptures(current)) {
+      } else if (c === ',' && code && braces.at(-1) === parens && !inCaptures(current) && !betweenPatterns(current, text.slice(i + 1))) {
         // (An item's `,` ends its line: no `;` after it.)
         this.lines.push(INDENT.repeat(depth) + current.trim() + ',');
         current = '';
@@ -698,7 +709,7 @@ function layoutUtu(source) {
       line = line.trimEnd() + ';';
       i = trailer(i);
       flush();
-    } else if (c === ',' && braces.at(-1) === parens && !inCaptures(line)) {
+    } else if (c === ',' && braces.at(-1) === parens && !inCaptures(line) && !betweenPatterns(line, source.slice(i))) {
       line = line.trimEnd() + ',';
       i = trailer(i);
       flush();

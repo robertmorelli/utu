@@ -206,7 +206,7 @@ exports.buildExpressionRules = function buildExpressionRules() {
 
     // match on scalars; ~> is the default arm
     match_expr: ($) => seq('match', $._expr, '{', repeat($.match_arm), optional($.match_default), '}'),
-    match_arm: ($) => seq($.match_lit, '=>', $._expr, ','),
+    match_arm: ($) => seq($.match_lit, repeat(seq(',', $.match_lit)), '=>', $._expr, ','),
     match_default: ($) => seq('~>', $._expr, ','),
     // Zig-style switch loop: `continue v` re-dispatches on v, `break` leaves,
     // and an arm that finishes ends the loop. Lowers to loop + br_table.
@@ -214,7 +214,9 @@ exports.buildExpressionRules = function buildExpressionRules() {
 
     // alt on enum variants; ~> is the default arm
     alt_expr: ($) => seq('alt', $._expr, '{', repeat($.alt_arm), optional($.alt_default), '}'),
-    alt_arm: ($) => seq(choice($.type_ident, $.qualified_type_ref, alias($._variant_type_ref, $.qualified_type_ref)), optional(seq('|', $._binding_name, '|')), '=>', $._expr, ','),
+    // `A, B => e` binds neither.
+    alt_arm: ($) => seq(choice(seq($._alt_pattern, optional(seq('|', $._binding_name, '|'))), seq($._alt_pattern, repeat1(seq(',', $._alt_pattern)))), '=>', $._expr, ','),
+    _alt_pattern: ($) => choice($.type_ident, $.qualified_type_ref, alias($._variant_type_ref, $.qualified_type_ref)),
     alt_default: ($) => seq('~>', $._expr, ','),
 
     // `for (xs) |x| f(x)`: a body of one statement, a block of it.

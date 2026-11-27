@@ -2499,8 +2499,12 @@ fn walk_match(node: I32, w: Walk) Void {
     c = next_sibling(c)
     while (c >= 0) {
         if is_kind(c, Node.Match_arm) {
-            walk_match_lit(first_child(c), w)
-            walk_expr(next_sibling(first_child(c)), w)
+            let lit = first_child(c)
+            while (lit != last_child(c)) {
+                walk_match_lit(lit, w)
+                lit = next_sibling(lit)
+            }
+            walk_expr(last_child(c), w)
         } else {
             walk_children(c, w)
         }
@@ -2592,22 +2596,21 @@ fn is_type_node(kind: I32) Bool {
         or kind == Node.Promoted_type.i32()
 }
 
-/// `Variant |x| => e`: the variant (by its type when it is qualified), then
-/// the arm with the binding in scope.
+/// `Variant |x| => e` (or `A, B => e`): each variant (by its type when it is
+/// qualified), then the arm with the binding in scope.
 fn walk_alt_arm(arm: I32, w: Walk) Void {
-    let pattern = first_child(arm)
-    if is_kind(pattern, Node.Qualified_type_ref) { walk_variant_path(pattern, w) }
-    else {
-        let decl = lookup(word_of(pattern))
-        if decl >= 0 and is_type_decl(decl) { node_decl[pattern] = decl }
-    }
-    let c = next_sibling(pattern)
-    let mark = scope_mark()
-    if arm_binding(arm) >= 0 {
-        declare_in_scope(Decl.ArmBinding, c, arm, -1)
+    let c = first_child(arm)
+    while (c != last_child(arm) and not is_kind(c, Node.Identifier)) {
+        if is_kind(c, Node.Qualified_type_ref) { walk_variant_path(c, w) }
+        else {
+            let decl = lookup(word_of(c))
+            if decl >= 0 and is_type_decl(decl) { node_decl[c] = decl }
+        }
         c = next_sibling(c)
     }
-    walk_expr(c, w)
+    let mark = scope_mark()
+    if arm_binding(arm) >= 0 { declare_in_scope(Decl.ArmBinding, c, arm, -1) }
+    walk_expr(last_child(arm), w)
     scope_pop(mark)
 }
 

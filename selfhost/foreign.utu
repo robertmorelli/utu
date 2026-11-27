@@ -2939,6 +2939,35 @@ fn check_host_alt(node: I32, st: I32, m: I32, expect: I32, cx: Cx) I32 {
     return t
 }
 
+/// The class host alt pattern `pattern` (of arm `a`) names, of `st`'s view; else -1, reported.
+fn host_arm_class(a: I32, pattern: I32, st: I32) I32 {
+    let owner = if is_kind(pattern, Node.Qualified_type_ref) { node_decl[name_node(first_child(pattern))] } else { -1 }
+    if not decl_is(owner, Decl.Foreign) or decl_a[owner] < 0 {
+        report(Diag.HostAltArm, a, -1)
+        return -1
+    }
+    let view = decl_a[owner]
+    let class = word_of(name_node(last_child(pattern)))
+    let narrowed = foreign_named_type(view, class)
+    if narrowed < 0 or jget_word(jget(view_json[view], fgs(Fgt.Exports)), class) < 0 {
+        report2(Diag.HostAltClass, a, class, view, -1)
+        return -1
+    }
+    return narrowed
+}
+
+/// `tested = (value instanceof C ? value : null)`, C pattern's class.
+fn host_arm_test(pattern: I32, s: I32, st: I32, narrowed: I32, tested: I32) Void {
+    let view = decl_a[node_decl[name_node(first_child(pattern))]]
+    let class = word_of(name_node(last_child(pattern)))
+    let mt = w_mark()
+    w_leaf(Op.LocalGet, repr(st), s, 0)
+    let access = member_access(view, class, true)
+    let params = one_type(erased(st, view))
+    foreign_call_op(params, nullable(narrowed), fgs2(Fgt.ValueValueInstanceofValueNull, word_text(access_prologue), access), mt)
+    w_node(Op.LocalSet, vt_none, tested, 0, mt)
+}
+
 fn host_alt_arms(arm: I32, s: I32, st: I32, expect: I32, default_: I32, cx: Cx) I32 {
     let a = arm
     while (a >= 0 and not is_kind(a, Node.Alt_arm)) { a = next_sibling(a) }
@@ -2952,33 +2981,32 @@ fn host_alt_arms(arm: I32, s: I32, st: I32, expect: I32, default_: I32, cx: Cx) 
         return ty_void()
     }
     let pattern = first_child(a)
-    let owner = if is_kind(pattern, Node.Qualified_type_ref) { node_decl[name_node(first_child(pattern))] } else { -1 }
-    if not decl_is(owner, Decl.Foreign) or decl_a[owner] < 0 {
-        report(Diag.HostAltArm, a, -1)
-        return error_value()
-    }
-    let view = decl_a[owner]
-    let class = word_of(name_node(last_child(pattern)))
-    let narrowed = foreign_named_type(view, class)
-    if narrowed < 0 or jget_word(jget(view_json[view], fgs(Fgt.Exports)), class) < 0 {
-        report2(Diag.HostAltClass, a, class, view, -1)
-        return error_value()
-    }
+    let narrowed = host_arm_class(a, pattern, st)
+    if narrowed < 0 { return error_value() }
     let m = w_mark()
     // tested = (value instanceof C ? value : null)
     let tested = new_local(vt_externref)
-    let mt = w_mark()
-    w_leaf(Op.LocalGet, repr(st), s, 0)
-    let access = member_access(view, class, true)
-    let params = one_type(erased(st, view))
-    foreign_call_op(params, nullable(narrowed), fgs2(Fgt.ValueValueInstanceofValueNull, word_text(access_prologue), access), mt)
-    w_node(Op.LocalSet, vt_none, tested, 0, mt)
+    host_arm_test(pattern, s, st, narrowed, tested)
     // if tested != null: bind, then the arm; else the next arms.
     let mi = w_mark()
     let mc = w_mark()
     w_leaf(Op.LocalGet, vt_externref, tested, 0)
     w_node(Op.RefIsNull, vt_i32, 0, 0, mc)
     w_node(Op.Plain, vt_i32, 69, 0, mc)
+    // `A, B => e`: either class.
+    let q = next_pattern(pattern, a)
+    while (q >= 0) {
+        let t = host_arm_class(a, q, st)
+        if t < 0 { return error_value() }
+        let mq = w_mark()
+        host_arm_test(q, s, st, t, tested)
+        w_leaf(Op.LocalGet, vt_externref, tested, 0)
+        w_node(Op.RefIsNull, vt_i32, 0, 0, w_mark() - 1)
+        w_node(Op.Plain, vt_i32, 69, 0, w_mark() - 1)
+        w_node(Op.Seq, vt_i32, 0, 0, mq)
+        w_node(Op.Plain, vt_i32, 114, 0, mc)
+        q = next_pattern(q, a)
+    }
     let mthen = w_mark()
     let c = next_sibling(pattern)
     if arm_binding(a) >= 0 {
@@ -2987,8 +3015,8 @@ fn host_alt_arms(arm: I32, s: I32, st: I32, expect: I32, default_: I32, cx: Cx) 
         let mb = w_mark()
         w_leaf(Op.LocalGet, vt_externref, tested, 0)
         bind_value(d, narrowed, mb)
-        c = next_sibling(c)
     }
+    c = last_child(a)
     let t = first_branch(check_expr(c, expect, cx), expect, c)
     w_node(Op.Seq, if t >= 0 { repr(t) } else { vt_unreachable }, 0, 0, mthen)
     let me = w_mark()

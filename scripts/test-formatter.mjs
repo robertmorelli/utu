@@ -165,4 +165,13 @@ html {
   fs.rmSync(dir, { recursive: true, force: true });
 }
 
+// `A, B => e`: an arm's patterns stay on its line.
+{
+  const source = 'enum S:\n    | A\n    | B\n    | C\nfn f(s: S) I32 => alt s { A, B => 1, C => 2, }\nfn g(n: I32) I32 => match n { 1, -2, 3 => 1, ~> 0, }\nmain {}\n';
+  const text = await formatUtuSource(source, { shape });
+  assert.match(text, /\n {4}A, B => 1,\n {4}C => 2,\n/);
+  assert.match(text, /\n {4}1, -2, 3 => 1,\n/);
+  assert.equal(await formatUtuSource(text, { shape }), text);
+}
+
 console.log(`formatter: ${files.length} programs (${formatted} reformatted) keep their tree and are stable; targeted layout, CLI, and compilation checks passed`);

@@ -671,7 +671,7 @@ if cond { ... } else { ... }
 match expr {
     -1 => ...,
     0 => ...,
-    1 => ...,
+    1, 2 => ...,                 // either value
       ~> ...,
 }
 
@@ -679,6 +679,7 @@ match expr {
 alt expr {
     Variant1 |x| => ...,
     Variant2 |y| => {...},
+    Variant3, Variant4 => ...,   // either variant; an arm of several binds none
                  ~> ...,
 }
 

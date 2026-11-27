@@ -91,6 +91,42 @@ lib { fn run() I32 {
     let r: Color = Red
     return area(a) + area(xs[1]) + xs.len() + area(Dot) + hue(Green) + hue(r) + lit(Red)
 } }`, { run: 137 }],
+    // `A, B => e`: an arm for several variants or values, by an alt, a match
+    // dispatched by table and by chain, and a loop match.
+    [`enum Shape:
+    | Dot
+    | Line
+    | Box
+    | Circle { r: I32 }
+enum(U8) Tag:
+    | A
+    | B
+    | C
+    | D
+fn f(s: Shape) I32 => alt s { Dot, Line => 1, Shape.Box => 2, Circle |c| => c.r, }
+fn g(t: Tag) I32 => match t { Tag.A, Tag.C => 10, Tag.B => 20, Tag.D => 30, }
+fn h(n: I32) I32 => match n { 1, 2, 3 => 1, 7 => 2, ~> 0, }
+fn k(n: I32) I32 => match n { 1, 1000 => 1, ~> 0, }
+fn st(t: Tag) I32 {
+    let n = 0
+    loop match t {
+        Tag.A, Tag.B => {
+            n += 1
+            continue Tag.C
+        },
+        Tag.C => {
+            n += 10
+            continue Tag.D
+        },
+        Tag.D => { break },
+    }
+    return n
+}
+lib { fn run() I32 {
+    let fs = f(Dot) + f(Line) + f(Shape.Box) + f(Circle { r: 5 })
+    let gs = g(Tag.A) + g(Tag.B) + g(Tag.C) + g(Tag.D)
+    return fs + gs * 10 + h(2) * 1000 + h(7) * 10000 + h(9) + k(1000) * 100000 + k(5) + st(Tag.A) * 1000000 + st(Tag.C) * 100000000
+} }`, { run: 1011121709 }],
     // `let _ = e` drops e, a Void one too.
     ['let n: I32 = 0\nfn bump() Void { n += 1 }\nlib { fn run() I32 { let _ = bump(); let _ = bump(); return n } }', { run: 2 }],
   ];
@@ -99,6 +135,35 @@ lib { fn run() I32 {
     const { exports, errors } = await selfhost(file);
     assert.ok(exports, errors?.join('\n'));
     for (const [name, value] of Object.entries(expected)) assert.equal(exports[name](), value, source.slice(0, 60));
+    checked++;
+  }
+
+  // A host alt arm for several classes: either one's instance takes it.
+  {
+    const built = await compileFile(utu, await write(`using Browser from std:Browser
+fn kind(x: Browser.EventTarget) I32 => alt x {
+    Browser.HTMLInputElement, Browser.HTMLButtonElement => 1,
+    Browser.Element |e| => e.tagName.len(),
+    ~> 0,
+}
+lib { fn run() I32 {
+    let d = Browser.document
+    return kind(d.createElement("input")) * 1000 + kind(d.createElement("button")) * 100 + kind(d.createElement("section")) * 10 + kind(d)
+} }
+`));
+    assert.ok(built.wasm, built.diagnostics?.map(d => d.message).join('\n'));
+    const names = ['document', 'HTMLInputElement', 'HTMLButtonElement', 'Element'];
+    const saved = names.map(key => [key, Object.getOwnPropertyDescriptor(globalThis, key)]);
+    try {
+      const window = parseHTML('<html><body></body></html>');
+      for (const key of names) globalThis[key] = window[key];
+      assert.equal((await instantiateNode(built.wasm, built.spec)).exports.run(), 1170);
+    } finally {
+      for (const [key, descriptor] of saved) {
+        if (descriptor) Object.defineProperty(globalThis, key, descriptor);
+        else delete globalThis[key];
+      }
+    }
     checked++;
   }
 
@@ -2190,6 +2255,10 @@ lib { fn run() I32 { return f(Many.V1); } }
     // A bare variant: one with fields is a type; one two enums have needs its enum.
     ['enum S:\n    | Dot\n    | Circle { r: I32 }\nlib { fn run() I32 { let a = Circle\n return 0 } }\n', 'S.Circle is a type, not a value'],
     ['enum A:\n    | Red\nenum B:\n    | Red\nlib { fn run() I32 { let a = Red\n return 0 } }\n', 'Red is a variant of A and of B: write A.Red or B.Red'],
+    // `A, B => e`: each pattern covers its variant, once.
+    ['enum S:\n    | A\n    | B\n    | C\nfn f(s: S) I32 => alt s { A, B => 1, }\nlib { fn run() I32 => f(S.A) }\n', 'alt misses S.C'],
+    ['enum S:\n    | A\n    | B\n    | C\nfn f(s: S) I32 => alt s { A, B => 1, C, B => 2, }\nlib { fn run() I32 => f(S.A) }\n', 'Duplicate arm B: never runs'],
+    ['enum(U8) T:\n    | A\n    | B\nfn f(t: T) I32 => match t { T.A, T.B => 1, T.A => 2, }\nlib { fn run() I32 => f(T.A) }\n', 'Duplicate pattern T.A'],
     ['fn f(a: $T, b: T) T { return a; }\nlib { fn run() I32 { let x: I64 = 1; f("s", x); return 0; } }\n', 'f takes Str, got I64'],
     // F64(x), I64(n): a literal of that type, or x converted.
     ['lib { fn run() I32 { let s = F64("a"); return 0; } }\n', 'No method Str.f64'],

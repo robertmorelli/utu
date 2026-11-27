@@ -447,11 +447,11 @@ fn list_word(c: I32) I32 {
     return if is_kind(n, Node.Identifier) or is_kind(c, Node.Module_type_param) { word_of(n) } else { -1 }
 }
 
-/// By alt arm: the next arm of its alt whose pattern ends in the same word.
+/// By alt pattern: the next pattern of its alt that ends in the same word.
 vec arm_same_end: I32
 
 /// An alt's arms, each variant once: a second arm for one can never run.
-/// (Two patterns of one text end in one word: an arm is compared with the
+/// (Two patterns of one text end in one word: a pattern is compared with the
 /// earlier ones that do, chained by that word, first and last noted.)
 fn duplicate_alt_arms(node: I32) Void {
     if arm_same_end.len() < node_kind.len() {
@@ -461,32 +461,39 @@ fn duplicate_alt_arms(node: I32) Void {
     }
     let c = first_child(node)
     while (c >= 0) {
-        if is_kind(c, Node.Alt_arm) {
-            let text = node_text(first_child(c))
-            let w = end_word(first_child(c))
-            let other = if w >= 0 { word_note(w, 0) } else { first_child(node) }
-            while (other >= 0 and other != c) {
-                if is_kind(other, Node.Alt_arm) and node_text(first_child(other)) == text {
-                    report2(Diag.DuplicatePattern, c, -1, 1, -1)
-                    diag_place(Extra.Related, first_child(other), "first here")
-                    other = c
-                } else {
-                    other = if w >= 0 { arm_same_end[other] } else { next_sibling(other) }
-                }
+        let p = if is_kind(c, Node.Alt_arm) { first_child(c) } else { -1 }
+        // (Said at the arm, or at its pattern when it has several.)
+        let at = if p >= 0 and next_pattern(p, c) >= 0 { p } else { c }
+        while (p >= 0) {
+            let text = node_text(p)
+            let w = end_word(p)
+            let other = if w >= 0 { word_note(w, 0) } else { -1 }
+            while (other >= 0) {
+                if node_text(other) == text {
+                    report2(Diag.DuplicatePattern, at, -1, 1, -1)
+                    diag_place(Extra.Related, other, "first here")
+                    other = -1
+                } else { other = arm_same_end[other] }
             }
             if w >= 0 {
-                arm_same_end[c] = -1
-                if word_note(w, 0) < 0 { set_word_note(w, 0, c) } else { arm_same_end[word_note(w, 1)] = c }
-                set_word_note(w, 1, c)
+                arm_same_end[p] = -1
+                if word_note(w, 0) < 0 { set_word_note(w, 0, p) } else { arm_same_end[word_note(w, 1)] = p }
+                set_word_note(w, 1, p)
             }
+            p = next_pattern(p, c)
+            if at != c { at = p }
         }
         c = next_sibling(c)
     }
     c = first_child(node)
     while (c >= 0) {
-        if is_kind(c, Node.Alt_arm) and end_word(first_child(c)) >= 0 {
-            set_word_note(end_word(first_child(c)), 0, -1)
-            set_word_note(end_word(first_child(c)), 1, -1)
+        let p = if is_kind(c, Node.Alt_arm) { first_child(c) } else { -1 }
+        while (p >= 0) {
+            if end_word(p) >= 0 {
+                set_word_note(end_word(p), 0, -1)
+                set_word_note(end_word(p), 1, -1)
+            }
+            p = next_pattern(p, c)
         }
         c = next_sibling(c)
     }

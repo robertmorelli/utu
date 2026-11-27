@@ -2520,6 +2520,11 @@ fn match_arm(p: Parser) I32 {
     let at = mark()
     let first = p.pos
     match_lit(p)
+    // `A, B => e`: one arm for each.
+    while (is(p, Tok.Comma)) {
+        advance(p)
+        match_lit(p)
+    }
     expect(p, Tok.FatArrow)
     expression(p)
     expect(p, Tok.Comma)
@@ -2554,7 +2559,13 @@ fn alt_expr(p: Parser) I32 {
         let arm = mark()
         let start = p.pos
         alt_pattern(p)
-        if is(p, Tok.Pipe) {
+        // `A, B => e` (binding neither).
+        let several = is(p, Tok.Comma)
+        while (is(p, Tok.Comma)) {
+            advance(p)
+            alt_pattern(p)
+        }
+        if not several and is(p, Tok.Pipe) {
             advance(p)
             capture_name(p)
             expect(p, Tok.Pipe)

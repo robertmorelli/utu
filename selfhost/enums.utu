@@ -519,28 +519,17 @@ fn alt_arms(arm: I32, s: I32, st: I32, expect: I32, default_: I32, cx: Cx) I32 {
             }
         } else {
             let pattern = first_child(a)
-            let variant = alt_variant(pattern, ty_decl(st))
+            let variant = arm_variant(pattern, st, cx)
+            let q = next_pattern(pattern, a)
+            while (q >= 0) {
+                if arm_variant(q, st, cx) < 0 { variant = -1 }
+                q = next_pattern(q, a)
+            }
             let m = w_mark()
-            let other = if is_kind(pattern, Node.Qualified_type_ref) { node_decl[name_node(last_child(pattern))] } else { -1 }
-            if variant < 0 and decl_is(other, Decl.Variant) {
-                // `E1.V` tested against an E0: another enum's variant.
-                report2(Diag.TypeMismatch, pattern, -1, st, named(other, 0))
-                w_leaf(Op.Unreachable, vt_unreachable, 0, 0)
-                result = ty_error()
-            } else if variant >= 0 and is_kind(pattern, Node.Qualified_type_ref) and ty_inst(type_path(pattern, cx.inst)) != ty_inst(st) {
-                // `MS.E.A` tested against an `MI.E`: another instance's variant.
-                report2(Diag.TypeMismatch, pattern, -1, st, named(ty_decl(st), ty_inst(type_path(pattern, cx.inst))))
-                w_leaf(Op.Unreachable, vt_unreachable, 0, 0)
-                result = ty_error()
-            } else if variant < 0 {
-                let n = if is_kind(pattern, Node.Qualified_type_ref) { name_node(last_child(pattern)) } else { pattern }
-                report2(Diag.UnknownVariant, n, word_of(n), st, -1)
-                suggest_member(ty_decl(st), n, Space.Member)
+            if variant < 0 {
                 w_leaf(Op.Unreachable, vt_unreachable, 0, 0)
                 result = ty_error()
             } else {
-                // A bare variant two enums have is the tested one's: said on it (for an editor).
-                if not is_kind(pattern, Node.Qualified_type_ref) { node_decl[pattern] = variant }
                 let vt_ = named(variant, ty_inst(st))
                 let vrepr = repr(vt_)
                 // Without a default, the last arm is the only variant left: it is not
@@ -552,6 +541,15 @@ fn alt_arms(arm: I32, s: I32, st: I32, expect: I32, default_: I32, cx: Cx) I32 {
                     let mc = w_mark()
                     w_get(repr(st), s)
                     w_node(Op.RefTest, vt_i32, vt_nullable(vrepr) + 1, 0, mc)
+                    // `A, B => e`: either variant.
+                    q = next_pattern(pattern, a)
+                    while (q >= 0) {
+                        let mq = w_mark()
+                        w_get(repr(st), s)
+                        w_node(Op.RefTest, vt_i32, vt_nullable(repr(named(alt_variant(q, ty_decl(st)), ty_inst(st)))) + 1, 0, mq)
+                        w_node(Op.Plain, vt_i32, 114, 0, mc)
+                        q = next_pattern(q, a)
+                    }
                 }
                 // The arm: bind, then its expression.
                 let mt = w_mark()
@@ -563,8 +561,8 @@ fn alt_arms(arm: I32, s: I32, st: I32, expect: I32, default_: I32, cx: Cx) I32 {
                     w_get(repr(st), s)
                     w_node(Op.RefCast, vrepr, vt_nullable(vrepr) + 1, 0, mb)
                     bind_value(d, vt_, mb)
-                    b = next_sibling(b)
                 }
+                b = last_child(a)
                 let t = first_branch(check_expr(b, exp, cx), exp, b)
                 w_node(Op.Seq, if t >= 0 { repr(t) } else { vt_unreachable }, 0, 0, mt)
                 if last { result = if t >= 0 { t } else { ty_never() } }
@@ -591,6 +589,37 @@ fn alt_arms(arm: I32, s: I32, st: I32, expect: I32, default_: I32, cx: Cx) I32 {
     return result
 }
 
+/// The variant alt pattern `pattern` names, of the tested `st`; else -1, reported.
+fn arm_variant(pattern: I32, st: I32, cx: Cx) I32 {
+    let variant = alt_variant(pattern, ty_decl(st))
+    let other = if is_kind(pattern, Node.Qualified_type_ref) { node_decl[name_node(last_child(pattern))] } else { -1 }
+    if variant < 0 and decl_is(other, Decl.Variant) {
+        // `E1.V` tested against an E0: another enum's variant.
+        report2(Diag.TypeMismatch, pattern, -1, st, named(other, 0))
+        return -1
+    }
+    if variant >= 0 and is_kind(pattern, Node.Qualified_type_ref) and ty_inst(type_path(pattern, cx.inst)) != ty_inst(st) {
+        // `MS.E.A` tested against an `MI.E`: another instance's variant.
+        report2(Diag.TypeMismatch, pattern, -1, st, named(ty_decl(st), ty_inst(type_path(pattern, cx.inst))))
+        return -1
+    }
+    if variant < 0 {
+        let n = if is_kind(pattern, Node.Qualified_type_ref) { name_node(last_child(pattern)) } else { pattern }
+        report2(Diag.UnknownVariant, n, word_of(n), st, -1)
+        suggest_member(ty_decl(st), n, Space.Member)
+        return -1
+    }
+    // A bare variant two enums have is the tested one's: said on it (for an editor).
+    if not is_kind(pattern, Node.Qualified_type_ref) { node_decl[pattern] = variant }
+    return variant
+}
+
+/// The pattern after `p` in alt arm `arm` (`A, B => e`), or -1.
+fn next_pattern(p: I32, arm: I32) I32 {
+    let n = next_sibling(p)
+    return if n == last_child(arm) or is_kind(n, Node.Identifier) { -1 } else { n }
+}
+
 /// The variant an alt arm names (`Circle`, or `Shape.Circle`).
 fn alt_variant(pattern: I32, enum_decl: I32) I32 {
     let word = if is_kind(pattern, Node.Qualified_type_ref) { word_of(name_node(last_child(pattern))) } else { word_of(pattern) }
@@ -608,21 +637,44 @@ fn alt_variant(pattern: I32, enum_decl: I32) I32 {
 /// validate's.)
 fn same_variant_arms(arms: I32, enum_decl: I32) Void {
     let q = arms
-    while (q >= 0 and not (is_kind(q, Node.Alt_arm) and is_kind(first_child(q), Node.Qualified_type_ref))) { q = next_sibling(q) }
+    while (q >= 0 and not (is_kind(q, Node.Alt_arm) and qualified_arm(q))) { q = next_sibling(q) }
     if q < 0 { return }
-    let later = next_sibling(arms)
+    let later = arms
     while (later >= 0) {
-        let v = if is_kind(later, Node.Alt_arm) { alt_variant(first_child(later), enum_decl) } else { -1 }
-        let e = arms
-        while (v >= 0 and e != later) {
-            if is_kind(e, Node.Alt_arm) and alt_variant(first_child(e), enum_decl) == v and node_text(first_child(e)) != node_text(first_child(later)) {
-                report2(Diag.DuplicatePattern, later, -1, 1, -1)
-                diag_place(Extra.Related, first_child(e), "first here")
-                e = later
-            } else { e = next_sibling(e) }
+        let lp = if is_kind(later, Node.Alt_arm) { first_child(later) } else { -1 }
+        // (Said at the arm, or at its pattern when it has several.)
+        let at = if lp >= 0 and next_pattern(lp, later) >= 0 { lp } else { later }
+        while (lp >= 0) {
+            let v = alt_variant(lp, enum_decl)
+            // The earlier patterns: of the arms before, then of this one.
+            let e = if v >= 0 { arms } else { -1 }
+            while (e >= 0) {
+                let ep = if is_kind(e, Node.Alt_arm) { first_child(e) } else { -1 }
+                while (ep >= 0 and ep != lp) {
+                    if alt_variant(ep, enum_decl) == v and node_text(ep) != node_text(lp) {
+                        report2(Diag.DuplicatePattern, at, -1, 1, -1)
+                        diag_place(Extra.Related, ep, "first here")
+                        ep = -1
+                        e = later
+                    } else { ep = next_pattern(ep, e) }
+                }
+                e = if e == later { -1 } else { next_sibling(e) }
+            }
+            lp = next_pattern(lp, later)
+            if at != later { at = lp }
         }
         later = next_sibling(later)
     }
+}
+
+/// Whether one of alt arm `arm`'s patterns names its enum (`Shape.Circle`).
+fn qualified_arm(arm: I32) Bool {
+    let p = first_child(arm)
+    while (p >= 0) {
+        if is_kind(p, Node.Qualified_type_ref) { return true }
+        p = next_pattern(p, arm)
+    }
+    return false
 }
 
 /// An `alt` without a default arm names every variant: the first missing one
@@ -631,7 +683,13 @@ fn check_alt_exhaustive(node: I32, enum_decl: I32) Void {
     // An arm naming no variant is the mistake (reported): no more of it.
     let a0 = next_sibling(first_child(node))
     while (a0 >= 0) {
-        if is_kind(a0, Node.Alt_arm) and alt_variant(first_child(a0), enum_decl) < 0 { return }
+        if is_kind(a0, Node.Alt_arm) {
+            let p = first_child(a0)
+            while (p >= 0) {
+                if alt_variant(p, enum_decl) < 0 { return }
+                p = next_pattern(p, a0)
+            }
+        }
         a0 = next_sibling(a0)
     }
     // The variants the arms name, marked by declaration (and unmarked after).
@@ -642,7 +700,13 @@ fn check_alt_exhaustive(node: I32, enum_decl: I32) Void {
     }
     let a = next_sibling(first_child(node))
     while (a >= 0) {
-        if is_kind(a, Node.Alt_arm) { alt_covered[alt_variant(first_child(a), enum_decl)] = 1 }
+        if is_kind(a, Node.Alt_arm) {
+            let p = first_child(a)
+            while (p >= 0) {
+                alt_covered[alt_variant(p, enum_decl)] = 1
+                p = next_pattern(p, a)
+            }
+        }
         a = next_sibling(a)
     }
     let missing = -1
@@ -653,7 +717,13 @@ fn check_alt_exhaustive(node: I32, enum_decl: I32) Void {
     }
     a = next_sibling(first_child(node))
     while (a >= 0) {
-        if is_kind(a, Node.Alt_arm) { alt_covered[alt_variant(first_child(a), enum_decl)] = 0 }
+        if is_kind(a, Node.Alt_arm) {
+            let p = first_child(a)
+            while (p >= 0) {
+                alt_covered[alt_variant(p, enum_decl)] = 0
+                p = next_pattern(p, a)
+            }
+        }
         a = next_sibling(a)
     }
     if missing >= 0 { report2(Diag.NonExhaustive, node, decl_name[missing], 3, named(enum_decl, 0)) }
