@@ -8,6 +8,119 @@
     /// 1: this module is utu-tools.wasm.
     fn tools_version() I32 => 1
 
+    // ── size blame ──
+
+    /// Size blame (`tools/blame*.utu`), of the build this module just made
+    /// (with a source map): blame_begin, then the host's files (`start`:
+    /// where the file is in src, `size` its bytes; a file of the build's may
+    /// be given as several), the module's bytes (written to blame_in after
+    /// blame_wasm_room), its brotli costs and glue if any; then blame_run
+    /// ("" or why not) and its outputs.
+    fn blame_begin(name: Str) Void => blame_reset(name)
+
+    fn blame_file(key: Str, label: Str, start: I32, size: I32) Void => add_blame_file(key, label, start, size)
+
+    /// The last file's text, for the page.
+    fn blame_text(text: Str) Void { bf_text[bf_text.len() - 1] = bs_add(text) }
+
+    fn blame_wasm_room(n: I32) Void {
+        blame_in.resize(n)
+        rd_size = n
+    }
+
+    /// The module's quality-11 brotli size, and that the costs of `chunk` bytes each follow (blame_cost).
+    fn blame_brotli(total: I32, chunk: I32) Void {
+        br_total = total
+        br_chunk = chunk
+    }
+
+    fn blame_cost(bytes: I32) Void => br_costs.push(bytes)
+
+    /// The glue's size, then each @es binding's bytes in it (blame_glue).
+    fn blame_glue_size(bytes: I32) Void { glue_size = bytes }
+
+    fn blame_glue(field: Str, bytes: I32) Void {
+        gl_field.push(bs_add(field))
+        gl_bytes.push(bytes)
+    }
+
+    fn blame_run() Str => blame_report_run()
+
+    /// NAME.blame.json, NAME.blame.html, and the top `n` of each list as text.
+    fn blame_json() Str => report_json()
+
+    fn blame_html() Str => page_html()
+
+    fn blame_top(n: I32) Str => top_text(n)
+
+    // ── format ──
+
+    /// `source` laid out (`utu format`), or as it is: then format_refused says why.
+    fn format(source: Str) Str => format_utu(source)
+
+    /// Why the last format left its source as it is (it does not parse, its
+    /// layout would parse differently, its layout is not stable), or "".
+    fn format_refused() Str => fu_refused
+
+    /// `source` with each `@wutu` island laid out.
+    fn format_wutu(source: Str) Str => format_wutu_source(source)
+
+    /// A template laid out, from its first line's start; it throws when it does not parse.
+    fn format_template_text(text: Str) Str => format_wutu_body(text, false)
+
+    /// The shape of `source`'s tree that format compares, as text ("" when it does not parse).
+    fn format_shape(source: Str) Str => syntax_shape(source)
+
+    /// A template's tree as JSON, or its syntax error: `{"error":…,"at":…}` (see wutu_json).
+    fn wutu_template_tree(text: Str) Str => wutu_tree(text)
+
+    /// The `@wutu` islands of `source`: each payload's start and end (UTF-16 offsets), space-separated.
+    fn wutu_islands(source: Str) Str {
+        find_islands(source)
+        let out = ""
+        for (0 ..< fw_islands.len()) |k| { out = out + (if k > 0 { " " } else { "" }) + fw_islands[k].str() }
+        return out
+    }
+
+    /// The Wutu completion words at `offset` of `source` (see wutu_completion_words).
+    fn wutu_completions(source: Str, offset: I32) Str => wutu_completion_words(source, offset)
+
+    // ── grep ──
+
+    /// `utu grep`'s pattern, parsed for @grep_match (it resets the program):
+    /// how many nodes it is, 0 when it is not utu.
+    fn grep_pattern(pattern: Str) I32 => gr_pattern(pattern)
+
+    /// A `--where`: hole `name`'s node has type `want`. 0 when the pattern has no such hole.
+    fn grep_where(name: Str, want: Str) I32 => gr_where_add(name, want)
+
+    /// The pattern's matches in the program the compiler holds: lines
+    /// `m file start end` (a file id, UTF-16 offsets), each followed by its
+    /// bindings, `b name file start end` (`b name -`: nowhere).
+    fn grep_match() Str => gr_match()
+
+    /// Each `--where` no node met: lines `hole\ttype`, then `\ttype` for each type seen.
+    fn grep_unmatched() Str => gr_unmatched()
+
+    /// The declarations named `name` in the program's own files: lines
+    /// `d kind file start end`, each followed by its references, `r kind file start end`.
+    fn grep_refs(name: Str) Str => gr_refs(name)
+
+    // ── utudoc ──
+
+    /// tools/utudoc: a new build, `keys` its files' keys, a line each in file order.
+    fn doc_build(keys: Str) Void => ud_build(keys)
+
+    /// Document file `f` of this build (its name in the document, where
+    /// errors name it, its text). Returns how many declarations it has.
+    fn doc_file(f: I32, name: Str, display: Str, text: Str) I32 => ud_file(f, name, display, text)
+
+    /// The last file's colored pieces: lines `start end class`.
+    fn doc_pieces(pieces: Str) Void => ud_pieces(pieces)
+
+    /// The Typst document, `title`, over `files` files.
+    fn doc_write(title: Str, files: I32) Str => ud_write(title, files)
+
     // ── the language server's analysis, and doc comments ──
 
     // What names mean, for an editor (selfhost/tools/query.utu, lsp.utu,
@@ -46,7 +159,3 @@
     fn query_completions(file: I32, start: I32, placeholder: Str) Str => q_completions(file, start, placeholder)
     fn query_import_paths(text: Str) Str => q_import_paths(text)
 
-    // Doc comments.
-    fn query_doc_declaration(decl: I32) Str => q_doc_declaration(decl)
-    fn query_doc_file(file: I32) Str => q_doc_file(file)
-    fn query_doc_sections(file: I32) Str => q_doc_sections(file)

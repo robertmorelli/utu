@@ -17,9 +17,11 @@
 /// A token's text.
 fn qd_text(t: I32) Str => bytes_text(tok_start[t], tok_end[t])
 
-/// The host's file a token is in, or -1.
+/// The file a token is one of (not a generated one), or -1.
 fn qd_file_of_token(t: I32) I32 {
-    for (0 ..< q_nfiles) |f| { if file_tok[f] <= t and t < file_tok_end[f] { return f } }
+    for (0 ..< file_start.len()) |f| {
+        if file_role[f] != FileRole.Generated.i32() and file_tok[f] <= t and t < file_tok_end[f] { return f }
+    }
     return -1
 }
 
@@ -87,10 +89,9 @@ fn q_doc_file(file: I32) Str {
     return qd_lines(found, "//!")
 }
 
-/// A file's other `//!` blocks, each going on with its doc where it is, as
-/// JSON: `{"start": s, "text": t}` (s in the file's text), in order.
-fn q_doc_sections(file: I32) Str {
-    if file < 0 { return "[]" }
+/// A file's other `//!` blocks, each going on with its doc where it is: each
+/// block's tokens, in order (its text: @qd_lines with `//!`).
+fn q_doc_sections(file: I32) Pile[Pile[I32]] {
     let blocks = Pile[Pile[I32]].new()
     let last = -1
     for (file_tok[file] ..< file_tok_end[file]) |t| {
@@ -103,14 +104,12 @@ fn q_doc_sections(file: I32) Str {
         }
         last = t
     }
-    let out = ""
+    let out = Pile[Pile[I32]].new()
     for (0 ..< blocks.len()) |i| {
-        let block = blocks[i]
         // (The leading block is the file's own.)
-        if i == 0 and block[0] == file_tok[file] { continue }
-        out = q_comma(out) + "{\"start\":" + q_unit(file, tok_start[block[0]]).str() + ",\"text\":" + q_json(qd_lines(block, "//!")) + "}"
+        if i > 0 or blocks[i][0] != file_tok[file] { out.push(blocks[i]) }
     }
-    return "[" + out + "]"
+    return out
 }
 
 //! == Typst as Markdown

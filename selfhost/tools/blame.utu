@@ -1,13 +1,18 @@
 //! = Size blame
 //!
-//! Every byte of a module, blamed on the source it came from
-//! (src/selfhost/blame.js reads the module, and these). Code is placed by the
-//! source map (wasm.utu); the rest by these: by entity of the last module
-//! (its index there), the syntax node it was made for, or -1. A declaration's
-//! own node when one made it (a struct's type, a `let`'s global, a mem's
-//! memory, globals and data, an `@es` import), else the syntax being checked
-//! when it was made (@ht_src, @glob_src): its first use. Reading them changes
-//! nothing built.
+//! Every byte of a module, blamed on the source it came from: it answers
+//! "why is my binary this big". The build that is blamed ran on this module
+//! (with a source map); here, what its entities were made for. Code is placed
+//! by the source map (wasm.utu); the rest by these: by entity of the last
+//! module (its index there), the syntax node it was made for, or -1. A
+//! declaration's own node when one made it (a struct's type, a `let`'s
+//! global, a mem's memory, globals and data, an `@es` import), else the
+//! syntax being checked when it was made (@ht_src, @glob_src): its first use.
+//! Reading them changes nothing built.
+//!
+//! Each node is then a place (file, line, declaration) in the host's files
+//! (blame_places.utu); blame_module.utu reads the module and blames each
+//! byte, blame_report.utu sums them.
 
 /// By heap type, global, function, and memory: the declaration that made it, or -1.
 vec blame_ht_decl: I32
@@ -65,13 +70,13 @@ fn func_role(i: I32) I32 {
     return 0
 }
 
-/// Function `i`'s name (as the name section has it): its UTF-8 bytes, a code unit each; "" for none.
-fn func_name_text(i: I32) Str {
+/// Function `i`'s name (as the name section has it), or -1 for none (or "").
+fn func_name_text(i: I32) I32 {
     let n = func_debug_name[func_order[i]]
-    if n < 0 { return "" }
-    let codes = Array[I32].new(name_len[n], 0)
-    for (0 ..< name_len[n]) |k| { codes[k] = names[name_start[n] + k] }
-    return Str.from_codes(codes, name_len[n])
+    if n < 0 or name_len[n] == 0 { return -1 }
+    let bytes = Array[I32].new(name_len[n], 0)
+    for (0 ..< name_len[n]) |k| { bytes[k] = names[name_start[n] + k] }
+    return bs_add(utf8_text(bytes, name_len[n]))
 }
 
 /// Global `i` of the module (imports first).

@@ -2,10 +2,10 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs/promises';
 import {cssProjection,stencilCss} from '../src/wutu/css-stencil.js';
 import {dslEnd} from '../src/wutu/dsl-envelope.js';
-import {createSyntaxShape,formatUtuSource} from '../src/wutu/wutu-tooling.js';
+import {formatUtuSource} from '../src/wutu/wutu-tooling.js';
 
-import {loadNodeCompiler} from '../src/selfhost/node.js';
-const shape=createSyntaxShape(await loadNodeCompiler());
+import {loadNodeTools} from '../src/selfhost/node.js';
+const tools=await loadNodeTools();
 const css=String.raw`@layer reset, theme;
 @property --angle { syntax: "<angle>"; inherits: false; initial-value: 0deg; }
 @future-rule unknown(foo) { --tokens: { a: b; }; }
@@ -25,15 +25,15 @@ assert.throws(()=>dslEnd('a @utu/\\ b \\/',0),/Unterminated/);
 for(const round of ['one','two'])for(const name of await fs.readdir(`examples/wutu-round-${round}`)){
  if(name==='theme.utu')continue;
  const source=await fs.readFile(`examples/wutu-round-${round}/${name}/main.utu`,'utf8');
- const formatted=await formatUtuSource(source, { shape });
- assert.equal(await formatUtuSource(formatted, { shape }),formatted,`${name} formatter idempotence`);
+ const formatted=await formatUtuSource(tools, source);
+ assert.equal(await formatUtuSource(tools, formatted),formatted,`${name} formatter idempotence`);
 }
 {
  // Blank lines between statements survive (one at most); `else` stays on its
  // closing brace's line; a `\"` in a string is not its end.
  const source='fn a() Str { return "say \\"hi\\" {"; }\n\n\nfn b(x: Bool) I32 {\n    return if x { 1; }\n    else { 2; };\n}\n';
- const formatted=await formatUtuSource(source, { shape });
+ const formatted=await formatUtuSource(tools, source);
  assert.equal(formatted,'fn a() Str {\n    return "say \\"hi\\" {";\n}\n\nfn b(x: Bool) I32 {\n    return if x {\n        1;\n    } else {\n        2;\n    };\n}\n');
- assert.equal(await formatUtuSource(formatted, { shape }),formatted,'blank line idempotence');
+ assert.equal(await formatUtuSource(tools, formatted),formatted,'blank line idempotence');
 }
 console.log('CSS payload/offset preservation, balanced DSL envelopes, and ten-source formatter idempotence passed');

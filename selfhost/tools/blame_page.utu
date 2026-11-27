@@ -1,0 +1,356 @@
+//! = Size blame: as text, and as a page
+//!
+//! The report's top of each list, as terminal text (top_text); and as a
+//! page (page_html): a treemap (file → declaration → line; click to go in,
+//! the path to go out) and the source of what is chosen, each line with its
+//! bytes.
+
+let locale_number: fun(F64) Str = @es/\ (n) => Math.round(n).toLocaleString('en-US') \/
+let fixed1: fun(F64) Str = @es/\ (x) => x.toFixed(1) \/
+
+fn num(n: F64) Str => locale_number(n)
+
+fn count_text(n: I32) Str => locale_number(n.f64())
+
+fn pct(n: I32, of: I32) Str => if of != 0 { fixed1(100.0 * n.f64() / of.f64()) + "%" } else { "-" }
+
+/// The lines of the text, as they are made.
+vec tx_lines: I32
+
+fn say(line: Str) Void => tx_lines.push(bs_add(line))
+
+/// A table of the first `n` rows (`cells`: each row's cells): the first two
+/// right-aligned, the rest left, under its title after a blank line.
+fn table(title: Str, cells: Array[Array[Str]]) Void {
+    if cells.len() == 0 { return }
+    say("")
+    say(title)
+    let widths = Array[I32].new(cells[0].len(), 0)
+    for (cells) |row| {
+        for (row, 0 ..< row.len()) |cell, i| { if cell.len() > widths[i] { widths[i] = cell.len() } }
+    }
+    for (cells) |row| {
+        let line = ""
+        for (row, 0 ..< row.len()) |cell, i| {
+            let padded = if i < 2 { cell.pad_start(widths[i], " ") } else { cell.pad_end(widths[i], " ") }
+            line = if i == 0 { padded } else { line + "  " + padded }
+        }
+        say(("  " + line).trim_end())
+    }
+}
+
+/// The first `n` of `order`, as many rows of `width` cells.
+fn rows_of(order: Array[I32], n: I32, width: I32) Array[Array[Str]] {
+    let count = if order.len() < n { order.len() } else { n }
+    let rows = Array[Array[Str]].new(count, Array[Str].new(0, ""))
+    for (0 ..< count) |k| { rows[k] = Array[Str].new(width, "") }
+    return rows
+}
+
+fn where_text(f: I32, line: I32) Str => if f < 0 { "" } else { `${bs(bf_label[f])}:${line}` }
+
+fn br_cell(br: F64) Str => if br_total >= 0 { `~${num(br)} br` } else { "" }
+
+fn decl_name_or(d: I32, none: Str) Str => if d >= 0 { bs(dc_name[d]) } else { none }
+
+fn fn_name_text(f: I32) Str => if fn_named[f] >= 0 { bs(fn_named[f]) } else { `function ${f}` }
+
+/// The report's top `n` of each list.
+fn top_text(n: I32) Str {
+    tx_lines.clear()
+    let total = rd_size
+    let br = if br_total >= 0 { `, brotli ${count_text(br_total)}` } else { "" }
+    say(`${bs(rp_name)}  ${count_text(total)} bytes${br}; ${pct(rp_blamed, total)} blamed on source, the rest in buckets below`)
+    let sections = rows_of(o_sections, n, 5)
+    for (sections, 0 ..< sections.len()) |row, k| {
+        let s = o_sections[k]
+        row[0] = count_text(sr_bytes[s])
+        row[1] = pct(sr_bytes[s], total)
+        row[2] = nm(sr_name[s])
+        row[3] = br_cell(sr_br[s])
+        row[4] = if sr_unattributed[s] != 0 { `${count_text(sr_unattributed[s])} in buckets` } else { "" }
+    }
+    table("sections", sections)
+    let decls = rows_of(o_decls, n, 6)
+    for (decls, 0 ..< decls.len()) |row, k| {
+        let r = o_decls[k]
+        let d = dr_decl[r]
+        row[0] = count_text(dr_bytes[r])
+        row[1] = pct(dr_bytes[r], total)
+        row[2] = decl_name_or(d, "(no declaration)")
+        row[3] = if d >= 0 { where_text(dc_file[d], dc_line[d]) } else { "" }
+        row[4] = br_cell(dr_br[r])
+        let inlined = if dr_inlined[r] != 0 { `${count_text(dr_inlined[r])} inlined copies` } else { "" }
+        let helpers = if dr_helpers[r] != 0 { `${count_text(dr_helpers[r])} helper shares` } else { "" }
+        row[5] = if inlined != "" and helpers != "" { inlined + ", " + helpers } else { inlined + helpers }
+    }
+    table("declarations", decls)
+    let lines = rows_of(o_lines, n, 5)
+    for (lines, 0 ..< lines.len()) |row, k| {
+        let l = o_lines[k]
+        row[0] = count_text(lr_bytes[l])
+        row[1] = pct(lr_bytes[l], total)
+        row[2] = where_text(lr_file[l], lr_line[l])
+        row[3] = decl_name_or(lr_decl[l], "")
+        row[4] = br_cell(lr_br[l])
+    }
+    table("lines", lines)
+    let fns = rows_of(o_fns, n, 5)
+    for (fns, 0 ..< fns.len()) |row, k| {
+        let w = o_fns[k]
+        let f = fw_index[w]
+        let p = fn_place[f]
+        row[0] = count_text(fw_bytes[w])
+        row[1] = pct(fw_bytes[w], total)
+        row[2] = fn_name_text(f)
+        row[3] = if p >= 0 { where_text(bpl_file[p], bpl_line[p]) } else { "" }
+        row[4] = if fn_role[f] == 0 { "" } else { role_name(fn_role[f]) }
+    }
+    table("functions (code)", fns)
+    let files = rows_of(o_files, n, 4)
+    for (files, 0 ..< files.len()) |row, k| {
+        let f = o_files[k]
+        row[0] = count_text(fr_bytes[f])
+        row[1] = pct(fr_bytes[f], total)
+        row[2] = bs(bf_label[fr_file[f]])
+        row[3] = br_cell(fr_br[f])
+    }
+    table("files", files)
+    let helpers = rows_of(o_helpers, n, 4)
+    for (helpers, 0 ..< helpers.len()) |row, k| {
+        let h = o_helpers[k]
+        row[0] = count_text(hr_bytes[h])
+        row[1] = pct(hr_bytes[h], total)
+        row[2] = fn_name_text(hr_index[h])
+        row[3] = `${hr_calls[h]} calls from ${hr_sites[h]} lines`
+    }
+    table("helpers (split among their calls)", helpers)
+    if rp_inlined != 0 {
+        say("")
+        say(`inlining: ${count_text(rp_inlined)} bytes (${pct(rp_inlined, code_section_bytes())} of code) are copies of inlined functions`)
+        let callees = rows_of(o_callees, n, 4)
+        for (callees, 0 ..< callees.len()) |row, k| {
+            let c = o_callees[k]
+            row[0] = count_text(ce_bytes[c])
+            row[1] = pct(ce_bytes[c], total)
+            row[2] = decl_name_or(ce_decl[c], "(none)")
+            row[3] = `at ${ce_sites[c]} calls`
+        }
+        table("inlined callees", callees)
+    }
+    let buckets = rows_of(o_buckets, n, 4)
+    for (buckets, 0 ..< buckets.len()) |row, k| {
+        let u = o_buckets[k]
+        row[0] = count_text(bk_bytes[u])
+        row[1] = pct(bk_bytes[u], total)
+        row[2] = nm(bk_what[u])
+        row[3] = nm(bk_section[u])
+    }
+    table("buckets (no source)", buckets)
+    if glue_size > 0 {
+        say("")
+        say(`glue: ${count_text(glue_size)} bytes of @es source (before bundling)`)
+    }
+    if br_total >= 0 {
+        say("")
+        say(`br: estimated (${estimate_text()})`)
+    }
+    for (0 ..< notes.len()) |k| { say(`note: ${bs(notes[k])}`) }
+    let text = bs(tx_lines[0])
+    for (1 ..< tx_lines.len()) |k| { text = text + "\n" + bs(tx_lines[k]) }
+    return text
+}
+
+fn escape_html(s: Str) Str => s.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;").replace("\"", "&quot;")
+
+/// The page; the source of each file the report names.
+fn page_html() Str {
+    let decl_bytes = Array[Str].new(o_decls.len(), "")
+    for (o_decls, 0 ..< o_decls.len()) |r, i| { decl_bytes[i] = `[${dr_decl[r]},${dr_bytes[r]},${dr_br[r]}]` }
+    let texts = o_files filter |f| { bf_text[fr_file[f]] >= 0 } map |f| { `${file_json(fr_file[f])}:${q(bf_text[fr_file[f]])}` } collect(Str)
+    let data = `{"name":${q(rp_name)},"bytes":${rd_size},"blamed":${rp_blamed},"compressed":${compressed_json()},"sections":${sections_json()},"unattributed":${buckets_json()},"files":${files_json(true)},"decls":${decl_table_json()},"declBytes":${json_list(decl_bytes)},"lines":${line_tuples_json()},"helpers":${helpers_json()},"inlining":${inlining_json()},"texts":{${",".join(texts)}}}`
+    return page_head() + "\n<title>" + escape_html(bs(rp_name) + " size blame") + "</title>\n" + page_style() + "\nconst D = " + data.replace("<", "\\u003c") + ";\n" + page_script() + "\n"
+}
+
+fn page_head() Str =>
+    \\<!doctype html>
+    \\<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+
+fn page_style() Str =>
+    \\<style>
+    \\:root { --bg: #fbfaf7; --fg: #23262d; --dim: #737985; --line: #dedad2; --panel: #ffffff; --hot: #c2410c; --cool: #2563eb; --bar: #f2d3bf; }
+    \\@media (prefers-color-scheme: dark) { :root { --bg: #16181d; --fg: #e5e7eb; --dim: #9aa1ad; --line: #2c3038; --panel: #1d2026; --hot: #fb923c; --cool: #60a5fa; --bar: #5b3420; } }
+    \\* { box-sizing: border-box; }
+    \\body { margin: 0; background: var(--bg); color: var(--fg); font: 14px/1.4 system-ui, sans-serif; }
+    \\header { padding: 12px 16px; border-bottom: 1px solid var(--line); }
+    \\h1 { font-size: 17px; margin: 0 0 4px; }
+    \\.dim { color: var(--dim); }
+    \\main { display: grid; grid-template-columns: minmax(0, 3fr) minmax(0, 2fr); gap: 12px; padding: 12px 16px; height: calc(100vh - 76px); }
+    \\@media (max-width: 800px) { main { grid-template-columns: 1fr; height: auto; } #map { height: 60vh; } #source { height: 60vh; } }
+    \\#crumbs { margin-bottom: 6px; } #crumbs a { color: var(--cool); cursor: pointer; text-decoration: none; }
+    \\#mapwrap { display: flex; flex-direction: column; min-height: 0; }
+    \\#map { position: relative; flex: 1; min-height: 300px; background: var(--panel); border: 1px solid var(--line); overflow: hidden; }
+    \\.cell { position: absolute; overflow: hidden; border: 1px solid var(--bg); padding: 2px 4px; font-size: 12px; cursor: pointer; color: #111; }
+    \\.cell:hover { outline: 2px solid var(--fg); z-index: 1; }
+    \\.cell b { display: block; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    \\#side { display: flex; flex-direction: column; min-height: 0; }
+    \\#tabs button { font: inherit; background: none; border: 1px solid var(--line); color: var(--fg); padding: 2px 8px; cursor: pointer; }
+    \\#tabs button.on { background: var(--panel); border-bottom-color: var(--panel); }
+    \\#source, #lists { flex: 1; overflow: auto; background: var(--panel); border: 1px solid var(--line); font: 12px/1.45 ui-monospace, monospace; }
+    \\.row { display: grid; grid-template-columns: 4.5em 5.5em 1fr; white-space: pre; }
+    \\.row .n { color: var(--dim); text-align: right; padding-right: 6px; }
+    \\.row .b { text-align: right; padding-right: 6px; background-repeat: no-repeat; }
+    \\.row.focus { background: color-mix(in srgb, var(--hot) 15%, transparent); }
+    \\#lists table { border-collapse: collapse; width: 100%; } #lists td, #lists th { padding: 1px 6px; text-align: left; white-space: nowrap; }
+    \\#lists td.r { text-align: right; } #lists h3 { margin: 10px 6px 4px; font: 600 13px system-ui, sans-serif; }
+    \\</style></head><body>
+    \\<header><h1 id="title"></h1><div class="dim" id="summary"></div></header>
+    \\<main><div id="mapwrap"><div id="crumbs"></div><div id="map"></div></div>
+    \\<div id="side"><div id="tabs"><button data-tab="source" class="on">Source</button><button data-tab="lists">Totals</button></div>
+    \\<div id="source"></div><div id="lists" hidden></div></div></main>
+    \\<script>
+
+fn page_script() Str =>
+    \\const fmt = n => Math.round(n).toLocaleString('en-US');
+    \\const pc = n => (100 * n / D.bytes).toFixed(1) + '%';
+    \\document.getElementById('title').textContent = D.name + ' — ' + fmt(D.bytes) + ' bytes';
+    \\document.getElementById('summary').textContent = pc(D.blamed) + ' blamed on source; '
+    \\  + D.sections.map(s => s.section + ' ' + fmt(s.bytes)).join(', ')
+    \\  + (D.compressed ? '. Brotli ' + fmt(D.compressed.bytes) + ' (per bucket: estimated).' : '.');
+    \\// The tree: files, their declarations, their lines; buckets with no source beside them.
+    \\const root = { name: 'all', kids: [] };
+    \\const byFile = new Map();
+    \\for (const f of D.files) { const node = { name: f.label, file: f.file, kids: [], decls: new Map() }; byFile.set(f.file, node); root.kids.push(node); }
+    \\for (const [file, line, decl, bytes, br] of D.lines) {
+    \\  const f = byFile.get(file); if (!f || !bytes) continue;
+    \\  const d = D.decls[decl];
+    \\  let dn = f.decls.get(decl);
+    \\  if (!dn) { dn = { name: d ? d.name : '(no declaration)', file, line: d ? d.line : line, kids: [] }; f.decls.set(decl, dn); f.kids.push(dn); }
+    \\  dn.kids.push({ name: 'line ' + line, file, line, size: bytes, br });
+    \\}
+    \\if (D.unattributed.length) root.kids.push({ name: '(no source)', kids: D.unattributed.map(u => ({ name: u.what + ' (' + u.section + ')', size: u.bytes, br: u.br })) });
+    \\const sum = n => n.size ?? (n.size = n.kids.reduce((a, k) => a + sum(k), 0));
+    \\sum(root);
+    \\// Squarified treemap.
+    \\function layout(kids, x, y, w, h, out) {
+    \\  const items = kids.filter(k => k.size > 0).sort((a, b) => b.size - a.size);
+    \\  const total = items.reduce((a, k) => a + k.size, 0);
+    \\  if (!total) return;
+    \\  const scale = w * h / total;
+    \\  let i = 0;
+    \\  while (i < items.length) {
+    \\    const short = Math.min(w, h);
+    \\    let row = [], best = Infinity, area = 0;
+    \\    while (i < items.length) {
+    \\      const a = items[i].size * scale;
+    \\      const next = area + a;
+    \\      const side = next / short;
+    \\      const worst = Math.max(...row.concat(items[i]).map(k => { const s = k.size * scale / side; return Math.max(side / s, s / side); }));
+    \\      if (worst > best) break;
+    \\      best = worst; area = next; row.push(items[i]); i++;
+    \\    }
+    \\    const side = area / short;
+    \\    let off = 0;
+    \\    for (const k of row) {
+    \\      const len = k.size * scale / side;
+    \\      if (w >= h) out.push([k, x, y + off, side, len]); else out.push([k, x + off, y, len, side]);
+    \\      off += len;
+    \\    }
+    \\    if (w >= h) { x += side; w -= side; } else { y += side; h -= side; }
+    \\  }
+    \\}
+    \\const palette = ['#f6c89f', '#a7c7e7', '#b8e0b0', '#f2b5c4', '#d6c4f0', '#f7e3a1', '#a8dadc', '#e8c39e', '#c9d6a3', '#f0b8a0'];
+    \\let path = [root];
+    \\function draw() {
+    \\  const node = path[path.length - 1];
+    \\  const map = document.getElementById('map');
+    \\  map.innerHTML = '';
+    \\  const out = [];
+    \\  layout(node.kids ?? [], 0, 0, map.clientWidth, map.clientHeight, out);
+    \\  out.forEach(([k, x, y, w, h], i) => {
+    \\    const el = document.createElement('div');
+    \\    el.className = 'cell';
+    \\    Object.assign(el.style, { left: x + 'px', top: y + 'px', width: w + 'px', height: h + 'px', background: palette[(path.length === 1 ? i : root.kids.indexOf(path[1])) % palette.length] });
+    \\    el.style.filter = 'brightness(' + (1 - 0.06 * (path.length - 1)) + ')';
+    \\    el.title = k.name + ' — ' + fmt(k.size) + ' bytes (' + pc(k.size) + ')' + (k.br != null && D.compressed ? ', ~' + fmt(k.br) + ' br' : '');
+    \\    if (w > 40 && h > 16) el.innerHTML = '<b></b><span></span>';
+    \\    if (el.firstChild) { el.firstChild.textContent = k.name; el.lastChild.textContent = fmt(k.size); }
+    \\    el.onclick = () => { if (k.file) showSource(k.file, k.line); if (k.kids) { path.push(k); draw(); } };
+    \\    map.appendChild(el);
+    \\  });
+    \\  const crumbs = document.getElementById('crumbs');
+    \\  crumbs.innerHTML = '';
+    \\  path.forEach((p, i) => {
+    \\    const a = document.createElement('a');
+    \\    a.textContent = (i ? ' › ' : '') + p.name + ' (' + fmt(p.size) + ')';
+    \\    a.onclick = () => { path = path.slice(0, i + 1); draw(); };
+    \\    crumbs.appendChild(a);
+    \\  });
+    \\}
+    \\const lineBytes = new Map();
+    \\for (const [file, line, , bytes, br, inl, here, helpers, glue] of D.lines) lineBytes.set(file + ':' + line, { bytes, br, inl, here, helpers, glue });
+    \\function showSource(file, focus) {
+    \\  const text = D.texts[file];
+    \\  const el = document.getElementById('source');
+    \\  setTab('source');
+    \\  el.innerHTML = '';
+    \\  if (text == null) { el.textContent = 'No source for ' + file; return; }
+    \\  const lines = text.split('\n');
+    \\  let max = 1;
+    \\  for (let i = 0; i < lines.length; i++) max = Math.max(max, lineBytes.get(file + ':' + (i + 1))?.bytes ?? 0);
+    \\  const frag = document.createDocumentFragment();
+    \\  let target = null;
+    \\  lines.forEach((t, i) => {
+    \\    const info = lineBytes.get(file + ':' + (i + 1));
+    \\    const row = document.createElement('div');
+    \\    row.className = 'row' + (i + 1 === focus ? ' focus' : '');
+    \\    const n = document.createElement('span'); n.className = 'n'; n.textContent = i + 1;
+    \\    const b = document.createElement('span'); b.className = 'b';
+    \\    if (info) {
+    \\      b.textContent = fmt(info.bytes);
+    \\      b.style.backgroundImage = 'linear-gradient(to left, var(--bar), var(--bar))';
+    \\      b.style.backgroundSize = (100 * info.bytes / max) + '% 100%';
+    \\      b.style.backgroundPosition = 'right';
+    \\      b.title = fmt(info.bytes) + ' bytes' + (D.compressed ? ', ~' + fmt(info.br) + ' br' : '') + (info.inl ? '; ' + fmt(info.inl) + ' in inlined copies' : '')
+    \\        + (info.here ? '; ' + fmt(info.here) + ' inlined here' : '') + (info.helpers ? '; ' + fmt(info.helpers) + ' helper share' : '') + (info.glue ? '; ' + fmt(info.glue) + ' glue JS' : '');
+    \\    }
+    \\    const c = document.createElement('span'); c.textContent = t;
+    \\    row.append(n, b, c);
+    \\    frag.appendChild(row);
+    \\    if (i + 1 === focus) target = row;
+    \\  });
+    \\  el.appendChild(frag);
+    \\  if (target) target.scrollIntoView({ block: 'center' });
+    \\}
+    \\function setTab(name) {
+    \\  for (const b of document.querySelectorAll('#tabs button')) b.classList.toggle('on', b.dataset.tab === name);
+    \\  document.getElementById('source').hidden = name !== 'source';
+    \\  document.getElementById('lists').hidden = name !== 'lists';
+    \\}
+    \\for (const b of document.querySelectorAll('#tabs button')) b.onclick = () => setTab(b.dataset.tab);
+    \\function lists() {
+    \\  const el = document.getElementById('lists');
+    \\  const table = (title, head, rows) => {
+    \\    const h = document.createElement('h3'); h.textContent = title; el.appendChild(h);
+    \\    const t = document.createElement('table');
+    \\    const tr = document.createElement('tr');
+    \\    for (const x of head) { const th = document.createElement('th'); th.textContent = x; tr.appendChild(th); }
+    \\    t.appendChild(tr);
+    \\    for (const row of rows.slice(0, 200)) {
+    \\      const r = document.createElement('tr');
+    \\      row.forEach((x, i) => { const td = document.createElement('td'); td.textContent = x; if (i < 2) td.className = 'r'; r.appendChild(td); });
+    \\      t.appendChild(r);
+    \\    }
+    \\    el.appendChild(t);
+    \\  };
+    \\  table('Sections', ['bytes', '%', 'section', 'in buckets'], D.sections.map(s => [fmt(s.bytes), pc(s.bytes), s.section, s.unattributed ? fmt(s.unattributed) : '']));
+    \\  const declRows = D.declBytes.map(([d, bytes]) => [fmt(bytes), pc(bytes), D.decls[d]?.name ?? '(no declaration)', D.decls[d] ? D.decls[d].file.split('/').pop() + ':' + D.decls[d].line : '']);
+    \\  table('Declarations', ['bytes', '%', 'declaration', 'at'], declRows);
+    \\  table('Helpers (split among calls)', ['bytes', '%', 'helper', 'calls'], D.helpers.map(h => [fmt(h.bytes), pc(h.bytes), h.name ?? '', h.calls]));
+    \\  table('Inlined callees', ['bytes', '%', 'callee', 'sites'], D.inlining.callees.map(c => [fmt(c.bytes), pc(c.bytes), D.decls[c.decl]?.name ?? '', c.sites]));
+    \\  table('No source', ['bytes', '%', 'bucket', 'section'], D.unattributed.map(u => [fmt(u.bytes), pc(u.bytes), u.what, u.section]));
+    \\}
+    \\lists();
+    \\draw();
+    \\addEventListener('resize', draw);
+    \\</script></body></html>

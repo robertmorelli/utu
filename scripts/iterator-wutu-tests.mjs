@@ -1,7 +1,12 @@
 import { parseHTML } from 'linkedom/worker';
 import { printWat } from '../src/selfhost/wat.js';
 import { compileAndInstantiate, compileAndInstantiateSelfhost, selfhostDiagnostics, withTempUtu } from './test-harness.mjs';
-import { parseWutu } from '../src/wutu/wutu-parse.js';
+import { loadNodeTools } from '../src/selfhost/node.js';
+import { wutuTree } from '../src/wutu/wutu-tooling.js';
+
+// The compiler's template parser, from dist/utu-tools.wasm.
+const tools = await loadNodeTools();
+const parseWutu = text => wutuTree(tools, text);
 
 export function registerIteratorWutuTests({test,assert,assertEq,assertThrows,assertNoErrors,makeCompiler}) {
   test('iterators: fused stages, independent indexes, short circuit, and nested pipelines',async({ROOT})=>{
@@ -134,7 +139,7 @@ export function registerIteratorWutuTests({test,assert,assertEq,assertThrows,ass
   });
   test('wutu: parser separates attributes, events, CSS scopes, strings, and expressions',()=>{
     const parsed=parseWutu(`@document { :root { --ink: red; } } main.card { color: var(--ink); :hover {color:blue;} @media (width < 40rem) {display:grid;} @ & > * {margin:0;} h2 { "Hello"; |> items[0]; } button { type="button"; on click=cl(e) Void { call("["); }; "Go"; } }`);
-    assertEq(parsed.root.tag,'main');assertEq(parsed.root.children.length,2);assertEq(parsed.root.children[0].children[1].expr,'items[0]');
+    assertEq(parsed.root.text,'main');assertEq(parsed.root.children.length,2);assertEq(parsed.root.children[0].children[1].text,'items[0]');
     assertThrows(()=>parseWutu('canvas { padding="10"; }'),'unknown attribute');
     assertThrows(()=>parseWutu('input { "bad"; }'),'cannot have children');
     assertThrows(()=>parseWutu('div { onclick="bad"; }'),'events are written');

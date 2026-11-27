@@ -1,0 +1,474 @@
+//! = Tools: format
+//!
+//! `utu format`: general utu layout, one statement per line, indented by
+//! brace depth, `|` fields and variants one deeper than their declaration.
+//! Strings, templates, comments and DSL literals keep their text (`@wutu`
+//! islands are laid out by format_wutu_source, `wn` and `html` bodies as
+//! Wutu). The result is used only when the compiler parses it to the same
+//! tree as the source and it formats to itself; otherwise the source comes
+//! back unchanged, so formatting never changes what a program means.
+
+/// Why the last @format_utu left its source as it is, or "".
+let fu_refused: Str = ""
+
+/// The file the last @fu_parse parsed.
+let fu_file: I32 = -1
+
+/// Parse `source` as the program's one file (as the host's `source`,
+/// `tokens` and `nodes` do, comments as nodes): its root, or -1.
+fn fu_parse(source: Str) I32 {
+    unseal()
+    reset_program()
+    let start = src.len()
+    gen_text_utf8(source)
+    let n = src.len() - start
+    src.resize(start)
+    fu_file = add_file(n, FileRole.Entry)
+    src.resize(file_start[fu_file])
+    gen_text_utf8(source)
+    src.push(end_byte)
+    comment_nodes = 1
+    let root = parse_file(fu_file)
+    comment_nodes = 0
+    return root
+}
+
+//! == The tree's shape
+//!
+//! Two parses are compared by their nodes' kinds and every token's text. A
+//! function's body `{ return e }` is its `=> e`; a `@wutu` literal is checked
+//! by format_wutu_source; a `wn` or `html` body (one token) by its Wutu tree
+//! and its text but whitespace and `;`.
+
+/// The shape of the last walk: codes, a token's bytes (then -1), -2 `(`,
+/// -3 `)`, -5 `@wutu`, -10 - a node's kind.
+vec fu_shape: I32
+/// The source's shape, while its layout's is made.
+vec fu_before: I32
+/// Whether a body in the walk did not parse as Wutu.
+let fu_failed: Bool = false
+
+/// A function's `{ return e }` (node n, its parent of kind `parent`): its e, else -1.
+fn returned_expr(n: I32, parent: I32) I32 {
+    if parent != Node.Fn_decl.i32() or node_kind[n] != Node.Block.i32() or src[tok_start[node_first[n]]] != 123 { return -1 }
+    let r = node_child[n]
+    if r < 0 or node_next[r] >= 0 or node_kind[r] != Node.Return_expr.i32() or node_first[r] != node_first[n] + 1 or node_last[r] != node_last[n] - 1 { return -1 }
+    let e = node_child[r]
+    return if e >= 0 and node_next[e] < 0 and node_first[e] == node_first[r] + 1 and node_last[e] == node_last[r] { e } else { -1 }
+}
+
+fn shape_token(t: I32, comment: Bool) Void {
+    let end = if comment { trimmed_end(tok_start[t], tok_end[t]) } else { tok_end[t] }
+    for (tok_start[t] ..< end) |b| { fu_shape.push(src[b]) }
+    fu_shape.push(-1)
+}
+
+/// The end of `src[start ..< end_]` without the white space at its end (UTF-8, JavaScript's `\s`).
+fn trimmed_end(start: I32, end_: I32) I32 {
+    let e = end_
+    while (e > start) {
+        let b = src[e - 1]
+        if b == 32 or (b >= 9 and b <= 13) { e -= 1 }
+        else if e - 2 >= start and src[e - 2] == 194 and b == 160 { e -= 2 }
+        else if e - 3 >= start and is_utf8_space(src[e - 3], src[e - 2], b) { e -= 3 }
+        else { return e }
+    }
+    return e
+}
+
+/// U+1680, U+2000–U+200A, U+2028, U+2029, U+202F, U+205F, U+3000, U+FEFF in UTF-8.
+fn is_utf8_space(a: I32, b: I32, c: I32) Bool {
+    return (a == 225 and b == 154 and c == 128) or (a == 226 and b == 128 and ((c >= 128 and c <= 138) or c == 168 or c == 169 or c == 175))
+        or (a == 226 and b == 129 and c == 159) or (a == 227 and b == 128 and c == 128) or (a == 239 and b == 187 and c == 191)
+}
+
+fn shape_text(s: Str) Void {
+    for (0 ..< s.len()) |i| { fu_shape.push(s.get(i)) }
+    fu_shape.push(-1)
+}
+
+fn shape_node(n: I32, parent: I32) Void {
+    let kind = node_kind[n]
+    let e = returned_expr(n, parent)
+    if e >= 0 {
+        fu_shape.push(-2)
+        fu_shape.push(-10 - kind)
+        // (As `=> e` is: a block of `=>` and e.)
+        shape_text("=>")
+        shape_node(e, Node.Return_expr.i32())
+        fu_shape.push(-3)
+        return
+    }
+    fu_shape.push(-2)
+    fu_shape.push(-10 - kind)
+    if kind == Node.Dsl_expr.i32() and tok_text(node_first[n] + 1) == "wutu" {
+        fu_shape.push(-5)
+        fu_shape.push(-3)
+        return
+    }
+    if kind == Node.Wutu_body.i32() {
+        let body = tok_text(node_first[n])
+        // As it is expanded: a wn holds a template; html gives its root tag.
+        let tree = wutu_shape(if parent == Node.Export_html_decl.i32() { "html " + body } else { body.slice(1, body.len() - 1) })
+        if tree.len() == 0 { fu_failed = true }
+        shape_text(tree)
+        // Every character but whitespace and `;` (a `;` is a line break: the tree says what it separates), strings whole.
+        let i = 0
+        while (i < body.len()) {
+            let c = body.get(i)
+            let past = if c == 34 or c == 96 { quoted_end(body, i, c, false, false) } else { -1 }
+            if past > 0 {
+                for (i ..< past) |k| { fu_shape.push(body.get(k)) }
+                i = past
+            } else {
+                if not is_js_space(c) and c != 59 { fu_shape.push(c) }
+                i += 1
+            }
+        }
+        fu_shape.push(-3)
+        return
+    }
+    let comment = kind == Node.Comment.i32()
+    let t = node_first[n]
+    let c = node_child[n]
+    while (c >= 0) {
+        while (t < node_first[c]) {
+            shape_token(t, comment)
+            t += 1
+        }
+        shape_node(c, kind)
+        t = node_last[c]
+        c = node_next[c]
+    }
+    while (t < node_last[n]) {
+        shape_token(t, comment)
+        t += 1
+    }
+    fu_shape.push(-3)
+}
+
+/// The shape of `source` in @fu_shape (parsed, the parse kept); false when it does not parse.
+fn shape_of(source: Str) Bool {
+    fu_shape.clear()
+    fu_failed = false
+    let root = fu_parse(source)
+    if root < 0 { return false }
+    shape_node(root, -1)
+    return not fu_failed
+}
+
+//! == Arrow bodies
+
+/// Each function body `{ return e }` of the last parse, from n: block
+/// start, e start, e end, block end, bytes in its file.
+vec fu_arrows: I32
+
+fn find_arrows(n: I32, parent: I32) Void {
+    let e = returned_expr(n, parent)
+    let base = file_start[fu_file]
+    if e >= 0 {
+        fu_arrows.push(tok_start[node_first[n]] - base)
+        fu_arrows.push(tok_start[node_first[e]] - base)
+        fu_arrows.push(tok_end[node_last[e] - 1] - base)
+        fu_arrows.push(tok_end[node_last[n] - 1] - base)
+        return
+    }
+    let c = node_child[n]
+    while (c >= 0) {
+        find_arrows(c, node_kind[n])
+        c = node_next[c]
+    }
+}
+
+/// Whether nothing but a comment follows `close` on its line (looking 400 bytes on).
+fn line_ends_after(close: I32, n: I32) Bool {
+    let base = file_start[fu_file]
+    let end = if close + 400 < n { close + 400 } else { n }
+    let k = close
+    while (k < end and (src[base + k] == 32 or src[base + k] == 9)) { k += 1 }
+    if k + 1 < end and src[base + k] == 47 and src[base + k + 1] == 47 {
+        while (k < end and src[base + k] != 10) { k += 1 }
+    }
+    return k == end or src[base + k] == 10 or (src[base + k] == 13 and k + 1 < end and src[base + k + 1] == 10)
+}
+
+/// The last parsed source with each function body `{ return e }` written
+/// `=> e`, when nothing but a comment follows it on its line (an `=>` body
+/// ends at the line's end).
+fn arrow_bodies(source: Str, root: I32) Str {
+    fu_arrows.clear()
+    find_arrows(root, -1)
+    if fu_arrows.len() == 0 { return source }
+    let base = file_start[fu_file]
+    let n = file_end[fu_file] - base
+    let out = ""
+    let from = 0
+    let k = 0
+    while (k < fu_arrows.len()) {
+        let close = fu_arrows[k + 3]
+        if line_ends_after(close, n) {
+            let before = bytes_text(base + from, base + fu_arrows[k])
+            let e = before.len()
+            while (e > 0 and (before.get(e - 1) == 32 or before.get(e - 1) == 9)) { e -= 1 }
+            out = out + before.slice(0, e) + " => " + bytes_text(base + fu_arrows[k + 1], base + fu_arrows[k + 2])
+            from = close
+        }
+        k += 4
+    }
+    return out + bytes_text(base + from, base + n)
+}
+
+//! == Layout
+
+/// The layout so far: its pieces (each one or more lines, or a blank `"\n"`).
+let lu_out: Array[Str] = Array[Str].new(0, "")
+let lu_count: I32 = 0
+let lu_source: Str = ""
+let lu_line: Str = ""
+let lu_depth: I32 = 0
+let lu_parens: I32 = 0
+let lu_start_parens: I32 = 0
+/// Whether the line is kept as written but its start (a `\\` line, a Wutu body kept).
+let lu_raw: Bool = false
+/// Whether the line before was a declaration head (`struct P:`) or one of its `|` lines.
+let lu_bars: Bool = false
+/// The parens open at each open brace.
+vec lu_braces: I32
+
+fn lu_push(piece: Str) Void {
+    lu_out = grown_strs(lu_out, lu_count)
+    lu_out[lu_count] = piece
+    lu_count += 1
+}
+
+fn lu_flush() Void {
+    let text = if lu_raw { lu_line.trim_start() } else { lu_line.trim() }
+    if lu_raw and text.ends_with("\r") { text = text.slice(0, text.len() - 1) }
+    if text.trim().len() > 0 {
+        let field = text.starts_with("|") and lu_bars
+        // A line that continues a `(` or `[` opened in this block, one deeper.
+        let top = if lu_braces.len() > 0 { lu_braces[lu_braces.len() - 1] } else { 0 }
+        let continued = lu_start_parens > top and not has_code(")]}", text.get(0))
+        lu_push(indent((if lu_depth < 0 { 0 } else { lu_depth }) + (if field or continued { 1 } else { 0 })) + text + "\n")
+        if not lu_raw { lu_bars = field or (lu_parens == 0 and text.ends_with(":") and not text.starts_with("//")) }
+    }
+    lu_line = ""
+    lu_raw = false
+    lu_start_parens = lu_parens
+}
+
+/// A blank line the author left between statements stays (one at most),
+/// except just inside a block's braces.
+fn lu_blank_line() Void {
+    if lu_count == 0 or (lu_count >= 2 and lu_out[lu_count - 1] == "\n") or lu_out[lu_count - 1].ends_with("{\n") { return }
+    lu_push("\n")
+}
+
+/// A comment after the code on its line stays on that line: past it, from `i`.
+fn lu_trailer(i: I32) I32 {
+    let s = lu_source
+    let k = i
+    while (k < s.len() and (s.get(k) == 32 or s.get(k) == 9)) { k += 1 }
+    if not text_at(s, k, "//") { return i }
+    let end = line_end(s, k)
+    lu_line = lu_line + " " + s.slice(k, end).trim_end()
+    return end
+}
+
+/// Past the character literal at `i` (`'a'`, `'\\'`), or -1.
+fn char_literal_end(s: Str, i: I32) I32 {
+    let k = i + 1
+    while (k < s.len()) {
+        let c = s.get(k)
+        if c == 39 { return if k > i + 1 { k + 1 } else { -1 } }
+        if c == 10 { return -1 }
+        if c == 92 {
+            if k + 1 >= s.len() or s.get(k + 1) == 10 { return -1 }
+            k += 2
+        } else {
+            k += 1
+        }
+    }
+    return -1
+}
+
+/// Whether `t` (a line, trimmed) heads a Wutu body: `html`, or `wn name(…)`.
+fn is_wutu_head(t: Str) Bool {
+    if t == "html" { return true }
+    if not text_at(t, 0, "wn") { return false }
+    let k = 2
+    while (k < t.len() and is_js_space(t.get(k))) { k += 1 }
+    if k == 2 or k >= t.len() or not (is_word_code(t.get(k)) and not (t.get(k) >= 48 and t.get(k) <= 57)) { return false }
+    if t.len() < k + 2 or t.get(t.len() - 1) != 41 { return false }
+    for (k + 1 ..< t.len()) |m| { if is_line_end(t.get(m)) { return false } }
+    return true
+}
+
+/// Whether `else` (a word) is next from `i`, past white space.
+fn else_ahead(s: Str, i: I32) Bool => word_at(s, skip_js_spaces(s, i), "else")
+
+fn layout_utu(source: Str) Str {
+    lu_source = source
+    lu_count = 0
+    lu_line = ""
+    lu_depth = 0
+    lu_parens = 0
+    lu_start_parens = 0
+    lu_raw = false
+    lu_bars = false
+    lu_braces.clear()
+    let n = source.len()
+    let i = 0
+    while (i < n) {
+        let c = source.get(i)
+        if text_at(source, i, "//") or text_at(source, i, "\\\\") {
+            let end = line_end(source, i)
+            lu_line = lu_line + source.slice(i, end)
+            // A `\\` line is a string's: its trailing blanks are text.
+            lu_raw = c == 92
+            lu_flush()
+            i = end
+            continue
+        }
+        if c == 34 or c == 96 {
+            let end = if c == 34 { string_end(source, i) + 1 } else { template_end(source, i) }
+            if end <= 0 { return source }
+            lu_line = lu_line + source.slice(i, end)
+            i = end
+            continue
+        }
+        // A character literal (`'\\'` is no `\\` line).
+        if c == 39 and char_literal_end(source, i) > 0 {
+            let end = char_literal_end(source, i)
+            lu_line = lu_line + source.slice(i, end)
+            i = end
+            continue
+        }
+        if opener_end(source, i) >= 0 {
+            let close = dsl_close(source, opener_end(source, i))
+            if close < 0 { return source }
+            lu_line = lu_line + source.slice(i, close + 2)
+            i = close + 2
+            continue
+        }
+        i += 1
+        if c == 40 or c == 91 { lu_parens += 1 }
+        if c == 41 or c == 93 { lu_parens -= 1 }
+        let empty = c == 123 and code_at(source, skip_js_spaces(source, i)) == 125
+        let struct_ = if c == 123 and not empty { one_line_struct(lu_line, source, i - 1) } else { "" }
+        let fits = struct_.len() > 0 and lu_line.len() + struct_.len() <= 100
+        let wutu = c == 123 and lu_parens == 0 and is_wutu_head(lu_line.trim())
+        let body = if c == 123 and not empty and not fits and not wutu { one_line_body(source, i - 1) } else { "" }
+        if empty {
+            // An empty block stays `{}`.
+            lu_line = lu_line.trim_end() + " {}"
+            i = text_index(source, "}", i) + 1
+        } else if fits {
+            lu_line = lu_line.trim_end() + " " + compact(struct_)
+            i += struct_.len() - 1
+        } else if body.len() > 0 {
+            // A one-line body stays as written.
+            lu_line = lu_line.trim_end() + " " + body
+            i += body.len() - 1
+        } else if wutu {
+            // A Wutu body: laid out as Wutu, or kept as written.
+            let end = wutu_brace_end_at(source, i - 1)
+            if end < 0 { return source }
+            let lines = wutu_body_lines(source.slice(i - 1, end), lu_line.trim() == "html")
+            if wb_kept {
+                lu_line = lu_line.trim_end() + " " + source.slice(i - 1, end)
+                lu_raw = true
+            } else {
+                lu_line = lu_line.trim_end() + " {"
+                lu_flush()
+                let d = if lu_depth < 0 { 1 } else { lu_depth + 1 }
+                if not wb_none { for (lines.split("\n")) |text| { lu_push(if text.trim().len() > 0 { indent(d) + text + "\n" } else { "\n" }) } }
+                lu_line = "}"
+            }
+            i = lu_trailer(end)
+            lu_flush()
+        } else if c == 123 {
+            lu_line = lu_line.trim_end() + " {"
+            i = lu_trailer(i)
+            lu_flush()
+            lu_braces.push(lu_parens)
+            lu_depth += 1
+        } else if c == 125 {
+            lu_flush()
+            if lu_count >= 2 and lu_out[lu_count - 1] == "\n" { lu_count -= 1 }
+            lu_depth -= 1
+            if lu_braces.len() > 0 { lu_braces.resize(lu_braces.len() - 1) }
+            lu_line = "}"
+            // What follows on its line stays there: a line break after `}` ends a
+            // statement (`} - 1` and `} sum` would be new ones).
+            // (`else` joins its `}` from the next line too.)
+            let k = i
+            while (k < n and (source.get(k) == 32 or source.get(k) == 9)) { k += 1 }
+            let goes_on = k < n and not is_js_space(source.get(k)) and source.get(k) != 47
+            if not (goes_on or else_ahead(source, i)) or text_at(source, k, "//") {
+                i = lu_trailer(i)
+                lu_flush()
+            }
+        } else if c == 59 and lu_parens == 0 {
+            lu_line = lu_line.trim_end() + ";"
+            i = lu_trailer(i)
+            lu_flush()
+        } else if c == 44 and lu_braces.len() > 0 and lu_braces[lu_braces.len() - 1] == lu_parens and not in_captures(lu_line) and not between_patterns(lu_line, source, i) {
+            lu_line = lu_line.trim_end() + ","
+            i = lu_trailer(i)
+            lu_flush()
+        } else if c == 10 and lu_line.trim() == "}" and else_ahead(source, i) {
+            lu_line = lu_line + " "
+        } else if c == 10 {
+            let k = i
+            while (k < n and (source.get(k) == 32 or source.get(k) == 9 or source.get(k) == 13)) { k += 1 }
+            let blank = code_at(source, k) == 10
+            lu_flush()
+            if blank { lu_blank_line() }
+        } else if is_js_space(c) {
+            if lu_line.len() > 0 and not lu_line.ends_with(" ") { lu_line = lu_line + " " }
+        } else {
+            lu_line = lu_line + source.slice(i - 1, i)
+        }
+    }
+    lu_flush()
+    return joined(lu_out, lu_count, "")
+}
+
+//! == Formatting
+
+/// `source` laid out, or as it is with @fu_refused saying why.
+fn format_utu(source: Str) Str {
+    fu_refused = ""
+    if not shape_of(source) {
+        fu_refused = "it does not parse"
+        return source
+    }
+    fu_before.clear()
+    for (0 ..< fu_shape.len()) |k| { fu_before.push(fu_shape[k]) }
+    let once = format_wutu_source(layout_utu(arrow_bodies(source, file_root[fu_file])))
+    if once == source { return source }
+    if not shape_of(once) or not same_shape() {
+        fu_refused = "its layout would parse differently"
+        return source
+    }
+    if format_wutu_source(layout_utu(arrow_bodies(once, file_root[fu_file]))) != once {
+        fu_refused = "its layout is not stable"
+        return source
+    }
+    return once
+}
+
+fn same_shape() Bool {
+    if fu_shape.len() != fu_before.len() { return false }
+    for (0 ..< fu_shape.len()) |k| { if fu_shape[k] != fu_before[k] { return false } }
+    return true
+}
+
+/// The shape of `source`'s tree, as text ("" when it does not parse).
+fn syntax_shape(source: Str) Str {
+    if not shape_of(source) { return "" }
+    let out = ""
+    for (0 ..< fu_shape.len()) |k| { out = out + fu_shape[k].str() + " " }
+    return out
+}

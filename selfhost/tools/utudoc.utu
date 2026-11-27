@@ -1,0 +1,680 @@
+//! = Utudoc
+//!
+//! A codebase as one Typst document (tools/utudoc): its declarations
+//! (modules, types, functions, globals, and their fields, variants, and
+//! methods), each with its signature, colored as the compiler reads it and
+//! with the names it uses linked to their declarations, then its doc
+//! comment, which is Typst already. A file's `//!` comment opens its
+//! section; a later `//!` block is set where it is.
+//!
+//! The host builds each file and, while the compiler holds that build,
+//! hands over what this reads of it (@ud_file): the file's text and its
+//! colored pieces (its doc comments are read here, by docs.utu). Labels
+//! are given out as files are read, so a name links to a declaration in a
+//! file read later; the document is written once all are (@ud_write).
+
+/// The level a doc comment's `= Heading` takes: below any declaration's.
+let ud_doc_heading: I32 = 5
+/// Past this many documented declarations, the contents list only the files
+/// (the PDF's bookmarks still list every one).
+let ud_contents_max: I32 = 200
+
+/// Files by key (their paths, as the host names them), and this build's by file id.
+let ud_keys: Array[Str] = Array[Str].new(0, "")
+let ud_key_count: I32 = 0
+vec ud_build_key: I32
+
+/// Labels by (key, UTF-16 start), `utu-N` with N given in the order asked:
+/// a table by hash (`ud_lh_id` -1 where empty).
+vec ud_lh_key: I32
+vec ud_lh_start: I32
+vec ud_lh_id: I32
+let ud_label_count: I32 = 0
+/// By label: 1 when it has a section (what is linked to).
+vec ud_shown: U8
+
+/// The files documented, in order: key, name (from the directory all are
+/// in), where errors name it, text, `//!` comment, its items, its later
+/// `//!` blocks (`ud_sec_*`), and its colored pieces (`ud_pc_*`).
+vec ud_pf_key: I32
+let ud_pf_name: Array[Str] = Array[Str].new(0, "")
+let ud_pf_display: Array[Str] = Array[Str].new(0, "")
+let ud_pf_text: Array[Str] = Array[Str].new(0, "")
+let ud_pf_doc: Array[Str] = Array[Str].new(0, "")
+vec ud_pf_item_at: I32
+vec ud_pf_item_n: I32
+vec ud_pf_sec_at: I32
+vec ud_pf_sec_n: I32
+vec ud_pf_pc_at: I32
+vec ud_pf_pc_n: I32
+vec ud_sec_start: I32
+let ud_sec_text: Array[Str] = Array[Str].new(0, "")
+vec ud_pc_start: I32
+vec ud_pc_end: I32
+let ud_pc_class: Array[Str] = Array[Str].new(0, "")
+
+/// The items (declarations worth a section), in each file's source order:
+/// declaration, its kind, name, parent (a declaration, or -1), label,
+/// where it is, its signature (UTF-16 in its file), doc comment, and its
+/// links (`ud_ln_*`: where, and the target's key and start).
+vec ud_decl: I32
+let ud_kind: Array[Str] = Array[Str].new(0, "")
+let ud_name: Array[Str] = Array[Str].new(0, "")
+vec ud_parent: I32
+vec ud_label: I32
+vec ud_span_start: I32
+vec ud_sig_start: I32
+vec ud_sig_end: I32
+let ud_doc: Array[Str] = Array[Str].new(0, "")
+vec ud_ln_at: I32
+vec ud_ln_n: I32
+vec ud_ln_start: I32
+vec ud_ln_end: I32
+vec ud_ln_key: I32
+vec ud_ln_target: I32
+
+// ── Kinds ──
+
+/// What a section documents (at the top, or in a module).
+fn ud_top(kind: Str) Bool {
+    for (["Module", "Struct", "Enum", "IntEnum", "Proto", "TypeDecl", "Distinct", "Fn", "Main", "Global", "Mem"]) |k| { if kind == k { return true } }
+    return false
+}
+
+/// What goes under its parent's section.
+fn ud_member(kind: Str) Bool {
+    for (["Field", "Variant", "ProtoMember", "Fn", "Struct", "Enum", "IntEnum", "TypeDecl", "Global"]) |k| { if kind == k { return true } }
+    return false
+}
+
+/// Shown whole (its members are part of it), not up to its body.
+fn ud_whole(kind: Str) Bool {
+    for (["Struct", "Enum", "IntEnum", "Proto", "TypeDecl", "Distinct", "Mem", "Field", "Variant", "ProtoMember"]) |k| { if kind == k { return true } }
+    return false
+}
+
+/// A kind as a section's title names it.
+fn ud_kind_name(kind: Str) Str {
+    if kind == "Fn" { return "function" }
+    if kind == "IntEnum" { return "enum" }
+    if kind == "Proto" { return "protocol" }
+    if kind == "TypeDecl" or kind == "Distinct" { return "type" }
+    if kind == "Global" { return "constant" }
+    if kind == "ProtoMember" { return "requirement" }
+    return kind.to_lower()
+}
+
+/// A class of colored piece as its color, or "" for none.
+fn ud_color(class: Str) Str {
+    if class == "keyword" { return "#8b2fa3" }
+    if class == "type" { return "#0b7285" }
+    if class == "function" { return "#1c5fbf" }
+    if class == "string" or class == "dsl" { return "#2b8a3e" }
+    if class == "number" or class == "constant" { return "#b35c00" }
+    if class == "comment" { return "#868e96" }
+    if class == "parameter" { return "#495057" }
+    return ""
+}
+
+// ── Labels ──
+
+fn ud_key(key: Str) I32 {
+    for (0 ..< ud_key_count) |k| { if ud_keys[k] == key { return k } }
+    ud_keys = pl_put(ud_keys, ud_key_count, key)
+    ud_key_count += 1
+    return ud_key_count - 1
+}
+
+/// The slot of (key, start) in the label table: its, or the empty one it would take.
+fn ud_slot(key: I32, start: I32) I32 {
+    let mask = ud_lh_id.len() - 1
+    let s = ((key * 7919 + start) * -1640531535 >> 7) & mask
+    while (ud_lh_id[s] >= 0 and not (ud_lh_key[s] == key and ud_lh_start[s] == start)) { s = (s + 1) & mask }
+    return s
+}
+
+/// The label of (key, start), given now when it has none.
+fn ud_label_of(key: I32, start: I32) I32 {
+    if (ud_label_count + 1) * 2 > ud_lh_id.len() {
+        let size = ud_lh_id.len()
+        let keys = Array[I32].new(size, 0)
+        let starts = Array[I32].new(size, 0)
+        let ids = Array[I32].new(size, 0)
+        for (0 ..< size) |k| {
+            keys[k] = ud_lh_key[k]
+            starts[k] = ud_lh_start[k]
+            ids[k] = ud_lh_id[k]
+        }
+        let grown = if size == 0 { 1024 } else { size * 2 }
+        ud_lh_key.resize(grown)
+        ud_lh_start.resize(grown)
+        ud_lh_id.resize(grown)
+        for (0 ..< grown) |k| { ud_lh_id[k] = -1 }
+        for (0 ..< size) |k| {
+            if ids[k] >= 0 {
+                let s = ud_slot(keys[k], starts[k])
+                ud_lh_key[s] = keys[k]
+                ud_lh_start[s] = starts[k]
+                ud_lh_id[s] = ids[k]
+            }
+        }
+    }
+    let s = ud_slot(key, start)
+    if ud_lh_id[s] < 0 {
+        ud_lh_key[s] = key
+        ud_lh_start[s] = start
+        ud_lh_id[s] = ud_label_count
+        ud_label_count += 1
+        ud_shown.push(0)
+    }
+    return ud_lh_id[s]
+}
+
+/// The label of (key, start), or -1.
+fn ud_label_at(key: I32, start: I32) I32 => if ud_lh_id.len() == 0 { -1 } else { ud_lh_id[ud_slot(key, start)] }
+
+// ── Reading a build ──
+
+/// A new build: `keys`, its files' keys, a line each in file order.
+fn ud_build(keys: Str) Void {
+    places_reset()
+    ud_build_key.clear()
+    for (keys.split("\n")) |k| { ud_build_key.push(ud_key(k)) }
+}
+
+/// Whether `text` is a name (`[A-Za-z_]\w*`).
+fn ud_word(text: Str) Bool {
+    if text.len() == 0 { return false }
+    for (0 ..< text.len()) |i| {
+        let c = text.get(i)
+        let letter = (c >= 65 and c <= 90) or (c >= 97 and c <= 122) or c == 95
+        if not letter and not (i > 0 and c >= 48 and c <= 57) { return false }
+    }
+    return true
+}
+
+/// White space, as JavaScript's `\s` is.
+fn ud_space(c: I32) Bool => (c >= 9 and c <= 13) or c == 32 or c == 160 or c == 5760 or (c >= 8192 and c <= 8202)
+    or c == 8232 or c == 8233 or c == 8239 or c == 8287 or c == 12288 or c == 65279
+
+/// `end_`, back past white space and `;` (not before `start`).
+fn ud_trim_end(text: Str, start: I32, end_: I32) I32 {
+    let e = end_
+    while (e > start and (ud_space(text.get(e - 1)) or text.get(e - 1) == 59)) { e -= 1 }
+    return e
+}
+
+/// Where a declaration's signature ends: all of it, or up to its body.
+fn ud_signature_end(text: Str, kind: Str, start: I32, end_: I32) I32 {
+    if ud_whole(kind) { return ud_trim_end(text, start, end_) }
+    let depth = 0
+    for (start ..< end_) |i| {
+        let c = text.get(i)
+        if c == 40 or c == 91 { depth += 1 } else if c == 41 or c == 93 { depth -= 1 } else if depth == 0 and (c == 123 or (c == 61 and kind == "Global")) {
+            return ud_trim_end(text, start, i)
+        }
+    }
+    return ud_trim_end(text, start, end_)
+}
+
+/// Read file `f` of this build (`text`, its name, and where errors name
+/// it): its declarations worth a section, in source order (see @ud_decl),
+/// each labeled, with its signature, the names in it linked, and its doc
+/// comment; and the file's. Returns how many.
+fn ud_file(f: I32, name: Str, display: Str, text: Str) I32 {
+    let key = ud_build_key[f]
+    let p = ud_pf_key.len()
+    ud_pf_key.push(key)
+    ud_pf_name = pl_put(ud_pf_name, p, name)
+    ud_pf_display = pl_put(ud_pf_display, p, display)
+    ud_pf_text = pl_put(ud_pf_text, p, text)
+    ud_pf_doc = pl_put(ud_pf_doc, p, q_doc_file(f))
+    ud_pf_sec_at.push(ud_sec_start.len())
+    ud_pf_sec_n.push(0)
+    ud_pf_pc_at.push(ud_pc_start.len())
+    ud_pf_pc_n.push(0)
+    // Its declarations, kept as their owners are.
+    let decls = decl_kind.len()
+    let kept = Array[I32].new(decls, 0)
+    let found = Array[I32].new(decls, 0)
+    let parents = Array[I32].new(decls, 0)
+    let starts = Array[I32].new(decls, 0)
+    let n = 0
+    for (0 ..< decls) |d| {
+        let node = decl_node[d]
+        if node >= 0 and pl_file(pl_node_start(node)) == f and pl_definition(d) == f {
+            let own_name = text.slice(pl_unit(f, pl_def_start), pl_unit(f, pl_def_end))
+            let kind = decl_kind_text(Decl(decl_kind[d]))
+            let owner = decl_owner[d]
+            // (A module's own type is `&`.)
+            if ud_word(own_name) or own_name == "&" {
+                let parent = if owner >= 0 and kept[owner] == 1 and ud_member(kind) { owner } else { -1 }
+                if not (parent < 0 and (not ud_top(kind) or (owner >= 0 and not decl_is(owner, Decl.Module)))) {
+                    kept[d] = 1
+                    found[n] = d
+                    parents[n] = parent
+                    starts[n] = pl_unit(f, pl_node_start(node))
+                    n += 1
+                }
+            }
+        }
+    }
+    let order = pl_order(starts, n)
+    let names = pl_names(f)
+    let name_starts = Array[I32].new(names, 0)
+    for (0 ..< names) |k| { name_starts[k] = pl_unit(f, pl_name_start[k]) }
+    ud_pf_item_at.push(ud_decl.len())
+    ud_pf_item_n.push(n)
+    for (0 ..< n) |o| {
+        let d = found[order[o]]
+        let i = ud_decl.len()
+        let kind = decl_kind_text(Decl(decl_kind[d]))
+        pl_definition(d)
+        let def_start = pl_unit(f, pl_def_start)
+        ud_decl.push(d)
+        ud_kind = pl_put(ud_kind, i, kind)
+        ud_name = pl_put(ud_name, i, text.slice(def_start, pl_unit(f, pl_def_end)))
+        ud_parent.push(parents[order[o]])
+        ud_label.push(ud_label_of(key, def_start))
+        let start = starts[order[o]]
+        let sig_end = ud_signature_end(text, kind, start, pl_unit(f, pl_node_end(decl_node[d])))
+        ud_span_start.push(start)
+        ud_sig_start.push(start)
+        ud_sig_end.push(sig_end)
+        ud_doc = pl_put(ud_doc, i, q_doc_declaration(d))
+        // The names in it, linked to where they are declared (not to itself).
+        ud_ln_at.push(ud_ln_start.len())
+        let lo = 0
+        let hi = names
+        while (lo < hi) {
+            let mid = (lo + hi) / 2
+            if name_starts[mid] < start { lo = mid + 1 } else { hi = mid }
+        }
+        let k = lo
+        while (k < names and name_starts[k] < sig_end) {
+            let at_end = pl_unit(f, pl_name_end[k])
+            let g = pl_definition(pl_name_decl[k])
+            if at_end <= sig_end and g >= 0 {
+                let target = pl_unit(g, pl_def_start)
+                if not (g == f and target == name_starts[k]) {
+                    ud_ln_start.push(name_starts[k])
+                    ud_ln_end.push(at_end)
+                    ud_ln_key.push(ud_build_key[g])
+                    ud_ln_target.push(target)
+                }
+            }
+            k += 1
+        }
+        ud_ln_n.push(ud_ln_start.len() - ud_ln_at[i])
+    }
+    // Its later `//!` blocks (docs.utu).
+    let blocks = q_doc_sections(f)
+    for (0 ..< blocks.len()) |b| { ud_section(pl_unit(f, tok_start[blocks[b][0]]), qd_lines(blocks[b], "//!")) }
+    return n
+}
+
+/// A later `//!` block of the last file, at `start` (UTF-16) in it.
+fn ud_section(start: I32, text: Str) Void {
+    ud_sec_text = pl_put(ud_sec_text, ud_sec_start.len(), text)
+    ud_sec_start.push(start)
+    ud_pf_sec_n[ud_pf_key.len() - 1] += 1
+}
+
+/// The last file's colored pieces: lines `start end class`, in order.
+fn ud_pieces(pieces: Str) Void {
+    for (pieces.split("\n")) |line| {
+        let parts = line.split(" ")
+        if parts.len() == 3 {
+            ud_pc_class = pl_put(ud_pc_class, ud_pc_start.len(), parts[2])
+            ud_pc_start.push(parts[0].parse_i32(0))
+            ud_pc_end.push(parts[1].parse_i32(0))
+            ud_pf_pc_n[ud_pf_key.len() - 1] += 1
+        }
+    }
+}
+
+// ── Typst ──
+
+/// A Typst string literal.
+fn ud_string(text: Str) Str {
+    let out = "\""
+    let run = 0
+    for (0 ..< text.len()) |i| {
+        let c = text.get(i)
+        let escaped = if c == 92 { "\\\\" } else if c == 34 { "\\\"" } else if c == 10 { "\\n" } else if c == 9 { "\\t" }
+            else if c < 32 { "\\u{" + ud_hex(c) + "}" } else { "" }
+        if escaped != "" {
+            out = out + text.slice(run, i) + escaped
+            run = i + 1
+        }
+    }
+    return out + text.slice(run, text.len()) + "\""
+}
+
+fn ud_hex(c: I32) Str {
+    let digits = "0123456789abcdef"
+    return if c < 16 { digits.slice(c, c + 1) } else { digits.slice(c / 16, c / 16 + 1) + digits.slice(c % 16, c % 16 + 1) }
+}
+
+/// Text in Typst markup, its markup characters escaped.
+fn ud_text(text: Str) Str {
+    let out = ""
+    let run = 0
+    for (0 ..< text.len()) |i| {
+        // \ # * _ ` $ < > @ = [ ] ~ / -
+        let markup = match text.get(i) {
+            92, 35, 42, 95, 96, 36, 60, 62, 64, 61, 91, 93, 126, 47, 45 => true,
+            ~> false,
+        }
+        if markup {
+            out = out + text.slice(run, i) + "\\"
+            run = i
+        }
+    }
+    return out + text.slice(run, text.len())
+}
+
+/// `text` from `start` begins with `part`.
+fn ud_at(text: Str, start: I32, part: Str) Bool => start + part.len() <= text.len() and text.slice(start, start + part.len()) == part
+
+fn ud_word_char(c: I32) Bool => (c >= 48 and c <= 57) or (c >= 65 and c <= 90) or (c >= 97 and c <= 122) or c == 95
+
+/// The label `@name` in file `p`'s doc comments links to: the file's own
+/// declaration named so (its last), else the first anywhere; -1 for none.
+fn ud_named(p: I32, name: Str) I32 {
+    let own = -1
+    let at = ud_pf_item_at[p]
+    for (at ..< at + ud_pf_item_n[p]) |i| { if ud_shown[ud_label[i]] == 1 and ud_name[i] == name { own = ud_label[i] } }
+    if own >= 0 { return own }
+    for (0 ..< ud_decl.len()) |i| { if ud_shown[ud_label[i]] == 1 and ud_name[i] == name { return ud_label[i] } }
+    return -1
+}
+
+/// A doc comment's markup outside code: `@Name` a link (any other `@`, an
+/// address's, the character), and its headings under the declaration's.
+fn ud_outside(p: I32, piece: Str) Str {
+    // `@Name` (after the start, or what is not a word character, `@`, or `\`), and a `;` right after it.
+    let linked = ""
+    let run = 0
+    let s = 0
+    let n = piece.len()
+    while (s < n) {
+        let at = -1
+        if s == 0 and piece.get(0) == 64 { at = 0 } else if s + 1 < n and piece.get(s + 1) == 64 and not ud_word_char(piece.get(s)) and piece.get(s) != 64 and piece.get(s) != 92 { at = s + 1 }
+        if at >= 0 and at + 1 < n and (ud_word_char(piece.get(at + 1)) and not (piece.get(at + 1) >= 48 and piece.get(at + 1) <= 57)) {
+            let e = at + 2
+            while (e < n and ud_word_char(piece.get(e))) { e += 1 }
+            let name = piece.slice(at + 1, e)
+            let semicolon = e < n and piece.get(e) == 59
+            let target = ud_named(p, name)
+            // (A `;` right after `#…` would end its expression, and be lost.)
+            let link = if target >= 0 { `#link(<utu-${target}>)[#raw(${ud_string(name)})]` } else { `#raw(${ud_string(name)})` }
+            linked = linked + piece.slice(run, at) + link + (if semicolon { "\\;" } else { "" })
+            run = if semicolon { e + 1 } else { e }
+            s = run
+        } else {
+            s += 1
+        }
+    }
+    linked = linked + piece.slice(run, n)
+    // Any other `@` after a word character or `.`: the character.
+    let escaped = ""
+    run = 0
+    for (1 ..< linked.len()) |i| {
+        let c = linked.get(i - 1)
+        if linked.get(i) == 64 and (ud_word_char(c) or c == 46) {
+            escaped = escaped + linked.slice(run, i) + "\\"
+            run = i
+        }
+    }
+    escaped = escaped + linked.slice(run, linked.len())
+    // `= Heading` at a line's start: under the declaration's.
+    let out = ""
+    run = 0
+    let i = 0
+    while (i < escaped.len()) {
+        let c = if i == 0 { 10 } else { escaped.get(i - 1) }
+        if (c == 10 or c == 13 or c == 8232 or c == 8233) and escaped.get(i) == 61 {
+            let e = i
+            while (e < escaped.len() and escaped.get(e) == 61) { e += 1 }
+            if e < escaped.len() and escaped.get(e) == 32 {
+                out = out + escaped.slice(run, i) + "=".repeat(ud_doc_heading + e - i - 1)
+                run = e
+            }
+            i = e
+        } else {
+            i += 1
+        }
+    }
+    return out + escaped.slice(run, escaped.len())
+}
+
+/// A doc comment of file `p` as Typst: its code (raw blocks and spans) as
+/// written, the rest as @ud_outside makes it.
+fn ud_references(p: I32, doc: Str) Str {
+    let out = ""
+    let run = 0
+    let s = 0
+    let n = doc.len()
+    while (s < n) {
+        let end_ = -1
+        if doc.get(s) == 96 {
+            let close = if ud_at(doc, s, "```") { doc.index_of("```", s + 3) } else { -1 }
+            if close >= 0 { end_ = close + 3 } else {
+                let tick = doc.index_of("`", s + 1)
+                if tick >= 0 { end_ = tick + 1 }
+            }
+        }
+        if end_ >= 0 {
+            out = out + ud_outside(p, doc.slice(run, s)) + doc.slice(s, end_)
+            run = end_
+            s = end_
+        } else {
+            s += 1
+        }
+    }
+    return out + ud_outside(p, doc.slice(run, n))
+}
+
+/// The (1-based) line of `start` in `text`.
+fn ud_line(text: Str, start: I32) I32 {
+    let line = 1
+    for (0 ..< start) |i| { if text.get(i) == 10 { line += 1 } }
+    return line
+}
+
+/// How many lines `text` is.
+fn ud_lines(text: Str) I32 => ud_line(text, text.len())
+
+/// Whether `markup` is `#raw("…")` of white space only.
+fn ud_blank_raw(markup: Str) Bool {
+    if not markup.starts_with("#raw(\"") or not markup.ends_with("\")") { return false }
+    for (6 ..< markup.len() - 2) |i| { if not ud_space(markup.get(i)) { return false } }
+    return true
+}
+
+/// Item `i`'s signature (in file `p`) as Typst: monospace, colored, its
+/// names linked, its lines as written (dedented).
+fn ud_signature_markup(p: I32, i: I32) Str {
+    let text = ud_pf_text[p]
+    let start = ud_sig_start[i]
+    let end_ = ud_sig_end[i]
+    let line_start = (if start - 1 < 0 { (if text.len() > 0 and text.get(0) == 10 { 0 } else { -1 }) } else { text.slice(0, start).last_index_of("\n") }) + 1
+    let indent = start - line_start
+    let out = Array[Str].new(16, "")
+    let count = 0
+    let plain = ""
+    // The pieces from the first that may begin in it; the links in order.
+    let pc_at = ud_pf_pc_at[p]
+    let pc_end = pc_at + ud_pf_pc_n[p]
+    let lo = pc_at
+    let hi = pc_end
+    while (lo < hi) {
+        let mid = (lo + hi) / 2
+        if ud_pc_start[mid] < start { lo = mid + 1 } else { hi = mid }
+    }
+    let pc = lo
+    let ln = ud_ln_at[i]
+    let ln_end = ln + ud_ln_n[i]
+    let k = start
+    while (k < end_) {
+        while (pc < pc_end and ud_pc_start[pc] < k) { pc += 1 }
+        while (ln < ln_end and ud_ln_start[ln] < k) { ln += 1 }
+        let piece = if pc < pc_end and ud_pc_start[pc] == k { pc } else { -1 }
+        let link = if ln < ln_end and ud_ln_start[ln] == k { ln } else { -1 }
+        if text.get(k) == 10 {
+            if plain != "" {
+                out = pl_put(out, count, `#raw(${ud_string(plain)})`)
+                count += 1
+                plain = ""
+            }
+            out = pl_put(out, count, "#linebreak()")
+            count += 1
+            k += 1
+            // The declaration's own indentation, off each later line.
+            let m = 0
+            while (m < indent and k < text.len() and (text.get(k) == 32 or text.get(k) == 9)) {
+                k += 1
+                m += 1
+            }
+        } else if piece >= 0 and ud_pc_class[piece] == "comment" and ud_at(text, k, "///") {
+            // Doc comments are typeset below the signature, not in it: their lines go.
+            if plain != "" {
+                out = pl_put(out, count, `#raw(${ud_string(plain)})`)
+                count += 1
+                plain = ""
+            }
+            while (count > 0 and ud_blank_raw(out[count - 1])) { count -= 1 }
+            if count > 0 and out[count - 1] == "#linebreak()" { count -= 1 }
+            k = ud_pc_end[piece]
+        } else if piece >= 0 or link >= 0 {
+            if plain != "" {
+                out = pl_put(out, count, `#raw(${ud_string(plain)})`)
+                count += 1
+                plain = ""
+            }
+            let stop = if piece >= 0 { ud_pc_end[piece] } else { ud_ln_end[link] }
+            if stop > end_ { stop = end_ }
+            let markup = `#raw(${ud_string(text.slice(k, stop))})`
+            let color = if piece >= 0 { ud_color(ud_pc_class[piece]) } else { ud_color("type") }
+            if color != "" { markup = `#text(fill: rgb("${color}"))[${markup}]` }
+            if link >= 0 {
+                let target = ud_label_at(ud_ln_key[link], ud_ln_target[link])
+                if target >= 0 and ud_shown[target] == 1 { markup = `#link(<utu-${target}>)[${markup}]` }
+            }
+            out = pl_put(out, count, markup)
+            count += 1
+            k = stop
+        } else {
+            plain = plain + (if text.get(k) == 9 { "    " } else { text.slice(k, k + 1) })
+            k += 1
+        }
+    }
+    if plain != "" {
+        out = pl_put(out, count, `#raw(${ud_string(plain)})`)
+        count += 1
+    }
+    let joined = ""
+    for (0 ..< count) |m| { joined = joined + out[m] }
+    return joined
+}
+
+/// Whether item `i` has a doc comment.
+fn ud_has_doc(i: I32) Bool => ud_doc[i] != ""
+
+let ud_outlined: I32 = 0
+let ud_out: Str = ""
+
+/// Item `i`'s section (file `p`), and its members' under it.
+fn ud_write_item(p: I32, i: I32, depth: I32, documented: Array[I32]) Void {
+    if ud_shown[ud_label[i]] == 0 { return }
+    let at = ud_pf_item_at[p]
+    let level = if depth < 4 { depth } else { 4 }
+    let title = `#raw(${ud_string(ud_name[i])}) #h(0.5em) #text(size: 0.7em, fill: luma(120), smallcaps[${ud_kind_name(ud_kind[i])}])`
+    let label = `<utu-${ud_label[i]}>`
+    let heading = if documented[i - at] == 1 { "=".repeat(level) + " " + title + " " + label } else { `#heading(level: ${level}, outlined: false, numbering: none)[${title}] ${label}` }
+    if documented[i - at] == 1 { ud_outlined += 1 }
+    ud_out = ud_out + heading + "\n"
+    ud_out = ud_out + `#block(fill: luma(246), inset: (x: 8pt, y: 6pt), radius: 3pt, width: 100%, breakable: true)[${ud_signature_markup(p, i)}]` + "\n"
+    if ud_has_doc(i) {
+        // Marked with where it is, for typst's errors (which name a line of the .typ).
+        let line = ud_line(ud_pf_text[p], ud_span_start[i]) - ud_lines(ud_doc[i])
+        ud_out = ud_out + "\n" + `// ${ud_pf_display[p]}:${line}` + "\n" + ud_references(p, ud_doc[i]) + "\n"
+    }
+    ud_out = ud_out + "\n"
+    for (at ..< at + ud_pf_item_n[p]) |c| { if ud_parent[c] == ud_decl[i] { ud_write_item(p, c, depth + 1, documented) } }
+}
+
+/// File `p`'s later `//!` blocks from `sec` that begin before `before`, set; returns the next.
+fn ud_write_sections(p: I32, sec: I32, before: I32) I32 {
+    let s = sec
+    let end_ = ud_pf_sec_at[p] + ud_pf_sec_n[p]
+    while (s < end_ and ud_sec_start[s] < before) {
+        ud_out = ud_out + `// ${ud_pf_display[p]}:${ud_line(ud_pf_text[p], ud_sec_start[s])}` + "\n" + ud_references(p, ud_sec_text[s]) + "\n\n"
+        s += 1
+    }
+    return s
+}
+
+/// The document: `title`, over `files` files.
+fn ud_write(title: Str, files: I32) Str {
+    // Which declarations get a section: a field or variant is in its
+    // parent's signature, and on its own only with something to say.
+    for (0 ..< ud_pf_key.len()) |p| {
+        let at = ud_pf_item_at[p]
+        let end_ = at + ud_pf_item_n[p]
+        for (at ..< end_) |i| {
+            let doc_below = false
+            for (at ..< end_) |c| { if ud_has_doc(c) and ud_parent[c] == ud_decl[i] { doc_below = true } }
+            if not (ud_parent[i] >= 0 and ud_whole(ud_kind[i]) and not ud_has_doc(i) and not doc_below) { ud_shown[ud_label[i]] = 1 }
+        }
+    }
+    let sections = ""
+    for (0 ..< ud_pf_key.len()) |p| {
+        let at = ud_pf_item_at[p]
+        let n = ud_pf_item_n[p]
+        ud_out = `= ${ud_text(ud_pf_name[p])} <utu-${ud_label_of(ud_pf_key[p], -1)}>` + "\n\n"
+        if ud_pf_doc[p] != "" { ud_out = ud_out + `// ${ud_pf_display[p]}:1` + "\n" + ud_references(p, ud_pf_doc[p]) + "\n\n" }
+        // The outline lists what is documented (or holds something documented);
+        // the rest has its section, out of the outline and unnumbered.
+        let documented = Array[I32].new(n, 0)
+        let k = n - 1
+        while (k >= 0) {
+            if ud_has_doc(at + k) or documented[k] == 1 {
+                documented[k] = 1
+                for (0 ..< n) |m| { if ud_decl[at + m] == ud_parent[at + k] { documented[m] = 1 } }
+            }
+            k -= 1
+        }
+        let sec = ud_pf_sec_at[p]
+        for (at ..< at + n) |i| {
+            if ud_parent[i] < 0 {
+                sec = ud_write_sections(p, sec, ud_span_start[i])
+                ud_write_item(p, i, 2, documented)
+            }
+        }
+        ud_write_sections(p, sec, 2147483647)
+        // (Its lines joined: no line break after the last.)
+        sections = sections + "\n" + ud_out.slice(0, ud_out.len() - 1)
+    }
+    let s = if files == 1 { "" } else { "s" }
+    let unnumbered = ": set heading(numbering: none, outlined: false)"
+    let header = [
+        `#set document(title: ${ud_string(title)})`,
+        "#set page(numbering: \"1\", margin: (x: 2cm, y: 2.2cm))",
+        "#set text(size: 10pt)",
+        "#set heading(numbering: \"1.1\")",
+        `#show heading.where(level: ${ud_doc_heading})` + unnumbered,
+        `#show heading.where(level: ${ud_doc_heading + 1})` + unnumbered,
+        `#show heading.where(level: ${ud_doc_heading + 2})` + unnumbered,
+        "#show heading.where(level: 1): it => { pagebreak(weak: true); it; v(0.3em) }",
+        "#show raw: set text(size: 9pt)",
+        "#show link: set text(fill: rgb(\"#1c5fbf\"))",
+        "",
+        "#align(center)[#text(size: 22pt, weight: \"bold\")[" + ud_text(title) + "] \\ #text(fill: luma(120))[" + `${files} file${s}, documented by utudoc]]`,
+        "#v(1em)",
+        `#outline(depth: ${if ud_outlined > ud_contents_max { 1 } else { 2 }}, title: none)`,
+        "",
+    ]
+    return "\n".join(header) + sections
+}

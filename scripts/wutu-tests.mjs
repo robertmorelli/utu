@@ -1,8 +1,18 @@
 // Wutu parser, formatter, expansion, diagnostics, and @stored regressions.
 import { parseHTML } from 'linkedom/worker';
 import { compileAndInstantiateSelfhost, selfhostDiagnostics, withTempUtu } from './test-harness.mjs';
-import { parseWutu, WutuSyntaxError } from '../src/wutu/wutu-parse.js';
-import { formatWutuBody, formatWutuSource, wutuIslands } from '../src/wutu/wutu-tooling.js';
+import { loadNodeTools } from '../src/selfhost/node.js';
+import * as tooling from '../src/wutu/wutu-tooling.js';
+import { WutuSyntaxError } from '../src/wutu/wutu-tooling.js';
+
+// The compiler's template parser and the formatter, from dist/utu-tools.wasm.
+const tools = await loadNodeTools();
+const parseWutu = text => tooling.wutuTree(tools, text);
+const formatWutuBody = text => tooling.formatWutuBody(tools, text);
+const formatWutuSource = source => tooling.formatWutuSource(tools, source);
+const wutuIslands = source => tooling.wutuIslands(tools, source);
+/** An element's items of one kind (class attribute event bind css style). */
+const items = (node, kind) => node.items.filter(item => item.kind === kind);
 
 const BROWSER = 'using Browser from std:Browser;\n';
 
@@ -117,14 +127,13 @@ export function registerWutuTests({ test, assert, assertEq, assertThrows, assert
       color: red
     }`;
     const tree = parseWutu(source);
-    assertEq(tree.root.styles.length, 3);
-    assert(tree.root.styles[0].block && tree.root.styles[1].block && tree.root.styles[2].block);
-    for (const style of tree.root.styles) assertEq(source.slice(style.range.start, style.range.end), style.value);
+    assertEq(items(tree.root, 'style').length, 3);
+    for (const style of items(tree.root, 'style')) assertEq(source.slice(style.from, style.to), style.b);
     const formatted = formatWutuBody(source);
     assertEq(formatWutuBody(formatted), formatted);
     assert(formatted.includes('width: {'));
     assert(formatted.includes('// } remains a comment'));
-    assertEq(parseWutu(formatted).root.styles.length, 3);
+    assertEq(items(parseWutu(formatted).root, 'style').length, 3);
     assert(syntaxError('div { width: { "1px"').message.includes('unterminated computed CSS value'));
     assert(syntaxError('div { width: = "10px" }').message.includes('prop: { expr }'));
   });
@@ -193,7 +202,7 @@ export function registerWutuTests({ test, assert, assertEq, assertThrows, assert
     const formatted = formatWutuBody(source);
     assertEq(formatWutuBody(formatted), formatted);
     assertEq(parseWutu(formatted).root.children.length, 6);
-    for (const node of tree.root.children) assertEq(source.slice(node.range.start, node.range.end), node.expr);
+    for (const node of tree.root.children) assertEq(source.slice(node.from, node.to), node.text);
   });
 
   test('wutu pipes: errors point at authored Utu expressions', async ({ compiler, ROOT }) => {
@@ -386,13 +395,13 @@ export function registerWutuTests({ test, assert, assertEq, assertThrows, assert
     assertEq(chain.kind, 'if');
     assertEq(chain.otherwise.length, 1);
     assert(chain.otherwise[0].elseIf, 'else if is a nested conditional');
-    assertEq(chain.otherwise[0].otherwise[0].condition, 'c');
-    assertEq(chain.otherwise[0].otherwise[0].otherwise[0].expr, '"d"');
+    assertEq(chain.otherwise[0].otherwise[0].text, 'c');
+    assertEq(chain.otherwise[0].otherwise[0].otherwise[0].text, '"d"');
     assertEq(label.binding, 'label');
     // Parentheses hide a pipeline's captures; the loop continues the pipeline.
     // Around a finished pipeline (sort) or a range they stay.
     const loops = parseWutu('ul { for (xs filter |x| { x.ok; }) |x| key x.id { li { "a"; } } for (xs sort(I32) |a, b| { a < b; }) |x| { li { "b"; } } for (0..<n) |i| { li { "c"; } } }').root.children;
-    assertEq(loops.map(loop => loop.iterable).join(' / '), 'xs filter |x| { x.ok; } / (xs sort(I32) |a, b| { a < b; }) / (0..<n)');
+    assertEq(loops.map(loop => loop.text).join(' / '), 'xs filter |x| { x.ok; } / (xs sort(I32) |a, b| { a < b; }) / (0..<n)');
     assertEq(loops[0].key, 'x.id');
   });
 
@@ -440,8 +449,8 @@ export function registerWutuTests({ test, assert, assertEq, assertThrows, assert
 
   test('wutu parser: element CSS keeps authored and compiled forms separately', () => {
     const { root } = parseWutu('div { color: red; :hover { color: blue; } @ .x { margin: 0; } @ { padding: 0; } }');
-    assertEq(root.css.map(rule => rule.source).join(' '), 'color: red; :hover{ color: blue; } @ .x{ margin: 0; } @{ padding: 0; }');
-    assertEq(root.css.map(rule => rule.css).join(' '), 'color:red; &:hover{ color: blue; } .x{ margin: 0; } &, & *{ padding: 0; }');
+    assertEq(items(root, 'css').map(rule => rule.b).join(' '), 'color:red; :hover{ color: blue; } @ .x{ margin: 0; } @{ padding: 0; }');
+    assertEq(items(root, 'css').map(rule => rule.c).join(' '), 'color:red; &:hover{ color: blue; } .x{ margin: 0; } &, & *{ padding: 0; }');
   });
 
   test('wutu formatter: authored selectors, else-if, and unbalanced slots survive formatting', () => {
@@ -1127,16 +1136,17 @@ main { let s = @stored/\\ S "k" S { n: missing } \\/; }`, 'unknown-variable', 'm
   test('wutu parser: legacy surface still parses', () => {
     assertThrows(() => parseWutu('div { aria-hidden = "true" aspect-ratio: 0.68; }'), 'expected a line break or ;');
     const tree = parseWutu('section.a#b { data-x = x; hidden; svg { viewBox = "0 0 1 1"; } my-widget { anything = "ok"; } }');
-    assertEq(tree.root.attrs.find(a => a.name === 'id').value, '"b"');
+    assertEq(items(tree.root, 'attribute').find(a => a.a === 'id').b, '"b"');
     assertEq(tree.root.children.length, 2);
   });
 
   test('wutu parser: xlink:href, xml:lang and xmlns:xlink are attributes, not CSS declarations', () => {
     const { root } = parseWutu('svg { xmlns:xlink = "http://www.w3.org/1999/xlink"; xml:lang = "en"; color: red; use { xlink:href = u; } }');
-    assertEq(root.attrs.map(a => a.name).join(' '), 'xmlns:xlink xml:lang');
-    assertEq(root.css.map(rule => rule.css).join(' '), 'color:red;');
+    assertEq(items(root, 'attribute').map(a => a.a).join(' '), 'xmlns:xlink xml:lang');
+    assertEq(items(root, 'css').map(rule => rule.c).join(' '), 'color:red;');
     const use = root.children[0];
-    assertEq(`${use.attrs[0].name} ${use.attrs[0].value} ${use.attrs[0].dynamic}`, 'xlink:href u true');
+    const [href] = items(use, 'attribute');
+    assertEq(`${href.a} ${href.b} ${(href.flags & 2) !== 0}`, 'xlink:href u true');
     assertThrows(() => parseWutu('div { xlink:href = u; }'), 'unknown attribute xlink:href on div');
   });
 
@@ -1153,7 +1163,7 @@ main { let s = @stored/\\ S "k" S { n: missing } \\/; }`, 'unknown-variable', 'm
     const formatted = formatWutuBody(matchTemplate);
     assertEq(formatWutuBody(formatted), formatted);
     assertEq(parseWutu(formatted).root.children[0].kind, 'match');
-    assertEq(parseWutu(formatted).root.children[0].arms.length, 4);
+    assertEq(parseWutu(formatted).root.children[0].children.length, 4);
 
     // Compile and run BOTH |> match distribution and native Wutu match without using Browser
     await withDom(async document => {

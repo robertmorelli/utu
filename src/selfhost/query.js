@@ -75,21 +75,6 @@ export function programIndex(utu, files) {
   };
 }
 
-/**
- * Doc comments over the program the tools hold (`files` as the build
- * returned them): declaration(decl) and file(key), each the Typst text or
- * '', and sections(key), the file's other `//!` blocks ({ start, text }).
- */
-export function docComments(utu, files) {
-  utu.query_open(files.map(f => f.key).join('\n'));
-  const ids = new Map(files.map((f, i) => [f.key, i]));
-  return {
-    declaration: decl => utu.query_doc_declaration(decl),
-    file: key => ids.has(key) ? utu.query_doc_file(ids.get(key)) : '',
-    sections: key => ids.has(key) ? JSON.parse(utu.query_doc_sections(ids.get(key))) : [],
-  };
-}
-
 /** The paths of `text`'s `using … from "…"` (not in a comment or another string). */
 export function importPaths(utu, text) {
   return JSON.parse(utu.query_import_paths(text)).flatMap(literal => { try { return [JSON.parse(literal)]; } catch { return []; } });

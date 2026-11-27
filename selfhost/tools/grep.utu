@@ -1,0 +1,693 @@
+//! = Grep
+//!
+//! `utu grep`: utu code by its syntax, names, and types. A pattern is utu
+//! with holes: `$x` stands for any one node (the same code each time it
+//! recurs), `$...xs` for any run of siblings (arguments, statements), `$_`
+//! for any node, unbound. It is parsed by the compiler's own parser, so it
+//! matches what the code is, not how it is spaced:
+//!
+//! ```
+//! $v.push($x)                 every push, on anything
+//! if $c { $...body; }         every if without an else
+//! $a + $a                     a value added to itself
+//! ```
+//!
+//! Matches are filtered by the types the compiler checked (`--where 'x:
+//! Array[I32]'`, `*` for any run of characters), and names are found by
+//! what they resolve to, not by their spelling (@gr_refs). The host runs a
+//! query over a build of each entry file, both its exports' and its tests'.
+
+/// The pattern, parsed (rows by pattern node): its kind, its children (at
+/// `gr_kids[gr_kid_at[p] ..< + gr_kid_n[p]]`), its own tokens (the bytes
+/// of `gr_bytes` at `gr_tok_start[k] ..< gr_tok_end[k]`, `k` from
+/// `gr_own_at[p]`, `gr_own_n[p]` of them), and the hole it is (a name in
+/// @gr_names), or the run, or -1.
+vec gr_kind: I32
+vec gr_kid_at: I32
+vec gr_kid_n: I32
+vec gr_kids: I32
+vec gr_own_at: I32
+vec gr_own_n: I32
+vec gr_tok_start: I32
+vec gr_tok_end: I32
+vec gr_bytes: U8
+vec gr_hole: I32
+vec gr_many: I32
+/// 1: its children are runs, and its own tokens only `,` or `;`: it may be
+/// absent when they are empty (`f($...xs)`'s arguments, for `f()`).
+vec gr_optional: U8
+/// 1: a child is a run (then `,` and `;` come and go with it).
+vec gr_has_many: U8
+/// The pattern's nodes: one, or a run of statements.
+let gr_top_at: I32 = 0
+let gr_top_n: I32 = 0
+
+/// The holes' names; `_`'s id; the names as written, and by name the
+/// `--where` type its node must have ("" for none).
+let gr_names: Array[Str] = Array[Str].new(0, "")
+let gr_blank: I32 = -1
+vec gr_written: I32
+let gr_where: Array[Str] = Array[Str].new(0, "")
+vec gr_where_order: I32
+/// By name: 1 once a node met its `--where` type, and the types (text)
+/// of those that did not, over every build.
+vec gr_met: I32
+vec gr_seen_name: I32
+let gr_seen_type: Array[Str] = Array[Str].new(0, "")
+
+/// The bindings so far, a stack (a later row of a name stands for it):
+/// the name, 1 for a run, and the node, or (a run) where its nodes are in
+/// @gr_run and how many.
+vec gr_env_name: I32
+vec gr_env_run: I32
+vec gr_env_at: I32
+vec gr_env_n: I32
+vec gr_run: I32
+
+/// This build: each type's text, made when first asked (`gr_ty_made`); by
+/// type and name, whether it meets the name's `--where` (0 not asked, 1, 2 not).
+let gr_ty_text: Array[Str] = Array[Str].new(0, "")
+vec gr_ty_made: U8
+vec gr_ty_meets: U8
+/// This build: each node's parent, by its children's links.
+vec gr_parent: I32
+
+let gr_hole_prefix: Str = "__utu_hole_"
+let gr_many_prefix: Str = "__utu_many_"
+
+/// The id of hole name `name`, added when new.
+fn gr_name(name: Str) I32 {
+    let n = gr_met.len()
+    for (0 ..< n) |k| { if gr_names[k] == name { return k } }
+    gr_names = pl_put(gr_names, n, name)
+    gr_where = pl_put(gr_where, n, "")
+    gr_met.push(0)
+    if name == "_" { gr_blank = n }
+    return n
+}
+
+fn gr_word_start(c: I32) Bool => (c >= 65 and c <= 90) or (c >= 97 and c <= 122) or c == 95
+
+fn gr_word_part(c: I32) Bool => gr_word_start(c) or (c >= 48 and c <= 57)
+
+/// The pattern with its holes as names the parser reads: `$x` as
+/// `__utu_hole_x`, `$...xs` as `__utu_many_xs`. Each name goes in @gr_written.
+fn gr_holes(pattern: Str) Str {
+    let out = ""
+    let run = 0
+    let i = 0
+    let n = pattern.len()
+    while (i < n) {
+        if pattern.get(i) == 36 {
+            let many = i + 4 < n and pattern.slice(i + 1, i + 4) == "..." and gr_word_start(pattern.get(i + 4))
+            let from = if many { i + 4 } else { i + 1 }
+            if from < n and gr_word_start(pattern.get(from)) {
+                let e = from
+                while (e < n and gr_word_part(pattern.get(e))) { e += 1 }
+                let name = pattern.slice(from, e)
+                gr_written.push(gr_name(name))
+                out = out + pattern.slice(run, i) + (if many { gr_many_prefix } else { gr_hole_prefix }) + name
+                run = e
+                i = e
+            } else {
+                i += 1
+            }
+        } else {
+            i += 1
+        }
+    }
+    return out + pattern.slice(run, n)
+}
+
+/// `text` parsed alone (the compiler's lexer and parser, comments kept as
+/// nodes): its source file node, or -1.
+fn gr_parse(text: Str) I32 {
+    unseal()
+    reset_program()
+    let at = src.len()
+    gen_text_utf8(text)
+    let n = src.len() - at
+    gr_bytes.resize(n)
+    for (0 ..< n) |k| { gr_bytes[k] = src[at + k] }
+    src.resize(at)
+    let file = add_file(n, FileRole.Entry)
+    for (0 ..< n) |k| { src[file_start[file] + k] = gr_bytes[k] }
+    comment_nodes = 1
+    let root = parse_file(file)
+    comment_nodes = 0
+    return root
+}
+
+/// Node `n`'s children, without its comments.
+fn gr_children(n: I32) Array[I32] {
+    let count = 0
+    let c = node_child[n]
+    while (c >= 0) {
+        if not is_kind(c, Node.Comment) { count += 1 }
+        c = node_next[c]
+    }
+    let out = Array[I32].new(count, 0)
+    let k = 0
+    c = node_child[n]
+    while (c >= 0) {
+        if not is_kind(c, Node.Comment) {
+            out[k] = c
+            k += 1
+        }
+        c = node_next[c]
+    }
+    return out
+}
+
+/// Marks of node `n`'s tokens that a child (a comment too) covers: `gr_cover[t - node_first[n]]`.
+vec gr_cover: U8
+
+fn gr_cover_of(n: I32) Void {
+    let first = node_first[n]
+    let size = node_last[n] - first
+    if size < 0 { size = 0 }
+    gr_cover.resize(size)
+    for (0 ..< size) |k| { gr_cover[k] = 0 }
+    let c = node_child[n]
+    while (c >= 0) {
+        for (node_first[c] ..< node_last[c]) |t| { if t >= first and t - first < size { gr_cover[t - first] = 1 } }
+        c = node_next[c]
+    }
+}
+
+/// The pattern node for node `n` of the parsed pattern (with its children).
+fn gr_build(n: I32) I32 {
+    let kids = gr_children(n)
+    let ids = Array[I32].new(kids.len(), 0)
+    for (0 ..< kids.len()) |k| { ids[k] = gr_build(kids[k]) }
+    let p = gr_kind.len()
+    gr_kind.push(node_kind[n])
+    gr_kid_at.push(gr_kids.len())
+    gr_kid_n.push(kids.len())
+    for (0 ..< kids.len()) |k| { gr_kids.push(ids[k]) }
+    // Its own tokens: in it, in no child, not comments.
+    gr_cover_of(n)
+    gr_own_at.push(gr_tok_start.len())
+    let text = ""
+    let own = 0
+    let separators = true
+    let base = file_start[0]
+    for (node_first[n] ..< node_last[n]) |t| {
+        if gr_cover[t - node_first[n]] == 0 and tok_kind[t] != Tok.Comment.i32() {
+            gr_tok_start.push(tok_start[t] - base)
+            gr_tok_end.push(tok_end[t] - base)
+            let piece = bytes_text(tok_start[t], tok_end[t])
+            text = if own == 0 { piece } else { text + " " + piece }
+            if piece != "," and piece != ";" { separators = false }
+            own += 1
+        }
+    }
+    gr_own_n.push(own)
+    let hole = if kids.len() == 0 and text.starts_with(gr_hole_prefix) { gr_name(text.slice(gr_hole_prefix.len(), text.len())) } else { -1 }
+    let many = if kids.len() == 0 and text.starts_with(gr_many_prefix) { gr_name(text.slice(gr_many_prefix.len(), text.len())) } else { -1 }
+    gr_hole.push(hole)
+    gr_many.push(many)
+    let runs = kids.len() > 0
+    for (0 ..< ids.len()) |k| { if gr_many[ids[k]] < 0 { runs = false } }
+    gr_optional.push(if separators and runs { 1 } else { 0 })
+    let has_many = false
+    for (0 ..< ids.len()) |k| { if gr_many[ids[k]] >= 0 { has_many = true } }
+    gr_has_many.push(if has_many { 1 } else { 0 })
+    return p
+}
+
+/// The pattern's nodes, `kids` of the parsed pattern, as @gr_top_at.
+fn gr_set_top(kids: Array[I32]) I32 {
+    let ids = Array[I32].new(kids.len(), 0)
+    for (0 ..< kids.len()) |k| { ids[k] = gr_build(kids[k]) }
+    gr_top_at = gr_kids.len()
+    gr_top_n = kids.len()
+    for (0 ..< ids.len()) |k| { gr_kids.push(ids[k]) }
+    return gr_top_n
+}
+
+/// Parse a pattern: an expression or statements, in a function; else
+/// declarations. Returns how many nodes it is (0: it is not utu).
+fn gr_pattern(pattern: Str) I32 {
+    gr_kind.clear()
+    gr_kid_at.clear()
+    gr_kid_n.clear()
+    gr_kids.clear()
+    gr_own_at.clear()
+    gr_own_n.clear()
+    gr_tok_start.clear()
+    gr_tok_end.clear()
+    gr_hole.clear()
+    gr_many.clear()
+    gr_optional.clear()
+    gr_has_many.clear()
+    gr_written.clear()
+    gr_where_order.clear()
+    gr_met.clear()
+    gr_seen_name.clear()
+    gr_blank = -1
+    gr_top_n = 0
+    let holes = gr_holes(pattern).trim()
+    if holes.ends_with(";") { holes = holes.slice(0, holes.len() - 1) }
+    let root = gr_parse("fn __utu_pattern() Void { " + holes + "; }")
+    if root >= 0 {
+        let items = gr_children(root)
+        if items.len() > 0 {
+            let parts = gr_children(items[0])
+            if parts.len() > 0 {
+                let body = gr_children(parts[parts.len() - 1])
+                if body.len() > 0 { return gr_set_top(body) }
+            }
+        }
+    }
+    root = gr_parse(holes)
+    if root < 0 { return 0 }
+    return gr_set_top(gr_children(root))
+}
+
+/// A `--where`: hole `name`'s node has type `want`. 0 when the pattern names no such hole.
+fn gr_where_add(name: Str, want: Str) I32 {
+    let h = gr_name(name)
+    let written = false
+    for (0 ..< gr_written.len()) |k| { if gr_written[k] == h { written = true } }
+    if not written { return 0 }
+    gr_where[h] = want
+    gr_where_order.push(h)
+    return 1
+}
+
+// ── Types ──
+
+/// The text of node `n`'s type as this build checked it, or "".
+fn gr_type(n: I32) Str {
+    if n >= node_ty.len() or node_ty[n] < 0 { return "" }
+    let t = node_ty[n]
+    if gr_ty_made[t] == 0 {
+        gr_ty_text[t] = type_text(t)
+        gr_ty_made[t] = 1
+    }
+    return gr_ty_text[t]
+}
+
+/// Whether `text` is `want`, a `*` in it any run of characters.
+fn gr_glob(want: Str, text: Str) Bool {
+    let i = 0
+    let j = 0
+    let star = -1
+    let mark = 0
+    while (j < text.len()) {
+        if i < want.len() and want.get(i) == 42 {
+            star = i
+            mark = j
+            i += 1
+        } else if i < want.len() and want.get(i) == text.get(j) {
+            i += 1
+            j += 1
+        } else if star >= 0 {
+            i = star + 1
+            mark += 1
+            j = mark
+        } else {
+            return false
+        }
+    }
+    while (i < want.len() and want.get(i) == 42) { i += 1 }
+    return i == want.len()
+}
+
+/// `text` without its white space.
+fn gr_unspaced(text: Str) Str {
+    let out = ""
+    let run = 0
+    for (0 ..< text.len()) |k| {
+        let c = text.get(k)
+        if c == 32 or c == 9 or c == 10 or c == 13 {
+            out = out + text.slice(run, k)
+            run = k + 1
+        }
+    }
+    return out + text.slice(run, text.len())
+}
+
+/// Whether node `n`'s type is `want` (it has one: a node this build did not
+/// type, a test build's main, has none to meet; the build that typed it decides).
+fn gr_type_meets(h: I32, n: I32) Bool {
+    let got = gr_type(n)
+    if got == "" { return false }
+    let key = node_ty[n] * gr_met.len() + h
+    if gr_ty_meets[key] == 0 {
+        let want = gr_where[h]
+        gr_ty_meets[key] = if gr_glob(want, got) or gr_glob(want, gr_unspaced(got)) { 1 } else { 2 }
+    }
+    return gr_ty_meets[key] == 1
+}
+
+/// Node `n`'s parent, or -1.
+fn gr_parent_of(n: I32) I32 {
+    if gr_parent.len() != node_kind.len() {
+        gr_parent.resize(node_kind.len())
+        for (0 ..< node_kind.len()) |m| { gr_parent[m] = -1 }
+        for (0 ..< node_kind.len()) |m| {
+            let c = node_child[m]
+            while (c >= 0) {
+                gr_parent[c] = m
+                c = node_next[c]
+            }
+        }
+    }
+    return gr_parent[n]
+}
+
+/// A statement, which a typed hole never is: a `let`, or an `if`, loop,
+/// `match`, or `alt` in a block that gives no value.
+fn gr_statement(n: I32) Bool {
+    if is_kind(n, Node.Bind_expr) { return true }
+    let statement = is_kind(n, Node.If_expr) or is_kind(n, Node.For_expr) or is_kind(n, Node.While_expr) or is_kind(n, Node.Match_expr)
+        or is_kind(n, Node.Loop_match_expr) or is_kind(n, Node.Alt_expr) or is_kind(n, Node.Defer_expr) or is_kind(n, Node.Errdefer_expr)
+    if not statement or gr_type(n) != "Void" { return false }
+    let p = gr_parent_of(n)
+    return p >= 0 and is_kind(p, Node.Block)
+}
+
+/// Whether node `n` meets hole `h`'s `--where` (none: it does); what it met is noted.
+fn gr_meets(h: I32, n: I32) Bool {
+    if gr_where[h] == "" { return true }
+    let statement = gr_statement(n)
+    let ok = not statement and gr_type_meets(h, n)
+    if ok { gr_met[h] = 1 } else if gr_met[h] == 0 { gr_met[h] = 2 }
+    if not ok and not statement { gr_seen(h, gr_type(n)) }
+    return ok
+}
+
+/// Note that a node hole `h` constrains has type `text`.
+fn gr_seen(h: I32, text: Str) Void {
+    for (0 ..< gr_seen_name.len()) |k| { if gr_seen_name[k] == h and gr_seen_type[k] == text { return } }
+    gr_seen_type = pl_put(gr_seen_type, gr_seen_name.len(), text)
+    gr_seen_name.push(h)
+}
+
+// ── Matching ──
+
+/// Whether nodes `a` and `b` are the same code (their tokens, comments aside).
+fn gr_same_code(a: I32, b: I32) Bool {
+    let i = node_first[a]
+    let j = node_first[b]
+    while (true) {
+        while (i < node_last[a] and tok_kind[i] == Tok.Comment.i32()) { i += 1 }
+        while (j < node_last[b] and tok_kind[j] == Tok.Comment.i32()) { j += 1 }
+        if i >= node_last[a] or j >= node_last[b] { return i >= node_last[a] and j >= node_last[b] }
+        if not pl_same(tok_start[i], tok_end[i], tok_start[j], tok_end[j]) { return false }
+        i += 1
+        j += 1
+    }
+    return true
+}
+
+/// Whether `src[a ..< a_end]` is `,` or `;`.
+fn gr_separator(a: I32, a_end: I32) Bool => a_end - a == 1 and (src[a] == 44 or src[a] == 59)
+
+fn gr_pat_separator(k: I32) Bool => gr_tok_end[k] - gr_tok_start[k] == 1 and (gr_bytes[gr_tok_start[k]] == 44 or gr_bytes[gr_tok_start[k]] == 59)
+
+/// Whether node `n`'s own tokens are pattern node `p`'s (with a run in
+/// `p`, its separators aside).
+fn gr_own_same(p: I32, n: I32) Bool {
+    gr_cover_of(n)
+    let strip = gr_has_many[p] == 1
+    let k = gr_own_at[p]
+    let k_end = k + gr_own_n[p]
+    let first = node_first[n]
+    for (first ..< node_last[n]) |t| {
+        if gr_cover[t - first] == 0 and tok_kind[t] != Tok.Comment.i32() and not (strip and gr_separator(tok_start[t], tok_end[t])) {
+            while (strip and k < k_end and gr_pat_separator(k)) { k += 1 }
+            if k >= k_end { return false }
+            let size = gr_tok_end[k] - gr_tok_start[k]
+            if tok_end[t] - tok_start[t] != size { return false }
+            for (0 ..< size) |m| { if src[tok_start[t] + m] != gr_bytes[gr_tok_start[k] + m] { return false } }
+            k += 1
+        }
+    }
+    while (strip and k < k_end and gr_pat_separator(k)) { k += 1 }
+    return k == k_end
+}
+
+/// The binding of name `h` (a run when `run` is 1), or -1.
+fn gr_bound(h: I32, run: I32) I32 {
+    let e = gr_env_name.len() - 1
+    while (e >= 0) {
+        if gr_env_name[e] == h and gr_env_run[e] == run { return e }
+        e -= 1
+    }
+    return -1
+}
+
+fn gr_bind(h: I32, run: I32, at: I32, n: I32) Void {
+    gr_env_name.push(h)
+    gr_env_run.push(run)
+    gr_env_at.push(at)
+    gr_env_n.push(n)
+}
+
+/// Back to the bindings there were (`marks`: how many, and how many run nodes).
+fn gr_restore(mark: I32, run_mark: I32) Void {
+    gr_env_name.resize(mark)
+    gr_env_run.resize(mark)
+    gr_env_at.resize(mark)
+    gr_env_n.resize(mark)
+    gr_run.resize(run_mark)
+}
+
+/// Pattern node `p` against node `n`, binding its holes.
+fn gr_node(p: I32, n: I32) Bool {
+    let h = gr_hole[p]
+    if h >= 0 {
+        if not gr_meets(h, n) { return false }
+        if h == gr_blank { return true }
+        let e = gr_bound(h, 0)
+        if e >= 0 { return gr_same_code(gr_env_at[e], n) }
+        gr_bind(h, 0, n, 1)
+        return true
+    }
+    if gr_kind[p] != node_kind[n] { return false }
+    if not gr_own_same(p, n) { return false }
+    let ns = gr_children(n)
+    return gr_list(gr_kid_at[p], gr_kid_n[p], 0, ns, 0, ns.len())
+}
+
+/// Pattern nodes `gr_kids[at + i ..< at + count]` against nodes `ns[j ..< end_]`, a run taking any number.
+fn gr_list(at: I32, count: I32, i: I32, ns: Array[I32], j: I32, end_: I32) Bool {
+    if i == count { return j == end_ }
+    let p = gr_kids[at + i]
+    let mark = gr_env_name.len()
+    let run_mark = gr_run.len()
+    let m = gr_many[p]
+    if m >= 0 {
+        // A run named twice is the same code both times.
+        let bound = gr_bound(m, 1)
+        for (j ... end_) |k| {
+            // A typed run: every node has the type.
+            if k > j and not gr_meets(m, ns[k - 1]) { return false }
+            let same = bound < 0 or gr_env_n[bound] == k - j
+            if same and bound >= 0 {
+                for (0 ..< k - j) |r| { if same and not gr_same_code(gr_run[gr_env_at[bound] + r], ns[j + r]) { same = false } }
+            }
+            if same {
+                if m != gr_blank {
+                    gr_bind(m, 1, gr_run.len(), k - j)
+                    for (j ..< k) |r| { gr_run.push(ns[r]) }
+                }
+                if gr_list(at, count, i + 1, ns, k, end_) { return true }
+                gr_restore(mark, run_mark)
+            }
+        }
+        return false
+    }
+    if gr_optional[p] == 1 {
+        let empty = true
+        for (0 ..< gr_kid_n[p]) |c| {
+            let e = gr_bound(gr_many[gr_kids[gr_kid_at[p] + c]], 1)
+            if e >= 0 and gr_env_n[e] > 0 { empty = false }
+        }
+        if empty {
+            // Each run empty, the node absent.
+            for (0 ..< gr_kid_n[p]) |c| {
+                let run = gr_many[gr_kids[gr_kid_at[p] + c]]
+                if run != gr_blank { gr_bind(run, 1, gr_run.len(), 0) }
+            }
+            if gr_list(at, count, i + 1, ns, j, end_) { return true }
+            gr_restore(mark, run_mark)
+        }
+    }
+    if j >= end_ { return false }
+    if gr_node(p, ns[j]) and gr_list(at, count, i + 1, ns, j + 1, end_) { return true }
+    gr_restore(mark, run_mark)
+    return false
+}
+
+/// The bindings, as lines `b name place` (a run's name `...name`), each
+/// name once, where it was first bound, with its last binding.
+fn gr_bindings() Str {
+    let out = ""
+    for (0 ..< gr_env_name.len()) |e| {
+        let first = true
+        for (0 ..< e) |d| { if gr_env_name[d] == gr_env_name[e] and gr_env_run[d] == gr_env_run[e] { first = false } }
+        if first {
+            let last = gr_bound(gr_env_name[e], gr_env_run[e])
+            let name = if gr_env_run[e] == 1 { "..." + gr_names[gr_env_name[e]] } else { gr_names[gr_env_name[e]] }
+            out = out + "b " + name + " " + gr_binding_place(last) + "\n"
+        }
+    }
+    return out
+}
+
+/// Where binding `e` is: its node's place; a run's, from its first node that has one to its last.
+fn gr_binding_place(e: I32) Str {
+    if gr_env_run[e] == 0 { return pl_node_text(gr_env_at[e]) }
+    let from = -1
+    let to = -1
+    for (0 ..< gr_env_n[e]) |r| {
+        let n = gr_run[gr_env_at[e] + r]
+        if pl_file(pl_node_start(n)) >= 0 {
+            if from < 0 { from = n }
+            to = n
+        }
+    }
+    return if from < 0 { "-" } else { pl_span_text(from, to) }
+}
+
+/// Every match of the pattern in the program the compiler holds, in the
+/// program's own files: lines `m place`, each followed by its bindings.
+fn gr_match() Str {
+    places_reset()
+    let types = ty_kind.len()
+    gr_ty_text = Array[Str].new(types, "")
+    gr_ty_made.resize(types)
+    for (0 ..< types) |t| { gr_ty_made[t] = 0 }
+    gr_ty_meets.resize(types * gr_met.len())
+    for (0 ..< types * gr_met.len()) |k| { gr_ty_meets[k] = 0 }
+    gr_parent.clear()
+    let out = ""
+    let lone = if gr_top_n == 1 { gr_kids[gr_top_at] } else { -1 }
+    // A lone hole matches every expression the compiler typed (filtered by `--where`).
+    let any = lone >= 0 and gr_hole[lone] >= 0
+    for (0 ..< node_kind.len()) |n| {
+        if pl_own(pl_file(pl_node_start(n))) {
+            gr_restore(0, 0)
+            if lone >= 0 {
+                let candidate = if any { gr_type(n) != "" and not gr_statement(n) } else { node_kind[n] == gr_kind[lone] }
+                if candidate and gr_node(lone, n) { out = out + "m " + pl_node_text(n) + "\n" + gr_bindings() }
+            } else {
+                // A run of statements: consecutive children of a block.
+                let kids = gr_children(n)
+                for (0 ..< kids.len() - gr_top_n + 1) |k| {
+                    gr_restore(0, 0)
+                    if gr_list(gr_top_at, gr_top_n, 0, kids, k, k + gr_top_n) {
+                        out = out + "m " + pl_span_text(kids[k], kids[k + gr_top_n - 1]) + "\n" + gr_bindings()
+                    }
+                }
+            }
+        }
+    }
+    return out
+}
+
+/// Each `--where` no node met, though some were tried: lines `hole\ttype`,
+/// then a tab before each type the tried nodes had, least first.
+fn gr_unmatched() Str {
+    let out = ""
+    for (0 ..< gr_where_order.len()) |w| {
+        let h = gr_where_order[w]
+        if gr_met[h] == 2 {
+            let types = Array[Str].new(gr_seen_name.len(), "")
+            let n = 0
+            for (0 ..< gr_seen_name.len()) |k| {
+                if gr_seen_name[k] == h and gr_seen_type[k] != "" {
+                    // In order as they come (by UTF-16 code units).
+                    let at = n
+                    while (at > 0 and gr_seen_type[k] < types[at - 1]) {
+                        types[at] = types[at - 1]
+                        at -= 1
+                    }
+                    types[at] = gr_seen_type[k]
+                    n += 1
+                }
+            }
+            out = out + gr_names[h] + "\t" + gr_where[h]
+            for (0 ..< n) |k| { out = out + "\t" + types[k] }
+            out = out + "\n"
+        }
+    }
+    return out
+}
+
+// ── References ──
+
+/// The text of `src[start ..< end_]` is `name`.
+fn gr_text_is(start: I32, end_: I32, name: Str) Bool => bytes_text(start, end_) == name
+
+/// Declaration `d`'s references (its own name aside), as lines `r kind place`;
+/// `but` leaves out those spelled so ("" for none).
+fn gr_references(d: I32, kind: Str, but: Str) Str {
+    let out = ""
+    let f = pl_definition(d)
+    let def_start = pl_def_start
+    let from = pl_uses(d)
+    for (from ..< pl_use_at[d + 1]) |u| {
+        let n = pl_use_list[u]
+        let start = pl_node_start(n)
+        let g = pl_file(start)
+        if g >= 0 and not (f >= 0 and g == f and start == def_start) and not (but != "" and gr_text_is(start, pl_node_end(n), but)) {
+            out = out + "r " + kind + " " + pl_text(g, start, pl_node_end(n)) + "\n"
+        }
+    }
+    pl_wat_uses()
+    for (0 ..< pl_wat_decl.len()) |k| {
+        if pl_wat_decl[k] == d and not (but != "" and gr_text_is(pl_wat_start[k], pl_wat_end[k], but)) {
+            out = out + "r " + kind + " " + pl_text(pl_file(pl_wat_start[k]), pl_wat_start[k], pl_wat_end[k]) + "\n"
+        }
+    }
+    return out
+}
+
+/// An import's alias (`using m |Point| …`): each place its file `f` spells
+/// it so, whatever that resolves to through it (the module, its type).
+fn gr_alias_references(d: I32, f: I32, def_start: I32, name: Str, kind: Str) Str {
+    let out = ""
+    for (0 ..< pl_names(f)) |k| {
+        let start = pl_name_start[k]
+        let end_ = pl_name_end[k]
+        if start != def_start and gr_text_is(start, end_, name) {
+            let spelled = if pl_definition(pl_name_decl[k]) >= 0 { bytes_text(pl_def_start, pl_def_end) } else { bytes_text(start, end_) }
+            if pl_name_decl[k] == d or spelled != name { out = out + "r " + kind + " " + pl_text(f, start, end_) + "\n" }
+        }
+    }
+    return out
+}
+
+/// The declarations named `name` in the program's own files, each with its
+/// references: lines `d kind place`, then `r kind place`.
+fn gr_refs(name: Str) Str {
+    places_reset()
+    let out = ""
+    for (0 ..< decl_kind.len()) |d| {
+        let f = if decl_node[d] >= 0 and pl_file(pl_node_start(decl_node[d])) >= 0 { pl_definition(d) } else { -1 }
+        if pl_own(f) and gr_text_is(pl_def_start, pl_def_end, name) {
+            let def_start = pl_def_start
+            let kind = decl_kind_text(Decl(decl_kind[d]))
+            out = out + "d " + kind + " " + pl_text(f, pl_def_start, pl_def_end) + "\n"
+            if decl_is(d, Decl.Alias) { out = out + gr_alias_references(d, f, def_start, name, kind) } else {
+                out = out + gr_references(d, kind, "")
+                if decl_is(d, Decl.Module) {
+                    // A module's own type (`struct &`), where it is named: by an alias.
+                    for (0 ..< decl_kind.len()) |e| {
+                        if decl_owner[e] == d and decl_node[e] >= 0 and pl_file(pl_node_start(decl_node[e])) >= 0 {
+                            // (One with no name is spelled as the module is.)
+                            let spelled = if pl_definition(e) >= 0 { bytes_text(pl_def_start, pl_def_end) } else { name }
+                            if spelled == "&" { out = out + gr_references(e, kind, "&") }
+                        }
+                    }
+                }
+            }
+        }
+    }
+    return out
+}

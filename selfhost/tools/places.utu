@@ -1,0 +1,373 @@
+//! = Places
+//!
+//! Where a node, a token, or a declaration's name is, as a tool reports it:
+//! a file (its id, among the files the host added; a generated file is
+//! none) and UTF-16 offsets in its text, which is what editors and the
+//! host's strings count. And what names mean, from the tables a build
+//! leaves: each declaration's own name, the names resolving to it, and a
+//! @wat function's parameters named in its text. Each is made when first
+//! asked, once a build; @places_reset forgets them for the next.
+
+/// By byte of an asked file: its UTF-16 offset in the file.
+vec pl_units: I32
+/// By file: 1 once its offsets are in @pl_units; its UTF-16 length.
+vec pl_units_made: I32
+vec pl_units_total: I32
+/// By declaration: the first name inside it that resolves to it (its own
+/// name), or -1; made once (`pl_naming_made`).
+vec pl_naming: I32
+let pl_naming_made: I32 = 0
+/// By declaration: the name nodes resolving to it, in node order, at
+/// `pl_use_list[pl_use_at[d] ..< pl_use_at[d + 1]]`; made once (`pl_uses_made`).
+vec pl_use_at: I32
+vec pl_use_list: I32
+let pl_uses_made: I32 = 0
+/// A @wat function's parameters, named in its text as `$x`: each place
+/// (bytes, after the `$`) and the parameter.
+vec pl_wat_decl: I32
+vec pl_wat_start: I32
+vec pl_wat_end: I32
+let pl_wat_made: I32 = 0
+
+/// Forget what was made of the last build.
+fn places_reset() Void {
+    pl_units_made.clear()
+    pl_units_total.clear()
+    pl_naming_made = 0
+    pl_uses_made = 0
+    pl_wat_made = 0
+}
+
+/// The file byte `b` is in, or -1 (a generated file's, or none).
+fn pl_file(b: I32) I32 {
+    // The last file that begins at or before it (files are in byte order).
+    let lo = -1
+    let hi = file_start.len() - 1
+    while (lo < hi) {
+        let mid = (lo + hi + 1) / 2
+        if file_start[mid] <= b { lo = mid } else { hi = mid - 1 }
+    }
+    return if lo < 0 or file_role[lo] == FileRole.Generated.i32() or b >= file_end[lo] { -1 } else { lo }
+}
+
+/// A file the program has of its own (not the standard library's).
+fn pl_own(f: I32) Bool => f >= 0 and is_own_file(f) and file_std[f] == 0
+
+/// Byte `b` of file `f` as a UTF-16 offset in it.
+fn pl_unit(f: I32, b: I32) I32 {
+    while (pl_units_made.len() <= f) {
+        pl_units_made.push(0)
+        pl_units_total.push(0)
+    }
+    if pl_units_made[f] == 0 {
+        if pl_units.len() < file_end[f] { pl_units.resize(file_end[f]) }
+        let u = 0
+        let i = file_start[f]
+        while (i < file_end[f]) {
+            let c = src[i]
+            let n = if c < 128 { 1 } else if c < 224 { 2 } else if c < 240 { 3 } else { 4 }
+            for (0 ..< n) |k| { if i + k < file_end[f] { pl_units[i + k] = u } }
+            i += n
+            u += if n == 4 { 2 } else { 1 }
+        }
+        pl_units_made[f] = 1
+        pl_units_total[f] = u
+    }
+    return if b >= file_end[f] { pl_units_total[f] } else { pl_units[b] }
+}
+
+/// Where node `n` begins and ends in `src`.
+fn pl_node_start(n: I32) I32 => tok_start[node_first[n]]
+
+fn pl_node_end(n: I32) I32 => if node_last[n] > 0 { tok_end[node_last[n] - 1] } else { pl_node_start(n) }
+
+/// A place, as a tool writes one: `file start end` (UTF-16), or `-` for none.
+fn pl_text(f: I32, start: I32, end_: I32) Str => if f < 0 { "-" } else { `${f} ${pl_unit(f, start)} ${pl_unit(f, end_)}` }
+
+/// Node `n`'s place.
+fn pl_node_text(n: I32) Str {
+    let start = pl_node_start(n)
+    return pl_text(pl_file(start), start, pl_node_end(n))
+}
+
+/// The place from node `a`'s start to node `b`'s end.
+fn pl_span_text(a: I32, b: I32) Str => pl_text(pl_file(pl_node_start(a)), pl_node_start(a), pl_node_end(b))
+
+/// Whether `src[a ..< a_end]` and `src[b ..< b_end]` are the same bytes.
+fn pl_same(a: I32, a_end: I32, b: I32, b_end: I32) Bool {
+    if a_end - a != b_end - b { return false }
+    for (0 ..< a_end - a) |k| { if src[a + k] != src[b + k] { return false } }
+    return true
+}
+
+/// Whether `src[a ..< a_end]` is `text` (ASCII).
+fn pl_is(a: I32, a_end: I32, text: Str) Bool {
+    if a_end - a != text.len() { return false }
+    for (0 ..< text.len()) |k| { if src[a + k] != text.get(k) { return false } }
+    return true
+}
+
+/// A name node: one token, resolving to a declaration.
+fn pl_named(n: I32) Bool => node_decl[n] >= 0 and node_last[n] - node_first[n] == 1
+
+/// The node naming declaration `d` (the first name inside it that resolves to it), or -1.
+fn pl_naming_node(d: I32) I32 {
+    if pl_naming_made == 0 {
+        pl_naming_made = 1
+        pl_naming.resize(decl_kind.len())
+        for (0 ..< decl_kind.len()) |k| { pl_naming[k] = -1 }
+        for (0 ..< node_kind.len()) |n| {
+            let e = node_decl[n]
+            if e >= 0 and e < decl_kind.len() and pl_named(n) and decl_node[e] >= 0 {
+                let s = tok_start[node_first[n]]
+                if s >= pl_node_start(decl_node[e]) and s < pl_node_end(decl_node[e]) {
+                    let best = pl_naming[e]
+                    if best < 0 or s < tok_start[node_first[best]] { pl_naming[e] = n }
+                }
+            }
+        }
+    }
+    return pl_naming[d]
+}
+
+/// Where declaration `d`'s uses begin in @pl_use_list (and `d + 1`'s, where they end).
+fn pl_uses(d: I32) I32 {
+    if pl_uses_made == 0 {
+        pl_uses_made = 1
+        let decls = decl_kind.len()
+        pl_use_at.resize(decls + 1)
+        for (0 ..< decls + 1) |k| { pl_use_at[k] = 0 }
+        for (0 ..< node_kind.len()) |n| {
+            if pl_named(n) and node_decl[n] < decls { pl_use_at[node_decl[n] + 1] += 1 }
+        }
+        for (0 ..< decls) |k| { pl_use_at[k + 1] += pl_use_at[k] }
+        pl_use_list.resize(pl_use_at[decls])
+        let fill = Array[I32].new(decls, 0)
+        for (0 ..< node_kind.len()) |n| {
+            if pl_named(n) and node_decl[n] < decls {
+                let e = node_decl[n]
+                pl_use_list[pl_use_at[e] + fill[e]] = n
+                fill[e] += 1
+            }
+        }
+    }
+    return pl_use_at[d]
+}
+
+/// The words a declaration begins with, before what it names.
+fn pl_declaring(a: I32, a_end: I32) Bool {
+    for (["export", "mod", "struct", "tag", "enum", "proto", "fn", "type", "distinct", "let", "const", "mem", "vec", "using"]) |w| {
+        if pl_is(a, a_end, w) { return true }
+    }
+    return false
+}
+
+/// Whether `src[a ..< a_end]` is a name (`[A-Za-z_]\w*`).
+fn pl_word(a: I32, a_end: I32) Bool {
+    if a_end <= a { return false }
+    for (a ..< a_end) |i| {
+        let c = src[i]
+        let letter = (c >= 65 and c <= 90) or (c >= 97 and c <= 122) or c == 95
+        if not letter and not (i > a and c >= 48 and c <= 57) { return false }
+    }
+    return true
+}
+
+/// What @pl_definition found: its bytes.
+let pl_def_start: I32 = 0
+let pl_def_end: I32 = 0
+
+/// Where declaration `d` names what it declares, as bytes: the name in it
+/// that resolves to it, or (`struct &:`) the first token after its
+/// keywords when that is a name or `&`, or its whole node. Sets
+/// @pl_def_start and @pl_def_end; returns the file, or -1 for none.
+fn pl_definition(d: I32) I32 {
+    let owner = decl_node[d]
+    if owner < 0 { return -1 }
+    let best = pl_naming_node(d)
+    if best >= 0 { return pl_set_def(pl_node_start(best), pl_node_end(best)) }
+    for (node_first[owner] ..< node_last[owner]) |t| {
+        if tok_kind[t] != Tok.Comment.i32() {
+            if pl_file(tok_start[t]) < 0 { return pl_set_def(pl_node_start(owner), pl_node_end(owner)) }
+            if not pl_declaring(tok_start[t], tok_end[t]) {
+                if not pl_is(tok_start[t], tok_end[t], "&") and not pl_word(tok_start[t], tok_end[t]) { return pl_set_def(pl_node_start(owner), pl_node_end(owner)) }
+                return pl_set_def(tok_start[t], tok_end[t])
+            }
+        }
+    }
+    return pl_set_def(pl_node_start(owner), pl_node_end(owner))
+}
+
+fn pl_set_def(start: I32, end_: I32) I32 {
+    pl_def_start = start
+    pl_def_end = end_
+    return pl_file(start)
+}
+
+/// The node a parameter's name is read from: its name, or its node.
+fn pl_param_name(d: I32) I32 => if pl_naming_node(d) >= 0 { pl_naming_node(d) } else { decl_node[d] }
+
+/// The @wat functions' parameters, named in their text (see @pl_wat_decl).
+fn pl_wat_uses() Void {
+    if pl_wat_made == 1 { return }
+    pl_wat_made = 1
+    pl_wat_decl.clear()
+    pl_wat_start.clear()
+    pl_wat_end.clear()
+    let count = find_wat()
+    for (0 ..< count) |k| {
+        let fn_node = wat_function_of(wat_site[k])
+        let fn_decl = -1
+        for (0 ..< decl_kind.len()) |d| { if fn_decl < 0 and decl_node[d] == fn_node { fn_decl = d } }
+        // Its parameters, each named by a span of src (the last of a name wins).
+        let params = Array[I32].new(decl_kind.len(), 0)
+        let n_params = 0
+        for (0 ..< decl_kind.len()) |d| {
+            if decl_owner[d] == fn_decl and decl_is(d, Decl.Param) and pl_file(pl_node_start(pl_param_name(d))) >= 0 {
+                params[n_params] = d
+                n_params += 1
+            }
+        }
+        let start = dsl_inner_start(wat_site[k])
+        let end_ = dsl_inner_end(wat_site[k])
+        if pl_file(start) >= 0 and n_params > 0 {
+            let b = start
+            while (b < end_) {
+                let c = src[b]
+                if c == 59 and src[b + 1] == 59 {
+                    // `;; …` to the line's end.
+                    while (b < end_ and src[b] != 10) { b += 1 }
+                } else if c == 40 and src[b + 1] == 59 {
+                    // `(; … ;)`, nested.
+                    let depth = 0
+                    let open = true
+                    while (b < end_ and open) {
+                        if src[b] == 40 and src[b + 1] == 59 {
+                            depth += 1
+                            b += 1
+                        } else if src[b] == 59 and src[b + 1] == 41 {
+                            depth -= 1
+                            b += 1
+                            if depth == 0 { open = false }
+                        }
+                        if open { b += 1 }
+                    }
+                } else if c == 36 {
+                    let e = b + 1
+                    while (e < end_ and pl_wat_id(src[e])) { e += 1 }
+                    let found = -1
+                    for (0 ..< n_params) |p| {
+                        let name = pl_param_name(params[p])
+                        if pl_same(pl_node_start(name), pl_node_end(name), b + 1, e) { found = params[p] }
+                    }
+                    if found >= 0 {
+                        pl_wat_decl.push(found)
+                        pl_wat_start.push(b + 1)
+                        pl_wat_end.push(e)
+                    }
+                    b = e - 1
+                }
+                b += 1
+            }
+        }
+    }
+}
+
+/// A character of a WAT identifier after its `$`.
+fn pl_wat_id(c: I32) Bool {
+    if (c >= 48 and c <= 57) or (c >= 65 and c <= 90) or (c >= 97 and c <= 122) { return true }
+    // ! # $ % & ' * + - . / : < = > ? @ \ ^ _ ` | ~
+    return match c {
+        33, 35, 36, 37, 38, 39, 42, 43, 45, 46, 47, 58, 60, 61, 62, 63, 64, 92, 94, 95, 96, 124, 126 => true,
+        ~> false,
+    }
+}
+
+/// What @pl_names found: each name's bytes and declaration.
+vec pl_name_start: I32
+vec pl_name_end: I32
+vec pl_name_decl: I32
+
+/// The names in file `f` that resolve (a @wat parameter's too), in source
+/// order, each place once, into @pl_name_start. Returns how many.
+fn pl_names(f: I32) I32 {
+    pl_wat_uses()
+    let count = 0
+    for (0 ..< node_kind.len()) |n| { if pl_named(n) and pl_file(pl_node_start(n)) == f { count += 1 } }
+    for (0 ..< pl_wat_decl.len()) |k| { if pl_file(pl_wat_start[k]) == f { count += 1 } }
+    let starts = Array[I32].new(count, 0)
+    let ends = Array[I32].new(count, 0)
+    let decls = Array[I32].new(count, 0)
+    let k = 0
+    for (0 ..< node_kind.len()) |n| {
+        if pl_named(n) and pl_file(pl_node_start(n)) == f {
+            starts[k] = pl_node_start(n)
+            ends[k] = pl_node_end(n)
+            decls[k] = node_decl[n]
+            k += 1
+        }
+    }
+    for (0 ..< pl_wat_decl.len()) |w| {
+        if pl_file(pl_wat_start[w]) == f {
+            starts[k] = pl_wat_start[w]
+            ends[k] = pl_wat_end[w]
+            decls[k] = pl_wat_decl[w]
+            k += 1
+        }
+    }
+    let order = pl_order(starts, count)
+    pl_name_start.clear()
+    pl_name_end.clear()
+    pl_name_decl.clear()
+    for (0 ..< count) |o| {
+        let i = order[o]
+        if o == 0 or starts[i] != pl_name_start[pl_name_start.len() - 1] {
+            pl_name_start.push(starts[i])
+            pl_name_end.push(ends[i])
+            pl_name_decl.push(decls[i])
+        }
+    }
+    return pl_name_start.len()
+}
+
+/// `list` with `item` at `n` (its first `n` kept), grown when it must be.
+fn pl_put(list: Array[Str], n: I32, item: Str) Array[Str] {
+    if n < list.len() {
+        list[n] = item
+        return list
+    }
+    let grown = Array[Str].new(n * 2 + 8, "")
+    for (0 ..< n) |k| { grown[k] = list[k] }
+    grown[n] = item
+    return grown
+}
+
+/// The order of `keys[0 ..< n]`, least first, equal keys as they came.
+fn pl_order(keys: Array[I32], n: I32) Array[I32] {
+    let order = Array[I32].new(n, 0)
+    for (0 ..< n) |i| { order[i] = i }
+    let spare = Array[I32].new(n, 0)
+    let width = 1
+    while (width < n) {
+        let lo = 0
+        while (lo < n) {
+            let mid = if lo + width < n { lo + width } else { n }
+            let hi = if lo + 2 * width < n { lo + 2 * width } else { n }
+            let a = lo
+            let b = mid
+            for (lo ..< hi) |k| {
+                if a < mid and (b >= hi or keys[order[a]] <= keys[order[b]]) {
+                    spare[k] = order[a]
+                    a += 1
+                } else {
+                    spare[k] = order[b]
+                    b += 1
+                }
+            }
+            lo = hi
+        }
+        for (0 ..< n) |k| { order[k] = spare[k] }
+        width *= 2
+    }
+    return order
+}
