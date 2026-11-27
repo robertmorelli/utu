@@ -165,9 +165,17 @@ html {
   fs.rmSync(dir, { recursive: true, force: true });
 }
 
+// One-line bodies stay as written; a function that only returns becomes `=> e`.
+{
+  const source = 'fn a(x: I32) I32 { return if x > 0 { x } else { 0 } }\nfn b(x: I32) I32 {\n    return x + 1\n}\nfn c(xs: Array[I32]) I32 => xs filter |x| { x > 0 } count\nfn d(x: I32) I32 {\n    let y = x\n    return y\n}\nmain {}\n';
+  const text = await formatUtuSource(source, { shape });
+  assert.equal(text, 'fn a(x: I32) I32 => if x > 0 { x } else { 0 }\nfn b(x: I32) I32 => x + 1\nfn c(xs: Array[I32]) I32 => xs filter |x| { x > 0 } count\nfn d(x: I32) I32 {\n    let y = x\n    return y\n}\nmain {}\n');
+  assert.equal(await formatUtuSource(text, { shape }), text);
+}
+
 // `A, B => e`: an arm's patterns stay on its line.
 {
-  const source = 'enum S:\n    | A\n    | B\n    | C\nfn f(s: S) I32 => alt s { A, B => 1, C => 2, }\nfn g(n: I32) I32 => match n { 1, -2, 3 => 1, ~> 0, }\nmain {}\n';
+  const source = 'enum S:\n    | A\n    | B\n    | C\nfn f(s: S) I32 => alt s {\n A, B => 1, C => 2, }\nfn g(n: I32) I32 => match n {\n 1, -2, 3 => 1, ~> 0, }\nmain {}\n';
   const text = await formatUtuSource(source, { shape });
   assert.match(text, /\n {4}A, B => 1,\n {4}C => 2,\n/);
   assert.match(text, /\n {4}1, -2, 3 => 1,\n/);

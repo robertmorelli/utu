@@ -201,6 +201,13 @@ class BodyFormatter {
         i += struct.length - 1;
         continue;
       }
+      const body = code && c === '{' ? oneLineBody(text, i) : null;
+      if (body) {
+        // A one-line body stays as written.
+        current = current.trimEnd() + ' ' + body;
+        i += body.length - 1;
+        continue;
+      }
       if (c === '{') {
         braces.push(parens);
         current = current.trimEnd() + ' {';
@@ -451,10 +458,10 @@ export async function formatUtu(source, { shape } = {}) {
   if (!shape) throw new Error('formatUtu needs a self-hosted parser shape function');
   const before = await shape(source);
   if (!before) return { text: source, refused: 'it does not parse' };
-  const once = formatWutuSource(layoutUtu(source));
+  const once = formatWutuSource(layoutUtu(shape.arrows ? arrowBodies(source, shape.arrows(source)) : source));
   if (once === source) return { text: source, refused: null };
   if (await shape(once) !== before) return { text: source, refused: 'its layout would parse differently' };
-  if (formatWutuSource(layoutUtu(once)) !== once) return { text: source, refused: 'its layout is not stable' };
+  if (formatWutuSource(layoutUtu(shape.arrows ? arrowBodies(once, shape.arrows(once)) : once)) !== once) return { text: source, refused: 'its layout is not stable' };
   return { text: once, refused: null };
 }
 
@@ -466,7 +473,7 @@ export async function formatUtu(source, { shape } = {}) {
  */
 export function createSyntaxShape(utu) {
   const encoder = new TextEncoder(), decoder = new TextDecoder();
-  return source => {
+  const parse = source => {
     const bytes = encoder.encode(source);
     const offset = utu.source(bytes.length);
     new Uint8Array(utu.src.buffer).set(bytes, offset);
@@ -479,9 +486,32 @@ export function createSyntaxShape(utu) {
       ['node_first', 'node_last', 'node_child', 'node_next', 'tok_start', 'tok_end'].map(memory);
     const kinds = new Uint8Array(utu.node_kind.buffer);
     const text = t => decoder.decode(new Uint8Array(utu.src.buffer, start[t], end[t] - start[t]));
+    const kind = n => utu.node_kind_name(kinds[n]);
+    const kids = n => { const out = []; for (let c = child[n]; c >= 0; c = next[c]) out.push(c); return out; };
+    // A function's `{ return e }`: its e (written `=> e`, the same function), else -1.
+    const returned = (n, parentKind) => {
+      if (parentKind !== 'fn_decl' || kind(n) !== 'block' || text(first[n]) !== '{') return -1;
+      const [r, ...more] = kids(n);
+      if (r === undefined || more.length || kind(r) !== 'return_expr' || first[r] !== first[n] + 1 || last[r] !== last[n] - 1) return -1;
+      const [e, ...rest] = kids(r);
+      return e !== undefined && !rest.length && first[e] === first[r] + 1 && last[e] === last[r] ? e : -1;
+    };
+    return { root, first, last, start, end, text, kind, kids, returned, offset };
+  };
+  const shape = source => {
+    const tree = parse(source);
+    if (!tree) return null;
+    const { root, first, last, text, kids, returned } = tree;
     const out = [];
     const walk = (n, parentKind) => {
-      const kind = utu.node_kind_name(kinds[n]);
+      const kind = tree.kind(n);
+      const e = returned(n, parentKind);
+      if (e >= 0) {
+        out.push('(', kind, '"=>"');
+        walk(e, 'return_expr');
+        out.push(')');
+        return;
+      }
       out.push('(', kind);
       if (kind === 'dsl_expr' && text(first[n] + 1) === 'wutu') {
         out.push('@wutu', ')');
@@ -500,8 +530,7 @@ export function createSyntaxShape(utu) {
         out.push(body.match(/"(?:[^"\\]|\\.)*"|`(?:[^`\\]|\\.)*`|[^\s;]/g)?.join('') ?? '', ')');
         return;
       }
-      const children = [];
-      for (let c = child[n]; c >= 0; c = next[c]) children.push(c);
+      const children = kids(n);
       let t = first[n];
       for (const c of children) {
         while (t < first[c]) out.push(JSON.stringify(text(t++)));
@@ -514,6 +543,40 @@ export function createSyntaxShape(utu) {
     try { walk(root); } catch { return null; }
     return out.join(' ');
   };
+  /** Each function body `{ return e }` of `source`: [block start, e start, e end, block end] in bytes. */
+  shape.arrows = source => {
+    const tree = parse(source);
+    if (!tree) return [];
+    const { root, first, last, start, end, kids, returned, offset } = tree;
+    const spans = [];
+    const visit = (n, parentKind) => {
+      const kind = tree.kind(n);
+      const e = returned(n, parentKind);
+      if (e >= 0) spans.push([start[first[n]], start[first[e]], end[last[e] - 1], end[last[n] - 1]].map(b => b - offset));
+      else for (const c of kids(n)) visit(c, kind);
+    };
+    visit(root);
+    return spans;
+  };
+  return shape;
+}
+
+/**
+ * `source` with each function body `{ return e }` (at `spans`, bytes) written
+ * `=> e`, when nothing but a comment follows it on its line (an `=>` body
+ * ends at the line's end).
+ */
+function arrowBodies(source, spans) {
+  if (!spans.length) return source;
+  const bytes = new TextEncoder().encode(source), decoder = new TextDecoder();
+  const at = (from, to) => decoder.decode(bytes.subarray(from, to));
+  let out = '', from = 0;
+  for (const [open, e, eEnd, close] of spans) {
+    if (!/^[ \t]*(\/\/[^\n]*)?(\r?\n|$)/.test(at(close, Math.min(bytes.length, close + 400)))) continue;
+    out += at(from, open).replace(/[ \t]+$/, '') + ' => ' + at(e, eEnd);
+    from = close;
+  }
+  return out + at(from, bytes.length);
 }
 
 /** Offset just past the template literal whose backtick is at `start`; -1 if unterminated. */
@@ -553,6 +616,19 @@ function oneLineStruct(before, text, i) {
   const m = /^\{\s*[a-z_]\w*\s*:(?!:)[^{}\n`]*\}/.exec(text.slice(i));
   if (!m || /\/\/|\/\*/.test(m[0].replace(/"(?:[^"\\]|\\.)*"/g, '""'))) return null;
   return m[0];
+}
+
+/**
+ * The block whose `{` is at `open` when it is written on one line and holds
+ * one statement (`filter |p| { p.ok }`, `if c { a } else { b }`): it stays as
+ * written. Null otherwise.
+ */
+function oneLineBody(text, open) {
+  const end = wutuBraceEnd(text, open);
+  if (end < 0) return null;
+  const body = text.slice(open, end);
+  const bare = body.replace(/"(?:[^"\\\n]|\\.)*"|`(?:[^`\\]|\\.)*`|'(?:[^'\\\n]|\\.)+'/g, '""');
+  return body.includes('\n') || bare.includes(';') || bare.includes('//') || bare.includes('/*') ? null : body;
 }
 
 /**
@@ -673,6 +749,11 @@ function layoutUtu(source) {
       const struct = oneLineStruct(line, source, i - 1);
       line = line.trimEnd() + ' ' + compactExpression(struct);
       i += struct.length - 1;
+    } else if (c === '{' && !(parens === 0 && (/^html$/.test(line.trim()) || /^wn\s+[A-Za-z_].*\)\s*$/.test(line.trim()))) && oneLineBody(source, i - 1)) {
+      // A one-line body stays as written.
+      const body = oneLineBody(source, i - 1);
+      line = line.trimEnd() + ' ' + body;
+      i += body.length - 1;
     } else if (c === '{' && parens === 0 && (/^html$/.test(line.trim()) || /^wn\s+[A-Za-z_].*\)\s*$/.test(line.trim()))) {
       // A Wutu body: laid out as Wutu, or kept as written.
       const end = wutuBraceEnd(source, i - 1);
