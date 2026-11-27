@@ -1804,6 +1804,36 @@ lib {
     assert.deepEqual(built.diagnostics.map(d => [d.message, d.start]), [['Not UTF-8', Buffer.byteLength(before)]], before);
     checked++;
   }
+  // A closure may await, whoever calls it: utu (it suspends), or the host (its
+  // JS function is async: a promise of its result, Bool and U32 as JS has them).
+  {
+    const file = path.join(dir, 'await_closures.utu');
+    await fs.writeFile(file, `using console from std:console
+let delay: fun(I32, I32) Promise[I32] =
+    @es/\\ (v, ms) => new Promise(r => setTimeout(() => r(v), ms)) \\/
+let host_call: fun(cl(I32) I32) Promise[I32] = @es/\\ (f) => Promise.resolve(f(5)) \\/
+let host_bool: fun(cl() Bool) Promise[Bool] = @es/\\ (f) => f().then(b => b === true) \\/
+let host_u32: fun(cl() U32) Promise[F64] = @es/\\ (f) => f() \\/
+
+fn slow(n: I32) I32 { return await delay(n, 1) + 1 }
+
+fn twice(f: cl(I32) I32, x: I32) I32 => f(f(x))
+
+main {
+    let add = cl(n: I32) I32 { return await delay(n + 10, 1) }
+    console.log(twice(add, 0))
+    console.log(await host_call(add))
+    console.log(await host_bool(cl() Bool { return await delay(1, 1) == 1 }))
+    console.log(await host_u32(cl() U32 { let v = await delay(-1, 1); return v.u32() }))
+    delay(3, 1).then(cl(v) { console.log(slow(v)) })
+    let n = 7
+    delay(0, 1).then(cl(v) { console.log(await delay(n, 50) + v) })
+}
+`);
+    const run = spawnSync(process.execPath, [path.join(ROOT, 'cli/utu.mjs'), 'run', file], { encoding: 'utf8', timeout: 60000 });
+    assert.equal(run.stdout, '20\n15\ntrue\n4294967295\n4\n7\n', run.stdout + run.stderr);
+    checked++;
+  }
   // A Wutu template that once expanded again each round (1024 copies of one mistake, and a
   // larger file ran for minutes): checked in a child, under a time limit.
   {
@@ -2057,9 +2087,6 @@ lib { fn run() I32 { return f(Many.V1); } }
     ['fn f() I32 {\n    let i = 0;\n    i++;\n    i;\n}\n', 'utu has no ++; write += 1'],
     ['fn f(s: Str) I32 { match s { "+" => 1, ~> 0, }; }\n', 'match takes number, Bool, and enum patterns, not strings'],
     ['fn f() Bool { return true and (0 ..< 5) all |i| { i < 9; }; }\n', 'A pipeline binds looser than and: its source is all of this'],
-    // A closure the host calls cannot suspend: JSPI cannot suspend through the host's frame.
-    ['let each: fun(cl(I32) Void) Void = @es/\\ (f) => f(1) \\/;\nlet later: fun(I32) Promise[I32] = @es/\\ (v) => Promise.resolve(v) \\/;\nmain { each(cl(v) { let w: I32 = await later(v); }); }\n',
-      'A closure the host calls cannot await'],
     // @comptime and the other DSLs (each crashed, hung, or passed silently).
     ['fn tab() Array[I32] { return [t.len()]; }\nconst mem t: I32 = @comptime/\\ tab() \\/;\nlib { fn run() I32 { return t[0]; } }\n', '@comptime t reads itself'],
     ['fn f() Array[I32] { return [u.len()]; }\nfn g() Array[I32] { return [t.len()]; }\nconst mem t: I32 = @comptime/\\ f() \\/;\nconst mem u: I32 = @comptime/\\ g() \\/;\nlib { fn run() I32 { return t[0]; } }\n', '@comptime t reads u, which waits on it'],

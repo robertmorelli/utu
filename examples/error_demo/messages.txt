@@ -2362,14 +2362,6 @@ ok
  8 │ }
 --- exit 1
 
-=== utu check examples/error_demo/iterators/66_await_in_closure.utu
-ok
---- exit 0
-
-=== utu check examples/error_demo/iterators/68_await_in_stream_map.utu
-ok
---- exit 0
-
 === utu check examples/error_demo/iterators/69_await_promise_wrong_type.utu
  ERROR  n is I32, got Str
         type-mismatch · examples/error_demo/iterators/69_await_promise_wrong_type.utu:6:18
