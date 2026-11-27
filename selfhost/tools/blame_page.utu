@@ -103,7 +103,7 @@ fn top_text(n: I32) Str {
         row[0] = count_text(fw_bytes[w])
         row[1] = pct(fw_bytes[w], total)
         row[2] = fn_name_text(f)
-        row[3] = if p >= 0 { where_text(pl_file[p], pl_line[p]) } else { "" }
+        row[3] = if p >= 0 { where_text(bpl_file[p], bpl_line[p]) } else { "" }
         row[4] = if fn_role[f] == 0 { "" } else { role_name(fn_role[f]) }
     }
     table("functions (code)", fns)

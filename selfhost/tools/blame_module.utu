@@ -7,7 +7,7 @@
 //!              locals and the body's size on the function's; code inlined
 //!              from another function on the callee's line, and its call
 //!              (`site`) as well; a helper the compiler made and shares
-//!              (array.slice, Tag (an enum made), closure.*, mem.push, ...) split
+//!              (array.slice, Tag (an enum made), `closure.*`, `mem.push`, ...) split
 //!              among the calls to it
 //!   types      on their struct, enum, or closure (else where first needed)
 //!   imports    on their @es declaration, or where first needed (a string

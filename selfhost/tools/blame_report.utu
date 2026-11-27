@@ -152,7 +152,7 @@ fn file_row(f: I32) I32 {
 }
 
 /// A place's declaration, or -1.
-fn decl_key(place: I32) I32 => if place >= 0 and pl_decl[place] >= 0 { pl_decl[place] } else { -1 }
+fn decl_key(place: I32) I32 => if place >= 0 and bpl_decl[place] >= 0 { bpl_decl[place] } else { -1 }
 
 fn decl_row(d: I32) I32 {
     if dr_of[d + 1] < 0 {
@@ -188,11 +188,11 @@ fn decl_section_add(row: I32, section: I32, bytes: I32) Void {
 }
 
 fn line_row(p: I32) I32 {
-    let key = bf_lines[pl_file[p]] + pl_line[p] - 1
+    let key = bf_lines[bpl_file[p]] + bpl_line[p] - 1
     if lr_of[key] < 0 {
         lr_of[key] = lr_file.len()
-        lr_file.push(pl_file[p])
-        lr_line.push(pl_line[p])
+        lr_file.push(bpl_file[p])
+        lr_line.push(bpl_line[p])
         lr_decl.push(decl_key(p))
         lr_inlined.push(0)
         lr_here.push(0)
@@ -272,7 +272,7 @@ fn pair_put(key: I64) Bool {
 
 // ── Summing ─────────────────────────────────────────────────────────────────
 
-/// One decimal place, as Math.round(x * 10) / 10 gives it.
+/// One decimal place, as `Math.round(x * 10) / 10` gives it.
 fn round1(x: F64) F64 {
     let v = x * 10.0
     let f = F64.floor(v)
@@ -316,7 +316,7 @@ fn sum_records() Void {
             continue
         }
         rp_blamed += bytes
-        let f = file_row(pl_file[place])
+        let f = file_row(bpl_file[place])
         fr_bytes[f] += bytes
         fr_br[f] += b
         let d = decl_row(decl_key(place))
@@ -351,7 +351,7 @@ fn sum_records() Void {
     for (0 ..< gl_field.len()) |g| {
         let place = es_place_of(bs(gl_field[g]))
         if place < 0 { continue }
-        let f = file_row(pl_file[place])
+        let f = file_row(bpl_file[place])
         fr_glue[f] += gl_bytes[g]
         fr_has_glue[f] = 1
         dr_glue[decl_row(decl_key(place))] += gl_bytes[g]
@@ -555,7 +555,7 @@ fn functions_json() Str {
     for (o_fns, 0 ..< o_fns.len()) |w, i| {
         let f = fw_index[w]
         let p = fn_place[f]
-        let at = if p >= 0 { `"file":${file_json(pl_file[p])},"line":${pl_line[p]},"decl":${decl_key(p)}` } else { `"file":null,"line":null,"decl":-1` }
+        let at = if p >= 0 { `"file":${file_json(bpl_file[p])},"line":${bpl_line[p]},"decl":${decl_key(p)}` } else { `"file":null,"line":null,"decl":-1` }
         items[i] = `{"index":${f},"name":${qn(fn_named[f])},"role":"${role_name(fn_role[f])}","inlined":${fw_inlined[w]},"bytes":${fw_bytes[w]},"br":${fw_br[w]},${at}}`
     }
     return json_list(items)
@@ -619,9 +619,9 @@ fn blame_reset(name: Str) Void {
     bf_lines.clear()
     bf_line_count.clear()
     bl_starts.clear()
-    pl_file.clear()
-    pl_line.clear()
-    pl_decl.clear()
+    bpl_file.clear()
+    bpl_line.clear()
+    bpl_decl.clear()
     dc_name.clear()
     dc_kind.clear()
     dc_file.clear()

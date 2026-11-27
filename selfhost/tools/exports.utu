@@ -10,7 +10,7 @@
 
     // ── size blame ──
 
-    /// Size blame (tools/blame*.utu), of the build this module just made
+    /// Size blame (`tools/blame*.utu`), of the build this module just made
     /// (with a source map): blame_begin, then the host's files (`start`:
     /// where the file is in src, `size` its bytes; a file of the build's may
     /// be given as several), the module's bytes (written to blame_in after
@@ -84,3 +84,51 @@
 
     /// The Wutu completion words at `offset` of `source` (see wutu_completion_words).
     fn wutu_completions(source: Str, offset: I32) Str => wutu_completion_words(source, offset)
+
+    // ── grep ──
+
+    /// `utu grep`'s pattern, parsed for @grep_match (it resets the program):
+    /// how many nodes it is, 0 when it is not utu.
+    fn grep_pattern(pattern: Str) I32 => gr_pattern(pattern)
+
+    /// A `--where`: hole `name`'s node has type `want`. 0 when the pattern has no such hole.
+    fn grep_where(name: Str, want: Str) I32 => gr_where_add(name, want)
+
+    /// The pattern's matches in the program the compiler holds: lines
+    /// `m file start end` (a file id, UTF-16 offsets), each followed by its
+    /// bindings, `b name file start end` (`b name -`: nowhere).
+    fn grep_match() Str => gr_match()
+
+    /// Each `--where` no node met: lines `hole\ttype`, then `\ttype` for each type seen.
+    fn grep_unmatched() Str => gr_unmatched()
+
+    /// The declarations named `name` in the program's own files: lines
+    /// `d kind file start end`, each followed by its references, `r kind file start end`.
+    fn grep_refs(name: Str) Str => gr_refs(name)
+
+    // ── utudoc ──
+
+    /// tools/utudoc: a new build, `keys` its files' keys, a line each in file order.
+    fn doc_build(keys: Str) Void => ud_build(keys)
+
+    /// Document file `f` of this build (its name in the document, where
+    /// errors name it, its text). Returns how many declarations it has.
+    fn doc_file(f: I32, name: Str, display: Str, text: Str) I32 => ud_file(f, name, display, text)
+
+    /// The declaration of the last file's `i`th.
+    fn doc_item_decl(i: I32) I32 => ud_item_decl(i)
+
+    /// Its doc comment.
+    fn doc_item_doc(i: I32, doc: Str) Void => ud_item_doc(i, doc)
+
+    /// The last file's `//!` comment.
+    fn doc_file_doc(doc: Str) Void => ud_file_doc(doc)
+
+    /// A later `//!` block of the last file, at `start` (UTF-16).
+    fn doc_section(start: I32, text: Str) Void => ud_section(start, text)
+
+    /// The last file's colored pieces: lines `start end class`.
+    fn doc_pieces(pieces: Str) Void => ud_pieces(pieces)
+
+    /// The Typst document, `title`, over `files` files.
+    fn doc_write(title: Str, files: I32) Str => ud_write(title, files)

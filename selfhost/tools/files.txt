@@ -6,3 +6,6 @@ blame_report.utu
 blame_page.utu
 wutu_format.utu
 format.utu
+places.utu
+grep.utu
+utudoc.utu

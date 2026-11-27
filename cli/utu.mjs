@@ -914,7 +914,7 @@ async function lsp() {
  */
 async function grepCommand(args) {
   const { grep } = await import('../src/selfhost/grep.js');
-  const { loadNodeCompiler, nodeHost } = await import('../src/selfhost/node.js');
+  const { loadNodeTools, nodeHost } = await import('../src/selfhost/node.js');
   const where = {};
   let references = null;
   let json = false;
@@ -972,7 +972,7 @@ async function grepCommand(args) {
     if (!hosts.has(root)) hosts.set(root, nodeHost({ root }));
     return hosts.get(root);
   };
-  const { matches, texts, error, skipped = [], unmatched = [] } = await grep(await loadNodeCompiler(), entries, hostFor, { pattern, where, references });
+  const { matches, texts, error, skipped = [], unmatched = [] } = await grep(await loadNodeTools(), entries, hostFor, { pattern, where, references });
   if (error) {
     console.error(error);
     process.exit(2);
