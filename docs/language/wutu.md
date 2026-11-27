@@ -525,8 +525,10 @@ virtual DOM; the compiler emits calls to a small shared DOM reconciler.
 Every template goes through the reconciler, so a component behaves the same
 wherever it is rendered: under an `@reactive` root it re-renders with the root
 (and `bind:` keeps both sides in step); rendered anywhere else it renders once.
-External callbacks (timers, network subscriptions) call `wutu.refresh()` after
-changing state. A refresh visits connected roots; this is explicit whole-view
+A handler that awaits (`on click { state.items = await api.load() }`) redraws
+again when its promise settles, so it needs no `wutu.refresh()`. Callbacks
+outside a handler (a timer's, a network subscription's `.then`) call
+`wutu.refresh()` after changing state. A refresh visits connected roots; this is explicit whole-view
 rendering, not dependency tracking or list virtualization.
 
 **Unchanged components are reused.** A hole that calls a function,

@@ -74,7 +74,7 @@ proto P1:
     | set b : F64
     | get set c : T1
     | foo(I32, F64) T2
-    | bar() void
+    | bar() Void
 ```
 
 > Protocol composition is planned for a future version.
@@ -93,10 +93,10 @@ enum(U8) Tag:
     | Unary
     | Eof = 255
 
-let t: Tag = Tag.Leaf;
-match t { Tag.Leaf => 1, Tag.Unary => 2, Tag.Eof => 3, };   // exhaustive without ~>
-loop match t { Tag.Leaf => { continue Tag.Unary; }, ~> { break; }, };
-t.i32();  Tag(1);  Tag.count();  Tag.name(t);    // == != < <= > >= compare values
+let t: Tag = Tag.Leaf
+match t { Tag.Leaf => 1, Tag.Unary => 2, Tag.Eof => 3, }   // exhaustive without ~>
+loop match t { Tag.Leaf => { continue Tag.Unary }, ~> { break }, }
+t.i32();  Tag(1);  Tag.count();  Tag.name(t)    // == != < <= > >= compare values
 ```
 
 A `Tag` is not an `I32`. Integer enums can be stored in a `mem` and dispatch
@@ -110,10 +110,10 @@ through `match` and `loop match` (`alt` is for enums whose variants carry data).
 comparisons (`I32 U32 I64 U64 F32 F64`). It converts only explicitly:
 
 ```
-type NodeId = distinct I32;
-let id = NodeId(3);
-id.i32();
-mem lhs: NodeId;            // stored as I32
+type NodeId = distinct I32
+let id = NodeId(3)
+id.i32()
+mem lhs: NodeId            // stored as I32
 ```
 
 ---
@@ -169,17 +169,17 @@ fn add(a: I32, b: I32) I32 {
 }
 
 // struct/enum method — self is T1
-fn T1.foo |t1| (a: I32) void {
+fn T1.foo |t1| (a: I32) Void {
     ...
 }
 
 // protocol virtual method implementation — self is T1, implementing P1
-fn P1[T1].foo |t1| (a: I32) void {
+fn P1[T1].foo |t1| (a: I32) Void {
     ...
 }
 
 // protocol method implementation — self is the protocol type P1
-fn P1.foo |p1| (a: I32) void {
+fn P1.foo |p1| (a: I32) Void {
     ...
 }
 
@@ -221,9 +221,9 @@ apart with `let .{…}`:
 
 ```
 fn divmod(a: I32, b: I32) .{I32, I32} {
-    return .{a / b, a % b};
+    return .{a / b, a % b}
 }
-let .{q, r} = divmod(17, 5);
+let .{q, r} = divmod(17, 5)
 ```
 
 Tuples are wasm multi-value results: no allocation, no boxing. A tuple type is
@@ -251,9 +251,9 @@ with no marshalling, at the cost of a host boundary crossing per call.
 function, or by an `@es` import. It carries no environment.
 
 ```
-fn double(x: I32) I32 { return x * 2; }
+fn double(x: I32) I32 { return x * 2 }
 
-let g: fun(I32) I32 = double;
+let g: fun(I32) I32 = double
 ```
 
 **`cl` is written inline** with the `cl` keyword. Parameter types may be omitted
@@ -268,36 +268,43 @@ Expression blocks, including blocks used by `if`, `match`, and iterator
 operators, still yield their final expression.
 
 ```
-let h: cl(I32) I32 = cl(x) { return x * 2; };          // types from the annotation
-let t: cl() void   = cl() { count += 1; };
-let k: cl(I32) I32 = cl(x: I32) I32 { return x * 2; }; // written out
+let h: cl(I32) I32 = cl(x) { return x * 2 }          // types from the annotation
+let t: cl() Void   = cl() { count += 1 }
+let k: cl(I32) I32 = cl(x: I32) I32 { return x * 2 } // written out
 
 // as a callback argument — parameter types come from the declaration
-listen("click", cl(e) { handle(e); });
+listen("click", cl(e) { handle(e) })
 ```
 
 Since `let` always carries a type annotation, a closure bound to a `let` can
 always read its parameter types from it.
 
-Captures are implicit, as in JS:
+Captures are implicit, and capture the binding, as in JS: a closure sees a
+later assignment to a variable it captured, and an assignment it makes is seen
+outside it. (A captured variable that is assigned after the capture lives in a
+box the closure and its scope share; one that is not is copied.) A GC reference
+is shared either way, so a mutation *through* it is observed too.
 
-- **scalars are snapshot** — the value is copied when the closure is built, so
-  a later assignment to the original binding is not observed.
-- **GC references are shared** — the reference is copied, so mutation *through*
-  it is observed.
-
-In both cases *rebinding* the original variable is not observed by the closure.
-This differs from JS, which captures the binding rather than the value.
+```
+let n = 1
+let f = cl() I32 { return n }
+n = 2
+f()                       // 2
+let c = 0
+let inc = cl() Void { c += 1 }
+inc()
+inc()                     // c is 2
+```
 
 **Closure decay.** A `fun` converts implicitly to a `cl` with an empty
 environment. The reverse is never allowed — it would have to discard the
 environment.
 
 ```
-fn on_each(f: cl(I32) void) void { ... }
-on_each(double);        // fun(I32) void decays to cl(I32) void
+fn on_each(f: cl(I32) Void) Void { ... }
+on_each(double)        // fun(I32) Void decays to cl(I32) Void
 
-let bad: fun(I32) I32 = cl(x) { return x; };   // error: cl does not decay to fun
+let bad: fun(I32) I32 = cl(x) { return x }   // error: cl does not decay to fun
 ```
 
 Decay and nullable widening are the only two implicit conversions in the
@@ -319,24 +326,24 @@ a promise utu produces is directly `await`-able from JS. Nothing is wrapped.
 
 ```
 let delay: fun(I32, I32) Promise[I32] =
-    @es/\ (v, ms) => new Promise(r => setTimeout(() => r(v), ms)) \/;
+    @es/\ (v, ms) => new Promise(r => setTimeout(() => r(v), ms)) \/
 ```
 
 **Subscribing** works on any JS host. The callback is a `cl`, which is already a
 JS function, so it is handed straight to the platform:
 
 ```
-delay(n, 5).then(cl(v) { record(v); });
-delay(n, 5).catch(cl(e) { report(e); });
+delay(n, 5).then(cl(v) { record(v) })
+delay(n, 5).catch(cl(e) { report(e) })
 ```
 
 **Awaiting** is ordinary straight-line code:
 
 ```
 fn total(a: I32, b: I32) I32 {
-    let first: I32  = await delay(a, 5);
-    let second: I32 = await delay(b, 5);
-    return first + second;
+    let first: I32  = await delay(a, 5)
+    let second: I32 = await delay(b, 5)
+    return first + second
 }
 ```
 
@@ -353,11 +360,14 @@ operator, so `await a + b` is `(await a) + b`, as in JS.
 > The cost is a host requirement: `await` needs a JSPI-capable host (Chrome
 > 126+, Node 23+, Bun). `.then` does not, and is the portable floor.
 >
-> A closure (`cl`) does not await: it is a host function (so JS can call it),
-> and JSPI cannot suspend a stack through JavaScript frames. An `await` in a
-> closure's body is an error; await in a function, and pass it as a `fun`
-> value where one is wanted (a `fun` is called inside wasm, and may await). A
-> closure that calls a function that awaits fails when it runs.
+> A closure (`cl`) may await too. Called from utu, it suspends as a function
+> does. Called by the host (a callback given to `.then`, an `@es` function, a
+> Wutu handler), it is an async JS function, so the host's call gets a promise
+> of its result: `cl(v) { let w = await later(v); … }` works as a `.then`
+> callback, and a Wutu handler that awaits redraws its view when it settles.
+> A named function given to the host as a value is its funcref, which JSPI
+> cannot suspend through: one that awaits is an error there; pass a closure
+> that calls it instead.
 
 ### Streams
 
@@ -366,9 +376,9 @@ held as an externref, as `Promise[T]` is a real promise. `await for` reads one:
 
 ```
 fn total(s: Stream[I32]) I32 {
-    let sum = 0;
-    await for (s) |v| { sum += v; };
-    return sum;
+    let sum = 0
+    await for (s) |v| { sum += v }
+    return sum
 }
 ```
 
@@ -378,8 +388,8 @@ closes the stream (its iterator's `return`, awaited), as JS's `for await`
 does. It is
 
 ```
-let it = s.iterator(); defer s.close(it);
-while (true) { let r = await s.next(it); if s.done(r) { break; }; let v = s.value(r); body; };
+let it = s.iterator(); defer s.close(it)
+while (true) { let r = await s.next(it); if s.done(r) { break }; let v = s.value(r); body }
 ```
 
 so any type with those methods can be read the same way (`next` returns a
@@ -392,7 +402,7 @@ reads the old one as it is read:
 
 ```
 Stream[I32].of([1, 2, 3])                  // an array's values
-Stream[I32].generate(10, cl(i) { i * i; })  // count values, each made from its index
+Stream[I32].generate(10, cl(i) { i * i })  // count values, each made from its index
 s.take(n)  s.skip(n)  s.filter(cl(v) { … })  s.map(cl(v) { … })  s.chain(other)
 Stream[Str].from_js(lines)                  // a host async iterable, its values typed
 ```
@@ -427,7 +437,7 @@ mod M1[T1, T2] {
         ...
     }
 
-    fn &.bar |p| () void {
+    fn &.bar |p| () Void {
         ...
     }
 }
@@ -445,7 +455,7 @@ mod Pair[out P1, in P2] {
         return .{
             first  = a.first.combine(b.first)
             second = a.second.combine(b.second)
-        };
+        }
     }
 }
 
@@ -456,7 +466,7 @@ mod Array[T1] {
 
     fn &.new(n: I32) & { ... }
     fn &.get |self| (i: I32) T1 { ... }
-    fn &.set |self| (i: I32, v: T1) void { ... }
+    fn &.set |self| (i: I32, v: T1) Void { ... }
     fn &.len |self| () I32 { ... }
 }
 
@@ -465,12 +475,12 @@ mod Array[T1] {
 mod I32 {
     type & = @ir/\ <ir-wasm-scalar kind="I32"/> \/
 
-    fn &:add  |a, b| & => @ir/\ <ir-i32-add/> \/;
-    fn &:sub  |a, b| & => @ir/\ <ir-i32-sub/> \/;
-    fn &:mul  |a, b| & => @ir/\ <ir-i32-mul/> \/;
-    fn &:eq   |a, b| Bool => @ir/\ <ir-i32-eq/> \/;
+    fn &:add  |a, b| & => @ir/\ <ir-i32-add/> \/
+    fn &:sub  |a, b| & => @ir/\ <ir-i32-sub/> \/
+    fn &:mul  |a, b| & => @ir/\ <ir-i32-mul/> \/
+    fn &:eq   |a, b| Bool => @ir/\ <ir-i32-eq/> \/
     // ... etc.
-    fn clz(x: &) & => @ir/\ <ir-i32-clz/> \/;
+    fn clz(x: &) & => @ir/\ <ir-i32-clz/> \/
 }
 ```
 
@@ -539,25 +549,25 @@ ambiguous where it is used; the file's own declarations hide opened ones.
 
 ```
 // cross-file import
-using M1 from "...";
+using M1 from "..."
 
 // platform standard library import
-using M1 from std:m1;
+using M1 from std:m1
 
 // cross-file import with alias
-using M1 |M2| from "...";
+using M1 |M2| from "..."
 
 // cross-file import, instantiated with type args, aliased
-using M1[I32, F64] |NumMap| from "...";
+using M1[I32, F64] |NumMap| from "..."
 
 // within-file alias
-using M1 |M2|;
+using M1 |M2|
 
 // within-file instantiation with alias
-using M1[I32, F64] |NumMap|;
+using M1[I32, F64] |NumMap|
 
 // inline instantiation (no alias needed — compiler derives name automatically)
-fn f() Array[I32] { return Array[I32].new(10); }
+fn f() Array[I32] { return Array[I32].new(10) }
 ```
 
 ---
@@ -630,7 +640,7 @@ a line of its own after the last one (a `;` on a `\\` line is text):
 ```
 let usage = \\usage: utu check <file.utu>
             \\       utu <file.utu>
-;
+
 ```
 
 ```
@@ -638,7 +648,7 @@ let usage = \\usage: utu check <file.utu>
 T1 { field1: 10, field2: x }
 
 // implicit struct init (type inferred from &)
-let t1: T1 = &{ field1: 10, field2: x };
+let t1: T1 = &{ field1: 10, field2: x }
 
 // Array is auto-imported from std:Array
 Array[I32].new(10)
@@ -678,7 +688,8 @@ promote expr {
         ~> ...,
 }
 
-// for / while (for loop captures are always I64) (support labels)
+// for / while (support labels). A range's counter has its ends' type: I32 for
+// `0 ..< 10`, I64 for `0 ..< n` with n: I64. An array's element has its type.
 for (0 ... 10) |i| { ... }     // inclusive
 for (0 ..< 10) |i| { ... }     // exclusive
 for (xs) |x| { ... }           // each element of an array (evaluated once)
@@ -689,43 +700,43 @@ continue                       // next iteration of the innermost loop
 
 // loop match: a state machine with computed-goto dispatch (Zig's labeled switch)
 loop match state {
-    0 => { ...; continue 1; },     // re-dispatch on the new state
-    1 => { ...; break; },          // leave the loop
+    0 => { ...; continue 1 },     // re-dispatch on the new state
+    1 => { ...; break },          // leave the loop
     ~> { ... },                    // an arm that finishes also leaves
-};
+}
 // Each `continue <state>` site has its own dispatch: a direct branch for a
 // constant later state, otherwise a br_table at that site, so every transition
-// is predicted separately. Order arms so hot transitions point forward; -O3
+// is predicted separately. Order arms so hot transitions point forward; -O fast
 // emits the arms twice so that nearly every edge is forward. Plain `continue`
 // inside a loop match is an error (name the next state); `break` leaves it.
 // Measurements: benchmarks/control-flow/README.md.
 
-// generators: `yield T` as the return type; consumed by for / await for.
+// generators: `gn`, its result the type it yields; consumed by for / await for.
 // A generator may be a module's (`for (seq.squares(4))`), a type's
-// (`for (Range.below(3))`), or a method (`fn &.each |s| () yield T`, read
+// (`for (Range.below(3))`), or a method (`gn &.each |s| () T`, read
 // with `for (stack.each())`). It is never a value, called, or exported.
-fn squares(n: I32) yield I32 {
-    for (0 ..< n) |i| { yield i * i; };
+gn squares(n: I32) I32 {
+    for (0 ..< n) |i| { yield i * i }
 }
-for (squares(10)) |x| { ... };
-await for (ticks()) |t| { ... };   // the generator body may `await`
-await for (stream) |v| { ... };    // a Stream[T]'s values (see Streams)
+for (squares(10)) |x| { ... }
+await for (ticks()) |t| { ... }   // the generator body may `await`
+await for (stream) |v| { ... }    // a Stream[T]'s values (see Streams)
 // The body expands inline at the consuming loop: in the loop body, `break`
 // ends the generation and `continue` resumes after the current yield; in the
-// generator, `return;` ends it. Generators are not values (they cannot be
+// generator, `return` ends it. Generators are not values (they cannot be
 // stored or passed); that is a compile-time error.
 
 // recursive generators: a generator may delegate to itself, and nothing else:
 // `for (walk(c)) |d| { yield d; }`. It runs as one loop over an explicit stack,
 // so values arrive depth-first with no call per node and no depth limit.
-fn walk(n: Node) yield Node {
-    for (children(n)) |c| { yield c; for (walk(c)) |d| { yield d; }; };
+gn walk(n: Node) Node {
+    for (children(n)) |c| { yield c; for (walk(c)) |d| { yield d } }
 }
 for (walk(root)) |n| {
-    if is_function(n) { prune; };  // do not descend below n
+    if is_function(n) { prune }  // do not descend below n
     ...
-};
-// `prune;` skips the delegations after the current value's yield, up to the
+}
+// `prune` skips the delegations after the current value's yield, up to the
 // next yield of the same call; the rest of the body still runs. One call's
 // body runs to completion before its values reach the consumer, so the
 // generator's own effects happen earlier than inline expansion would order
@@ -736,8 +747,8 @@ for (walk(root)) |n| {
 // a return value are computed first. Deferred code cannot itself return,
 // break, or continue out of the block. It does not run on traps.
 {
-    defer close(handle);
-    use(handle);
+    defer close(handle)
+    use(handle)
 }
 
 // Result[T, E] (std/Result.utu, in the prelude): a value or an expected error.
@@ -749,9 +760,9 @@ for (walk(root)) |n| {
 // with the pending defers, newest first. Only in a function returning a Result.
 // Neither is allowed in a generator. See docs/errors.md.
 fn quarter(n: I32) Result[I32, Str] {
-    errdefer log("failed");
-    let h = try half(n);
-    return half(h);
+    errdefer log("failed")
+    let h = try half(n)
+    return half(h)
 }
 
 // bind (let)
@@ -830,18 +841,18 @@ linear memory (multi-memory). It is for bulk data that a hot loop reads: source
 bytes, lexer tables, flat IR columns, buffers handed to the host.
 
 ```
-mem src: U8;            // one linear memory, starts empty
-mem node_lhs: I32;
-export mem pixels: F32; // also exported to the host as "pixels"
+mem src: U8            // one linear memory, starts empty
+mem node_lhs: I32
+export mem pixels: F32 // also exported to the host as "pixels"
 
-src.push(b);            // append, growing the memory when full
-let c = src[i];         // read: U8/I8/U16/I16 widen to I32
-src[i] = c;             // write: narrow kinds keep the low bits
-src[i] += 1;            // compound assignment evaluates i once
-src.len();  src.cap();  // elements in use / that fit without growing
-src.reserve(n);         // make n elements fit
-src.resize(n);          // reserve(n), then len = n (contents are kept)
-src.clear();            // len = 0
+src.push(b)            // append, growing the memory when full
+let c = src[i]         // read: U8/I8/U16/I16 widen to I32
+src[i] = c             // write: narrow kinds keep the low bits
+src[i] += 1            // compound assignment evaluates i once
+src.len();  src.cap()  // elements in use / that fit without growing
+src.reserve(n)         // make n elements fit
+src.resize(n)          // reserve(n), then len = n (contents are kept)
+src.clear()            // len = 0
 ```
 
 Element kinds: `U8 I8 U16 I16 I32 U32 I64 U64 F32 F64`, an integer enum (stored
@@ -855,9 +866,9 @@ An initializer fills a mem when the module is instantiated, from a data
 segment, and sets its length:
 
 ```
-const mem prec: U8 = [0, 1, 1, 2];                // number literals
-mem props: U16 = @embed/\ tables/props.bin \/;    // a file's bytes, beside the source
-const mem dfa: U8 = @comptime/\ build_dfa() \/;   // runs during compilation
+const mem prec: U8 = [0, 1, 1, 2]                // number literals
+mem props: U16 = @embed/\ tables/props.bin \/    // a file's bytes, beside the source
+const mem dfa: U8 = @comptime/\ build_dfa() \/   // runs during compilation
 ```
 
 `@comptime` compiles a copy of the program (without its exports and tests),
@@ -875,9 +886,9 @@ The host reaches a mem through two methods; a mem that uses either is created by
 the host and imported:
 
 ```
-using JS from std:JS;                  // view() needs it, under any alias
-src.copy_in(Fs.readFileSync(path));    // ArrayBuffer, typed array, or string (UTF-8); len = elements copied
-Fs.writeSync(1.0, out.view(0, out.len()));   // a JS.Uint8Array over the elements, no copy
+using JS from std:JS                  // view() needs it, under any alias
+src.copy_in(Fs.readFileSync(path))    // ArrayBuffer, typed array, or string (UTF-8); len = elements copied
+Fs.writeSync(1.0, out.view(0, out.len()))   // a JS.Uint8Array over the elements, no copy
 ```
 
 A view is a `JS.Uint8Array`, `JS.Float32Array`, and so on for the element kind,
@@ -888,11 +899,11 @@ To copy bytes to and from an `Array[I32]` instead, use `std:Bytes`
 A byte mem (`U8`, `I8`) interns spans of itself in place, without copying:
 
 ```
-let id = src.intern(start, stop);   // dense id (0, 1, …) of the bytes src[start ..< stop)
-src.interned();                     // distinct spans so far
-src.interned_start(id);             // where that id's first span starts
-src.interned_size(id);              // and its length
-src.intern_reset();                 // forget every id
+let id = src.intern(start, stop)   // dense id (0, 1, …) of the bytes src[start ..< stop)
+src.interned()                     // distinct spans so far
+src.interned_start(id)             // where that id's first span starts
+src.interned_size(id)              // and its length
+src.intern_reset()                 // forget every id
 ```
 
 The same bytes always get the same id. Ids refer to spans of the mem, so those
@@ -916,8 +927,8 @@ A top-level `vec` is the same array as a `mem`, held in a WasmGC array instead
 of a memory. A program may declare any number; the host cannot see one.
 
 ```
-vec node_kind: U8;                     // an array, starts empty
-const vec dfa: U8 = @comptime/\ build_dfa() \/;
+vec node_kind: U8                     // an array, starts empty
+const vec dfa: U8 = @comptime/\ build_dfa() \/
 ```
 
 It has a mem's element kinds, initializers, methods, and `const`, except
@@ -937,7 +948,7 @@ An index or stored value is evaluated before the array is read, so
 
 ```
 // global constant
-let PI: F64 = 3.14159;
+let PI: F64 = 3.14159
 
 // computed global: any expression. A wasm start function sets the computed
 // globals in the order written, each after the globals its initializer reads
@@ -945,13 +956,13 @@ let PI: F64 = 3.14159;
 // called), so none is read before it is set. Globals that need each other
 // are an error. Across files: an imported file's global read by the
 // entry's is set first.
-let TABLE: Array[I32] = build_table();
+let TABLE: Array[I32] = build_table()
 
 // DSL expressions — @name/\ body \/
 // builtins: @es (JavaScript), @utu (utu source), @ir (raw IR xml), @wat (WAT, below)
 // body is raw text handed to the named DSL module at compile time
-let foo: fun(I32, Str) F64 = @es/\ return a + b \/;
-let value: F64 = @utu/\ some.utu.expr \/;
+let foo: fun(I32, Str) F64 = @es/\ return a + b \/
+let value: F64 = @utu/\ some.utu.expr \/
 ```
 
 ---
@@ -961,7 +972,7 @@ let value: F64 = @utu/\ some.utu.expr \/;
 A function whose whole body is `@wat/\ … \/` is written in WebAssembly text:
 
 ```
-fn rotl(x: I32, k: I32) I32 => @wat/\ local.get $x local.get $k i32.rotl \/;
+fn rotl(x: I32, k: I32) I32 => @wat/\ local.get $x local.get $k i32.rotl \/
 
 fn triangle(n: I32) I32 => @wat/\
         (local $acc i32) (local $i i32)
@@ -972,7 +983,7 @@ fn triangle(n: I32) I32 => @wat/\
             (local.set $i (i32.add (local.get $i) (i32.const 1)))
             (br $next)))
         local.get $acc
-    \/;
+    \/
 ```
 
 - The parameters are locals, named as in utu (`$x`) or numbered; `(local …)`
