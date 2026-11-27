@@ -20,8 +20,8 @@ const CHUNK_FAILED = 'chunkError = error;';
 const FAILED = 'document.documentElement.setAttribute("data-utu-error",String(error.message??error));const notice=document.createElement("p");notice.setAttribute("role","status");notice.textContent="Interactive tools could not start. The page is still available to read. Try reloading in a browser with WebAssembly GC support.";document.body.append(notice);console.error(error);';
 
 /** Package any UTU main as browser Wasm and its generated JS loader. */
-export async function buildBrowserApp({ entry, outDir, stdlib, optimize = 'size', safe = true, compiled }) {
-  return buildWithSelfhost({ entry, outDir, stdlib, optimize, safe, compiled });
+export async function buildBrowserApp({ entry, outDir, stdlib, optimize = 'size', safe = true, compiled, externalCss = false }) {
+  return buildWithSelfhost({ entry, outDir, stdlib, optimize, safe, compiled, externalCss });
 }
 
 /**
@@ -69,13 +69,14 @@ async function buildChunks({ lazy, files, outDir, stdlib, optimize, safe }) {
 }
 
 /** buildBrowserApp with the self-hosted compiler: its module, glue, and loader. */
-async function buildWithSelfhost({ entry, outDir, stdlib, optimize, safe = true, chunk = false, compiled }) {
+async function buildWithSelfhost({ entry, outDir, stdlib, optimize, safe = true, chunk = false, compiled, externalCss = false }) {
   const started = performance.now();
   const { compileFile, loadNodeCompiler } = await import('../../src/selfhost/node.js');
   const { glueSource, loaderSource } = await import('../../src/selfhost/loader.js');
   const { formatDiagnostics: format } = await import('../../src/selfhost/format.js');
   const utu = await loadNodeCompiler();
-  const result = compiled ?? await compileFile(utu, path.resolve(entry), { optimize, safe, ...(stdlib ? { stdlib } : {}) });
+  // externalCss: the CSS ships as its own file, app.HASH.css (report.cssName), for the page to link.
+  const result = compiled ?? await compileFile(utu, path.resolve(entry), { optimize, safe, externalCss, ...(stdlib ? { stdlib } : {}) });
   // Warnings alone never fail a build.
   const errors = result.diagnostics.filter(d => d.severity !== 'warning');
   if (!result.wasm || errors.length) {
@@ -93,6 +94,10 @@ async function buildWithSelfhost({ entry, outDir, stdlib, optimize, safe = true,
   await fs.mkdir(outDir, { recursive: true });
   const chunks = !chunk && spec.lazy?.length ? await buildChunks({ lazy: spec.lazy, files: result.files, outDir, stdlib, optimize, safe }) : {};
   await fs.writeFile(path.join(outDir, 'app.wasm'), wasm);
+  // Named by its bytes, so it caches across builds that leave it as it is.
+  const css = result.css?.length ? Buffer.from(result.css.join('')) : null;
+  const cssName = css ? `app.${createHash('sha256').update(css).digest('hex').slice(0, 10)}.css` : null;
+  if (css) await fs.writeFile(path.join(outDir, cssName), css);
   const glue = glueSource(spec, wasm);
   const gluePath = path.resolve(outDir, 'glue.mjs');
   if (glue) await fs.writeFile(gluePath, glue);
@@ -123,7 +128,8 @@ async function buildWithSelfhost({ entry, outDir, stdlib, optimize, safe = true,
   const imported = WebAssembly.Module.imports(new WebAssembly.Module(wasm, { builtins: ['js-string'], importedStringConstants: "'" }));
   const report = { wasm: size(wasm), javascript: size(javascript), imports: imported.filter(entry => entry.module !== "'").length,
     declaredBindings: Object.values(spec.es ?? {}).reduce((n, m) => n + Object.keys(m).length, 0), compileMs: Math.round(performance.now() - started) };
-  report.total = Object.fromEntries(['raw', 'gzip', 'brotli'].map(key => [key, report.wasm[key] + report.javascript[key]]));
+  if (css) Object.assign(report, { css: size(css), cssName });
+  report.total = Object.fromEntries(['raw', 'gzip', 'brotli'].map(key => [key, report.wasm[key] + report.javascript[key] + (report.css?.[key] ?? 0)]));
   // Lazy chunks load later: counted apart from the page's total.
   if (!chunk && Object.keys(chunks).length) {
     report.chunks = {};

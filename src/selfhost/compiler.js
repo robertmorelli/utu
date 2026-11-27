@@ -80,7 +80,7 @@ export async function compile(utu, entry, host) {
   // (Own names only: `constructor` is no mode.)
   const chosen = host.mode && Object.hasOwn(MODES, host.mode) ? MODES[host.mode] : null;
   if (host.mode && !chosen) throw new Error(`no build mode ${host.mode}: ${Object.keys(MODES).join(', ')}`);
-  const { target = 'normal', optimize = 'size', debugNames = false, safe = false, sourceMap = false, blame = false, profile = false, run = false, luge = false } = { ...host, ...chosen };
+  const { target = 'normal', optimize = 'size', debugNames = false, safe = false, sourceMap = false, blame = false, profile = false, run = false, luge = false, externalCss = false } = { ...host, ...chosen };
   utu.set_optimize(OPTIMIZE[optimize] ?? OPTIMIZE.size);
   utu.set_luge?.(luge ? 1 : 0);
   utu.set_safe(safe ? 1 : 0);
@@ -89,6 +89,8 @@ export async function compile(utu, entry, host) {
   // Blame reads the source map: keeping one changes nothing built.
   utu.set_source_map?.(sourceMap || blame ? 1 : 0);
   utu.set_profile?.(profile ? 1 : 0);
+  // A site build ships Wutu's CSS as a file (`css`); otherwise the program installs it.
+  utu.set_external_css?.(externalCss ? 1 : 0);
   // utu run's: readers of an array main's result (`run:len:k`, `run:at:k`).
   utu.set_run?.(run ? 1 : 0);
   let files, size;
@@ -110,6 +112,7 @@ export async function compile(utu, entry, host) {
     tests: target === 'test' ? readTests(utu) : [], benches: target === 'bench' ? readBenches(utu) : [],
     map: sourceMap && utu.map_count ? readSourceMap(utu, files) : null,
     blame: blame && utu.blame_prepare ? readBlameTables(utu, files) : null,
+    css: externalCss && utu.css_count ? Array.from({ length: utu.css_count() }, (_, k) => utu.css_text(k)) : [],
     ...(profile ? { frames: readFrames(utu, files) } : {}),
     ...(run && utu.run_leaf?.() ? { array: { levels: utu.run_levels(), leaf: utu.run_leaf() } } : {}),
   };
@@ -259,11 +262,13 @@ export function readBlameTables(utu, files) {
     }
     return declOf.get(node);
   };
+  // Code a DSL made (parsed from a generated file) is placed on the literal it was made for.
   const place = node => {
     if (node < 0) return -1;
     if (!placeOf.has(node)) {
       const at = span(node);
-      placeOf.set(node, at ? places.push({ ...at, kind: kindName(node), decl: declIndex(utu.blame_decl(node)) }) - 1 : -1);
+      placeOf.set(node, at ? places.push({ ...at, kind: kindName(node), decl: declIndex(utu.blame_decl(node)) }) - 1
+        : place(utu.blame_node_site?.(node) ?? -1));
     }
     return placeOf.get(node);
   };

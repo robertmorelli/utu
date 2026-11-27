@@ -17,6 +17,10 @@ vec wu_aliases: I32
 /// The site's stylesheets: keys and CSS (words), in order.
 vec wu_style_key: I32
 vec wu_style_css: I32
+/// 1: the program's CSS is the build's (set_external_css), not installed by its code.
+let wu_external_css: I32 = 0
+/// That CSS (words), each sheet once, in order.
+vec wu_css_out: I32
 /// The site's helper bindings (words), in order.
 vec wu_decls: I32
 /// Which helpers it has (words), and their names.
@@ -143,8 +147,13 @@ fn expand_wutu(site: I32) Void {
     }
     let css = ""
     for (0 ..< wu_style_css.len()) |k| { css = css + word_text(wu_style_css[k]) }
-    css = layered_document_css(without_hash_lines(document)) + without_hash_lines(css)
-    if css.len() > 0 {
+    css = css_minify(layered_document_css(without_hash_lines(document)) + without_hash_lines(css))
+    if css.len() > 0 and wu_external_css == 1 {
+        let w = intern_text(css)
+        let seen = false
+        for (0 ..< wu_css_out.len()) |k| { if wu_css_out[k] == w { seen = true } }
+        if not seen { wu_css_out.push(w) }
+    } else if css.len() > 0 {
         let key = es_string(wus1(Wut.WutuDash, wutu_hash(css)))
         prelude = wus4(Wut.LetInstallCssFunVoidEs, prefix, key, key, es_string(css)) + wus2(Wut.InstallCss, prefix, prelude)
     }
@@ -207,6 +216,48 @@ fn layered_document_css(css: Str) Str {
     }
     rest = rest + css.slice(i, css.len())
     return imports + (if trim_end(rest).len() > 0 { wus1(Wut.LayerWutuDocumentAtDotBraceBraceE, rest) } else { "" })
+}
+
+fn css_space(c: I32) Bool => c == 32 or c == 9 or c == 10 or c == 13 or c == 12
+
+/// The CSS without its comments, its white space one space where it parts
+/// two tokens: none at either end, after `{ } ; , :`, or before `{ } ; ,`.
+/// Strings stay as written.
+fn css_minify(css: Str) Str {
+    let out = ""
+    let n = css.len()
+    let i = 0
+    let gap = false
+    while (i < n) {
+        let c = css.get(i)
+        if c == 47 and i + 1 < n and css.get(i + 1) == 42 {
+            i += 2
+            while (i < n and not (css.get(i) == 42 and i + 1 < n and css.get(i + 1) == 47)) { i += 1 }
+            i = if i < n { i + 2 } else { n }
+            gap = true
+        } else if css_space(c) {
+            gap = true
+            i += 1
+        } else {
+            let j = i
+            while (j < n and not css_space(css.get(j)) and not (css.get(j) == 47 and j + 1 < n and css.get(j + 1) == 42)) {
+                let q = css.get(j)
+                j += 1
+                if q == 34 or q == 39 {
+                    while (j < n and css.get(j) != q) { j += if css.get(j) == 92 { 2 } else { 1 } }
+                    j = if j < n { j + 1 } else { n }
+                }
+            }
+            if gap and out.len() > 0 {
+                let a = out.get(out.len() - 1)
+                if not (a == 123 or a == 125 or a == 59 or a == 44 or a == 58 or c == 123 or c == 125 or c == 59 or c == 44) { out = out + " " }
+            }
+            gap = false
+            out = out + css.slice(i, j)
+            i = j
+        }
+    }
+    return out
 }
 
 /// The CSS without its comment lines (those that begin with `# `).

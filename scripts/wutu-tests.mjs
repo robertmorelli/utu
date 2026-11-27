@@ -525,6 +525,31 @@ export function registerWutuTests({ test, assert, assertEq, assertThrows, assert
     });
   });
 
+  test('wutu: CSS ships without comments or spare white space, strings as written', async ({ ROOT }) => {
+    await withDom(async (document) => {
+      const { instance } = await compileAndInstantiateSelfhost({ ROOT, name: 'wutu_css_minify.utu', source: `${BROWSER}
+        lib { fn run() Browser.HTMLElement {
+          return @wutu/\\
+          @document {
+            /* a comment */
+            @import url("a b.css") layer(base);
+            nav :hover , a::after { content: "  /* kept */  "; width: calc(1px + 2px); }
+            @media (min-width: 40rem) { body { margin: 0 auto; } }
+          }
+          div { /* scoped */ color: red; "x"; }
+          \\/;
+        } }
+      `});
+      document.body.append(instance.exports.run());
+      const css = [...document.querySelectorAll('style')].map(node => node.textContent).join('');
+      assert(!css.includes('a comment') && !css.includes('scoped'), `comments kept: ${css}`);
+      assert(css.includes('@import url("a b.css") layer(base);'), css);
+      assert(css.includes('nav :hover,a::after{content:"  /* kept */  ";width:calc(1px + 2px);}'), css);
+      assert(css.includes('@media (min-width:40rem){body{margin:0 auto;}}'), css);
+      assert(!/\s{2}|\n/.test(css.replaceAll('"  /* kept */  "', '')), `spare white space: ${JSON.stringify(css)}`);
+    });
+  });
+
   test('wutu: reactive bindings, keyed reordering, and events update the view', async ({ ROOT }) => {
     await withDom(async (document) => {
       const { instance } = await compileAndInstantiateSelfhost({ ROOT, name: 'wutu_reactive.utu', source: `${BROWSER}

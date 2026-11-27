@@ -155,6 +155,14 @@ lib {
     /// A source map of the modules built (1: "Source maps" in wasm.utu), or none (0, the default).
     fn set_source_map(on: I32) Void { source_map = on }
 
+    /// Wutu's CSS for the build to ship (1), or installed by the program's code (0, the default).
+    fn set_external_css(on: I32) Void { wu_external_css = on }
+
+    /// After a build with set_external_css: its stylesheets, in order.
+    fn css_count() I32 => wu_css_out.len()
+
+    fn css_text(k: I32) Str => word_text(wu_css_out[k])
+
     /// The last module's source map: its entries, each an instruction's
     /// byte offset in the module and its syntax node's byte span in src
     /// (-1 for none), kind (as node_kind_name takes it), and function.
@@ -225,6 +233,9 @@ lib {
     fn blame_decl(node: I32) I32 => outer_decl(node)
 
     fn blame_decl_name(node: I32) Str => decl_label(node)
+
+    /// The DSL site a generated node was made for (dsl_site_of in dsl.utu), or -1.
+    fn blame_node_site(node: I32) I32 => if node < 0 { -1 } else { dsl_site_of(node) }
 
     /// Profile builds (1: "Profiling" in profile.utu), or none (0, the default).
     fn set_profile(on: I32) Void { profile_build = on }

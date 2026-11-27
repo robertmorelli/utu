@@ -55,17 +55,18 @@ export async function formatCommand(files, { check }) {
   }
 }
 
-function shellHtml(title) {
+function shellHtml(title, cssName) {
   return '<!doctype html><html lang="en"><meta charset="utf-8">'
     + '<meta name="viewport" content="width=device-width,initial-scale=1">'
     + `<title>${escapeHtml(title)}</title>`
+    + (cssName ? `<link rel="stylesheet" href="./${cssName}" data-wutu-style>` : '')
     + '<body><noscript>Interactive controls require JavaScript and WebAssembly.</noscript>'
     + '<script type="module" src="./app.js"></script></body></html>';
 }
 
 async function compileApp({ entry, title, mode, compiled }, directory) {
-  const report = await buildBrowserApp({ entry, outDir: directory, ...MODES[mode], compiled });
-  await fs.writeFile(path.join(directory, 'index.html'), shellHtml(title));
+  const report = await buildBrowserApp({ entry, outDir: directory, ...MODES[mode], compiled, externalCss: true });
+  await fs.writeFile(path.join(directory, 'index.html'), shellHtml(title, report.cssName));
   return report;
 }
 
@@ -74,14 +75,18 @@ async function compileApp({ entry, title, mode, compiled }, directory) {
  * it made into out, all or none: each file first to a temporary beside its
  * place, then each renamed over its name. Out's other files stay.
  */
-export async function buildCommand(app, { prerender: shouldPrerender }) {
+export async function buildCommand(app, { prerender: shouldPrerender, extra = [] }) {
   const candidate = path.join(path.dirname(app.out), `.${path.basename(app.out)}.building-${process.pid}`);
   if ((await fs.stat(app.out).catch(() => null))?.isDirectory() === false) throw new Error(`cannot write ${app.out}: a file is in the way`);
   try {
     const report = await compileApp(app, candidate);
     if (shouldPrerender) await prerender(candidate);
+    // [file under app.out, contents]: made with the rest, moved with it.
+    for (const [file, contents] of extra) await fs.writeFile(path.join(candidate, path.relative(app.out, file)), contents);
     await moveInto(candidate, app.out);
-    console.log(`${app.out}: ${report.total.gzip} bytes gzip for JS + Wasm`);
+    // An earlier build's stylesheet, named by other bytes.
+    for (const name of await fs.readdir(app.out)) if (/^app\.[0-9a-f]{10}\.css$/.test(name) && name !== report.cssName) await fs.rm(path.join(app.out, name), { force: true });
+    console.log(`${app.out}: ${report.total.gzip} bytes gzip for JS + Wasm${report.css ? ' + CSS' : ''}`);
   } finally {
     await fs.rm(candidate, { recursive: true, force: true });
   }

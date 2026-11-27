@@ -55,8 +55,8 @@ class Reader {
   valtype() { const b = this.byte(); if (b === 0x63 || b === 0x64) this.leb(); }
   blocktype() {
     const b = this.b[this.at];
-    if (b === 0x40 || (b & 0xc0) === 0x40) { this.at++; return; }
     if (b === 0x63 || b === 0x64) { this.at++; this.leb(); return; }
+    if (b === 0x40 || (b & 0xc0) === 0x40) { this.at++; return; }
     this.leb();
   }
   memarg() { if (this.u32() & 64) this.u32(); this.leb(); }

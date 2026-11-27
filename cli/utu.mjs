@@ -688,10 +688,24 @@ function duration(ms) {
 /** NAME.wasm and NAME.mjs: an ES module whose `exports` are the instance's. */
 async function build(file, options) {
   const { utu, optimize, safe, out, sourceMap, blame, target, luge } = options;
-  const built = await buildOrExit(utu, file, { optimize, safe, sourceMap, blame, luge });
+  // -O debug names its functions (a name section).
+  // (Only a Wutu site has CSS: it ships as a file.)
+  const built = await buildOrExit(utu, file, { optimize, safe, sourceMap, blame, luge, debugNames: options.mode === 'debug', externalCss: true });
   if (usesWutu(built.spec)) {
-    if (target === 'node' || blame || sourceMap && options.mode !== 'debug') fail('Site builds do not support --target node, --blame, or --source-map', 'unknown-option');
-    return (await import('./site.mjs')).buildCommand({ ...siteApp(file, options), compiled: built }, { prerender: !options.noPrerender });
+    if (target === 'node') fail('Site builds do not support --target node', 'unknown-option');
+    const app = siteApp(file, options);
+    // app.wasm is this wasm: its map and blame beside it, written with the rest.
+    const extra = [];
+    let wasm = built.wasm;
+    if (built.map) {
+      const relative = key => key.startsWith('std:') ? key : path.relative(app.out, key).split(path.sep).join('/');
+      extra.push([path.join(app.out, 'app.wasm.map'), sourceMapJson(built.map, { file: 'app.wasm', relative, texts: new Map(built.files.map(f => [f.key, f.text])) })]);
+      wasm = withMapUrl(wasm, 'app.wasm.map');
+    }
+    const top = built.blame ? await blameOutputs(built, wasm, app.out, 'app', extra) : null;
+    await (await import('./site.mjs')).buildCommand({ ...app, compiled: { ...built, wasm } }, { prerender: !options.noPrerender, extra });
+    if (top) console.log(top);
+    return;
   }
   if (options.title !== undefined || options.noPrerender) fail('--title and --no-prerender require a Wutu site', 'unknown-option');
   const { spec } = built;

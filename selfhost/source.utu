@@ -109,6 +109,7 @@ fn reset_program() Void {
     splice_rename_at.clear()
     splice_rename_to.clear()
     wu_serial = 0
+    wu_css_out.clear()
     dsl_file_site.clear()
     reset_wat()
     if kept[0] > 0 { intern_kept() } else {

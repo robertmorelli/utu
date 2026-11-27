@@ -15,7 +15,7 @@ mod wutu {
     fn page(root: Externref) Void {
         // The page's <html>: in place of the document's, with the styles Wutu
         // has put in the old head (a prerendered page adopts its own: no swap).
-        let attach: fun(Externref) Void = @es/\\ root=>{if(root===document.documentElement)return;const head=root.querySelector(':scope>head')??root.insertBefore(document.createElement('head'),root.firstChild);for(const s of document.head.querySelectorAll('style'))head.append(s);document.replaceChild(root,document.documentElement)} \\/;
+        let attach: fun(Externref) Void = @es/\\ root=>{if(root===document.documentElement)return;const head=root.querySelector(':scope>head')??root.insertBefore(document.createElement('head'),root.firstChild);for(const s of document.head.querySelectorAll('style,[data-wutu-style]'))head.append(s);document.replaceChild(root,document.documentElement)} \\/;
         attach(root);
     }
     fn storage_init() Void {
