@@ -153,4 +153,16 @@ html {
   fs.rmSync(dir, { recursive: true, force: true });
 }
 
+// Wutu: a handler's promote arms keep their `,` with no `;` after it (`,;` did not compile).
+{
+  const source = 'using Browser from std:Browser\n\nmain {\n    let n = @wutu/\\\n    button { on click { promote Browser.localStorage.getItem("k") { |t| => Browser.console.log(t), ~> { Browser.console.log("none") }, } } }\n    \\/\n    Browser.document.body.append(n)\n}\n';
+  const text = await formatUtuSource(source, { shape });
+  assert.doesNotMatch(text, /,;/);
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'utu-format-'));
+  fs.writeFileSync(path.join(dir, 'arms.utu'), text);
+  const check = spawnSync(process.execPath, [path.join(ROOT, 'cli/utu.mjs'), 'check', path.join(dir, 'arms.utu')], { encoding: 'utf8' });
+  assert.equal(check.status, 0, `arms formatted does not compile:\n${text}\n${check.stdout}${check.stderr}`);
+  fs.rmSync(dir, { recursive: true, force: true });
+}
+
 console.log(`formatter: ${files.length} programs (${formatted} reformatted) keep their tree and are stable; targeted layout, CLI, and compilation checks passed`);

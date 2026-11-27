@@ -207,8 +207,9 @@ class BodyFormatter {
       } else if (c === '\n' && parens === 0 && current.trim() && endsLine(current, text.slice(i + 1), code)) {
         flush();
       } else if (c === ',' && code && braces.at(-1) === parens && !inCaptures(current)) {
-        current = current.trimEnd() + ',';
-        flush();
+        // (An item's `,` ends its line: no `;` after it.)
+        this.lines.push(INDENT.repeat(depth) + current.trim() + ',');
+        current = '';
       } else if (/\s/.test(c)) {
         if (current && !current.endsWith(' ')) current += ' ';
       } else {
