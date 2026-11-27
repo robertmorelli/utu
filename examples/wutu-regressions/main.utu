@@ -27,6 +27,13 @@ struct State:
     | width: Str
     | twice: I32
     | picks: Array[Str]
+    | open: Bool
+    | clicks: Str
+    | on: Bool
+    | radio: Str
+    | outer: I32
+    | gen: I32
+    | mounts: Str
 
 fn cell(label: Str) Browser.HTMLElement {
     return @wutu/\
@@ -70,6 +77,19 @@ fn icon(state: State) Browser.SVGElement {
     \/
 }
 
+/// Its `on mount` replaces probe()'s element before probe()'s `on mount` runs.
+fn starter(state: State) Browser.HTMLElement {
+    return @wutu/\
+    p#starter { on mount { if state.gen == 0 { state.gen = 1; wutu.refresh() } } }
+    \/
+}
+
+fn probe(state: State, gen: I32) Browser.HTMLElement {
+    return @wutu/\
+    div as d { on mount { state.mounts = state.mounts + gen.str() + (if d.isConnected { ";" } else { " detached;" }) } }
+    \/
+}
+
 main {
     ticks.push(0)
     let state = State {
@@ -77,6 +97,7 @@ main {
         rows: [Row { id: "a", cells: ["b|c"] }, Row { id: "a|b", cells: ["c"] }],
         number: 2.5, capped: 5.0, pick: "c", options: ["a", "b", "c"],
         timer: true, beats: 0, hidden: true, width: "40%", twice: 0, picks: [""],
+        open: false, clicks: "", on: false, radio: "a", outer: 0, gen: 0, mounts: "",
     }
     let app = @wutu/\
     @reactive
@@ -123,6 +144,23 @@ main {
             on mount { chart.append(Browser.document.createTextNode("drawn;")) }
         }
         |> icon(state)
+        form#combo {
+            input#field { on focus { state.open = true } on blur { state.open = false } }
+            if state.open { ul#list { position: { "absolute" }; li { "x" } } }
+            button#pa { type = "button"; "A"; on click { state.clicks = state.clicks + "A" } }
+            button#pb { type = "button"; "B"; on click { state.clicks = state.clicks + "B" } }
+        }
+        p#clicks { | state.clicks }
+        div#checks {
+            on click { state.outer += 1 }
+            input#cb { type = "checkbox"; bind:checked = state.on }
+            input#ra { type = "radio"; name = "g"; value = "a"; bind:group = state.radio }
+            input#rb { type = "radio"; name = "g"; value = "b"; bind:group = state.radio }
+        }
+        p#checked { |> state.on.str() + " " + state.radio + " " + state.outer.str() }
+        |> starter(state)
+        for [state.gen] |gen| key gen.str() { |> probe(state, gen) }
+        p#mounts { | state.mounts }
         div#nested {
             |> framed(cell(state.n.str()))
             for state.rows |row| key row.id { |> framed(cell(row.id)) }

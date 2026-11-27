@@ -162,13 +162,14 @@ export function createWutuRuntime() {
     const selection = focused && 'selectionStart' in focused
       ? [focused.selectionStart, focused.selectionEnd, focused.selectionDirection]
       : null;
+    const keep = new Set(wanted), end = range ? range.end : null;
     let cursor = range ? range.start.nextSibling : parent.firstChild;
     for (const node of wanted) {
+      while (cursor && cursor !== end && !keep.has(cursor)) cursor = cursor.nextSibling;
       if (node === cursor) { cursor = cursor.nextSibling; continue; }
       if (parent.moveBefore && node.parentNode === parent) parent.moveBefore(node, cursor);
       else parent.insertBefore(node, cursor);
     }
-    const keep = new Set(wanted);
     for (const node of [...children]) {
       if (keep.has(node)) continue;
       // The page's <head> (an `html { }` template may not write one) and Wutu's own
@@ -453,6 +454,7 @@ export function createWutuRuntime() {
       mounted.add(node);
       const view = active;
       queueMicrotask(() => {
+        if (!node.isConnected) { mounted.delete(node); return; }
         const outer = owner;
         owner = [node, view];
         try { handler(new Event('mount')); } finally { owner = outer; }
@@ -483,7 +485,10 @@ export function createWutuRuntime() {
           owner = outer;
           if (loud) {
             autoSave();
-            if (record.view) schedule(record.view);
+            // (A checkbox or radio is checked once its click ends: the render waits, so as not to undo that.)
+            const view = record.view;
+            if (view && e.type === 'click' && ['checkbox', 'radio'].includes(e.target.type)) setTimeout(() => schedule(view));
+            else if (view) schedule(view);
           }
         }
       });
