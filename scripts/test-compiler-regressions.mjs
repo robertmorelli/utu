@@ -1936,6 +1936,14 @@ main {
     assert.equal(run.stdout, '20\n15\ntrue\n4294967295\n4\n7\n', run.stdout + run.stderr);
     checked++;
   }
+  // A /\\ no @name opens is text (a regex's), so it opens no nested body.
+  {
+    const file = path.join(dir, 'regex.utu');
+    await fs.writeFile(file, 'let words: fun(Str) I32 = @es/\\ (s) => s.split(/\\s+/).length \\/\nlet dashes: fun(Str) Str = @es/\\ (s) => s.replace(/\\//g, "-") \\/\nmain {\n    console.log(words("a b  c"))\n    console.log(dashes("a/b"))\n}\nusing console from std:console\n');
+    const run = spawnSync(process.execPath, [path.join(ROOT, 'cli/utu.mjs'), 'run', file], { encoding: 'utf8', timeout: 60000 });
+    assert.equal(run.stdout, '3\na-b\n', run.stdout + run.stderr);
+    checked++;
+  }
   // A Wutu template that once expanded again each round (1024 copies of one mistake, and a
   // larger file ran for minutes): checked in a child, under a time limit.
   {
@@ -2013,9 +2021,9 @@ lib { fn run() I32 { return Top[I32].top(1); } }
     ['using JS from std:JS;\nlib { fn run() I32 { let s: Str = new JS.Map(); return s.len(); } }\n', 's is Str, got JS.Map<any, any>'],
     ['fn take(s: Str) I32 { return s.len(); }\nlib { fn run() I32 { return take(cl() Void {}); } }\n', 'take takes Str, got cl() Void'],
     ['using JS from std:JS;\nlib { fn run() Str { return "hello".replace("l", cl(m) Str { return m; }); } }\n', 'replace takes Str, got cl(unknown) Str'],
-    // A bare /\\ in a body nests.
-    ['let f: fun(Str) I32 = @es/\\ (s) => s.split(/\\s\\//).length \\/;\nlib { fn run() I32 { return f("a"); } }\n', 'This /\\ opens a nested body, so the body ends at a later \\/'],
-    ['let f: fun(Str) Str = @es/\\ (s) => s.replace(/\\//g, "-") \\/;\nlib { fn run() I32 { 0; } }\n', 'No \\/ ends this body: the /\\ at line 1 opens another'],
+    // An unclosed body; a nested @name/\\ needs its own \\/.
+    ['let f: fun(Str) Str = @es/\\ (s) => s\nlib { fn run() I32 { 0; } }\n', 'No \\/ ends this body'],
+    ['let f: fun(Str) Str = @es/\\ (s) => @es/\\ s \\/\nlib { fn run() I32 { 0; } }\n', 'No \\/ ends this body'],
     ['lib { fn a() I32 { return 1; } }\nlib { fn b() I32 { return 2; } }\n', 'Two lib blocks'],
     ['main { 1 }\nmain { 2 }\n', 'Two mains'],
     ['lib { fn a() I32 { return 1; } }\nmain { 2 }\n', 'lib and main together: a program is one or the other'],

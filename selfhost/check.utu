@@ -4306,7 +4306,6 @@ fn compile(target: Target) I32 {
     validate_program()
     count_memories()
     report_wat()
-    report_bare_openers()
     keep_target_diagnostics(target)
     // A DSL that does not expand ends the build, as in stage 0: the first
     // the target has is its one diagnostic.

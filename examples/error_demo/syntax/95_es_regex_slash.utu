@@ -1,0 +1,8 @@
+// What: a JavaScript regex in an @es body holds `\/`, which ends the body (its `/\s+/` would not).
+// Expect: a note says \/ ends a DSL body in a regex too: write [/].
+let words: fun(Str) I32 = @es/\ (s) => s.split(/\s\//).length \/;
+
+main {
+    console.log(words("a /b"));
+}
+using console from std:console

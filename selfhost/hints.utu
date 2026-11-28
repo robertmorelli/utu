@@ -587,6 +587,12 @@ fn lines_apart(a: I32, b: I32) Bool {
     return false
 }
 
+/// Whether a line ends between token k and the next.
+fn token_ends_line(k: I32) Bool {
+    for (tok_end[k] ..< tok_start[k + 1]) |i| { if src[i] == 10 { return true } }
+    return false
+}
+
 /// The first token of t's line in `file`.
 fn line_first(file: I32, t: I32) I32 {
     let k = t
@@ -605,6 +611,14 @@ fn parse_hint(file: I32, t: I32, wanted: I32) Void {
     // `'\/'` in a DSL body: its `\/` ended the body (only a "…" string keeps one).
     if diag_fresh == 1 and t > 0 and tok_kind[t] == Tok.Error.i32() and src[tok_start[t]] == 39 and tok_kind[t - 1] == Tok.DslBody.i32() {
         diag_note(hs(Ht.EndsADSLBodyExceptInside))
+        return
+    }
+    // `/a\/b/` in a DSL body: its `\/` ended the body (one with no space
+    // before it, on the error's line).
+    let d = t - 1
+    while (diag_fresh == 1 and t > 0 and d > file_tok[file] and tok_kind[d] != Tok.DslBody.i32() and not token_ends_line(d)) { d -= 1 }
+    if diag_fresh == 1 and t > 0 and d >= 0 and tok_kind[d] == Tok.DslBody.i32() and not token_ends_line(d) and not is_space(src[tok_end[d] - 3]) {
+        diag_note(hs(Ht.EndsADSLBodyEvenInARegex))
         return
     }
     if diag_fresh == 0 or t < 0 or tok_kind[t] == Tok.Error.i32() { return }
@@ -1077,6 +1091,7 @@ enum(U8) Ht:
     | TheClosure
     | AssignsCompareWith
     | EndsADSLBodyExceptInside
+    | EndsADSLBodyEvenInARegex
     | Proto
     | UnfinishedProtocol
     | ProtocolMembersBeginWithFollowedBy
@@ -1235,6 +1250,7 @@ fn hs_src(t: Ht) Str {
         Ht.TheClosure => "The closure",
         Ht.AssignsCompareWith => "= assigns; compare with ==",
         Ht.EndsADSLBodyExceptInside => "\\/ ends a DSL body, except inside \"…\": write \"\\/\" there, not '\\/'",
+        Ht.EndsADSLBodyEvenInARegex => "\\/ ends a DSL body, in a regex too: write [/] there",
         Ht.Proto => "proto",
         Ht.UnfinishedProtocol => "unfinished protocol",
         Ht.ProtocolMembersBeginWithFollowedBy => "Protocol members begin with |, followed by a name and signature",

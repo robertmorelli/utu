@@ -28,6 +28,14 @@ static void skip_string(TSLexer *l) {
   if (l->lookahead == '"') l->advance(l, false);
 }
 
+/** After `c`, whether the text just read ends in `@name` and spaces (2), in `@` (1), or neither (0):
+ *  only a `/\` after `@name` opens a nested body. */
+static int after_name(int state, int32_t c) {
+  if (c == '@') return 1;
+  if (iswalnum(c) || c == '_') return state ? 2 : 0;
+  return state == 2 && iswspace(c) ? 2 : 0;
+}
+
 static void skip_quoted(TSLexer *l, int32_t quote) {
   l->advance(l, false);
   while (!l->eof(l) && l->lookahead != quote) {
@@ -75,12 +83,14 @@ static bool scan_wutu(TSLexer *l, const bool *valid) {
     } else if (c == '/' && l->lookahead == '\\') {
       l->advance(l, false);
       unsigned nested = 1;
+      int named = 0;
       while (!l->eof(l) && nested) {
         int32_t a = l->lookahead;
         l->advance(l, false);
-        if (a == '"') skip_string(l);
-        else if (a == '/' && l->lookahead == '\\') { nested++; l->advance(l, false); }
-        else if (a == '\\' && l->lookahead == '/') { nested--; l->advance(l, false); }
+        if (a == '"') { skip_string(l); named = 0; }
+        else if (a == '/' && l->lookahead == '\\') { if (named == 2) nested++; l->advance(l, false); named = 0; }
+        else if (a == '\\' && l->lookahead == '/') { nested--; l->advance(l, false); named = 0; }
+        else named = after_name(named, a);
       }
     }
     text = true;
@@ -197,10 +207,12 @@ bool tree_sitter_utu_external_scanner_scan(void *p, TSLexer *l, const bool *vali
   if (!valid[DSL_TEXT] && !valid[DSL_CLOSE]) return false;
   // The payload, up to the `\/` that balances its opener; or that `\/` itself.
   unsigned depth = 1;
+  int named = 0;
   bool text = false;
   while (!l->eof(l)) {
     int c = l->lookahead;
     if (c == '\\') {
+      named = 0;
       l->mark_end(l);
       l->advance(l, false);
       if (l->lookahead == '/') {
@@ -219,8 +231,9 @@ bool tree_sitter_utu_external_scanner_scan(void *p, TSLexer *l, const bool *vali
     }
     l->advance(l, false);
     text = true;
-    if (c == '"') skip_string(l);
-    else if (c == '/' && l->lookahead == '\\') { depth++; l->advance(l, false); }
+    if (c == '"') { skip_string(l); named = 0; }
+    else if (c == '/' && l->lookahead == '\\') { if (named == 2) depth++; l->advance(l, false); named = 0; }
+    else named = after_name(named, c);
   }
   return false;
 }

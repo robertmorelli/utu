@@ -69,7 +69,7 @@ type; a variable named `type` assigned with `&=` is the one source this
 lexes differently). Where the grammar's longest match
 needs a step back (`1..2`, `1.5e+x`, `0x` with no digits, `?.{I32}`,
 `|x|=>`), the table says so and the token ends a byte or two earlier. DSL
-bodies (`/\ … \/`) nest, so they are scanned by a loop.
+bodies (`@name/\ … \/`) nest, so they are scanned by a loop.
 
 The differential compares the tokens with the leaves of stage 0's syntax
 tree, for every `.utu` source in the repository and, with `--fuzz=N`, N

@@ -672,20 +672,17 @@ fn diag_text(i: I32) Str {
             else if tok_kind[a] == Tok.Error.i32() and src[tok_start[a]] == 34 { 1 }
             else if tok_kind[a] == Tok.Error.i32() and src[tok_start[a]] == 96 { 2 }
             else if tok_kind[a] == Tok.Error.i32() and utf8_char_size(tok_start[a], file_end[file_of_token(a)]) < 0 { 3 }
-            else if tok_kind[a] == Tok.Error.i32() and src[tok_start[a]] == 47 and src[tok_start[a] + 1] == 92 {
-                let inner = first_bare_opener(tok_start[a] + 2, file_end[file_of_token(a)])
-                if inner >= 0 { x = int_text(line_of_byte(inner)) }
-                if inner >= 0 { 4 } else { 5 }
-            } else {
+            else if tok_kind[a] == Tok.Error.i32() and src[tok_start[a]] == 47 and src[tok_start[a] + 1] == 92 { 4 }
+            else {
                 x = found_text(a)
-                if b >= 0 and semicolon_in_multiline(a - 1) and word_text(b) == dgs(Dgt.TickSemiTick) { 6 }
-                else if b >= 0 { 7 }
-                else if tok_kind[a] == Tok.End.i32() { 8 }
+                if b >= 0 and semicolon_in_multiline(a - 1) and word_text(b) == dgs(Dgt.TickSemiTick) { 5 }
+                else if b >= 0 { 6 }
+                else if tok_kind[a] == Tok.End.i32() { 7 }
                 // A mem is one program's memory: not a module's (made per instance) or a function's.
                 else if x == dgs(Dgt.Mem) or x == dgs(Dgt.Vec) {
                     y = x.slice(1, 4)
-                    9
-                } else { 10 }
+                    8
+                } else { 9 }
             }
         },
         Diag.DslPlace => if w == dgs(Dgt.Embed) or w == dgs(Dgt.Comptime) { 0 } else if w == dgs(Dgt.Ir) { 1 } else { 2 },
@@ -928,7 +925,7 @@ fn diag_text_src(k: Diag) Array[Str] {
         Diag.VecHost => ["The host cannot see vec {x}: make it a mem"],
         Diag.InvalidDslUsage => ["@es needs a typed let"],
         Diag.ParseError => ["{wc}", "Unclosed string", "Unclosed template string", "Not UTF-8",
-            "No \\/ ends this body: the /\\ at line {x} opens another", "No \\/ ends this body",
+            "No \\/ ends this body",
             "Expected ';', got {x} (a \\\\ line's ';' is text)", "Expected {wb}, got {x}", "Unexpected end of file",
             "Unexpected {x}: a {y} goes at the top level of a file", "Unexpected {x}"],
         Diag.Unsupported => ["Not supported yet"],

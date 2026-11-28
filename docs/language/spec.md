@@ -961,7 +961,9 @@ let TABLE: Array[I32] = build_table()
 
 // DSL expressions — @name/\ body \/
 // builtins: @es (JavaScript), @utu (utu source), @ir (raw IR xml), @wat (WAT, below)
-// body is raw text handed to the named DSL module at compile time
+// body is raw text handed to the named DSL module at compile time; the first
+// \/ ends it, except one closing a nested @name/\ (a bare /\, as in a regex
+// /\s+/, is text, and so is a "string")
 let foo: fun(I32, Str) F64 = @es/\ return a + b \/
 let value: F64 = @utu/\ some.utu.expr \/
 ```

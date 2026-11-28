@@ -9409,17 +9409,19 @@ ok
  5 │ }
 --- exit 1
 
-=== utu check examples/error_demo/syntax/95_es_regex_nests.utu
- ERROR  This /\ opens a nested body, so the body ends at a later \/
-        dsl-error · examples/error_demo/syntax/95_es_regex_nests.utu:3:48
+=== utu check examples/error_demo/syntax/95_es_regex_slash.utu
+ ERROR  Unexpected character '\'
+        parse-error · examples/error_demo/syntax/95_es_regex_slash.utu:3:63
 
- 1 │ // What: a JavaScript regex in an @es body holds `/\`, which opens a nested body.
- 2 │ // Expect: the `/\` in the regex is named: the body ends at a later `\/` than meant.
+ 1 │ // What: a JavaScript regex in an @es body holds `\/`, which ends the body (its `/\s+/` would not).
+ 2 │ // Expect: a note says \/ ends a DSL body in a regex too: write [/].
  3 │ let words: fun(Str) I32 = @es/\ (s) => s.split(/\s\//).length \/;
-   │                                                ━━
-   │                                                ╰─ here
+   │                                                               ━
+   │                                                               ╰─ unexpected
  4 │
  5 │ main {
+
+  note  \/ ends a DSL body, in a regex too: write [/] there
 --- exit 1
 
 === utu check examples/error_demo/syntax/96_int_negative_u64.utu

@@ -1,6 +1,7 @@
 // DSL envelopes: `@name/\ payload \/`, where payloads may nest balanced
-// envelopes. Mirrors the external scanner; used by the editor's CSS
-// projection (css-stencil.js), which must find payloads without parsing Utu.
+// envelopes (a `/\` no `@name` opens is text). Mirrors the external
+// scanner; used by the editor's CSS projection (css-stencil.js), which must
+// find payloads without parsing Utu.
 // (The formatter's are selfhost/tools/wutu_format.utu's.)
 
 /** The offset just past the string whose `"` is at `i` (its line's end if it has no closing quote). */
@@ -12,8 +13,8 @@ export function dslStringEnd(source, i) {
 
 /**
  * Offset of the `\/` closing an envelope whose payload starts at `start`.
- * Nested pairs balance, and a double-quoted string is text: a `/\` or `\/`
- * in one is not a delimiter. A string ends at its closing quote or its line,
+ * Nested `@name/\` pairs balance; a bare `/\` is text, and so is a
+ * double-quoted string: a `/\` or `\/` in one is not a delimiter. A string ends at its closing quote or its line,
  * so a stray quote cannot hide the rest of the file.
  */
 export function dslEnd(source, start) {
@@ -22,7 +23,7 @@ export function dslEnd(source, start) {
     if (source[i] === '"') {
       i = dslStringEnd(source, i) - 1;
     } else if (source[i] === '/' && source[i + 1] === '\\') {
-      depth++;
+      if (/@\w+\s*$/.test(source.slice(start, i))) depth++;
       i++;
     } else if (source[i] === '\\' && source[i + 1] === '/') {
       if (--depth === 0) return i;
