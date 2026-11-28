@@ -1,35 +1,15 @@
 //! = Static text
 //!
 //! The compiler's messages, word lists, and code templates are tables: an
-//! enum names each string, and a function for the build (`*_src`) gives its
-//! text. When the compiler is built, @st_pack lays every table's strings end
-//! to end, each ended by a 0, and compresses them into @strtab: byte-pair
-//! encoding (a byte past those the text uses stands for two others), then
-//! copies of what came before (LZ77), chosen to make the fewest bytes, then
-//! Huffman codes for the bytes that result. A compiler decodes it whole,
-//! into one string, the first time it needs one of them (about half a
-//! millisecond).
+//! enum names each string, and a function (`*_src`) gives its text. The
+//! first time the compiler needs one of them, @st_tables lays every
+//! table's strings end to end, each ended by a 0, in one string.
 //!
 //! A template's text has holes: `{0}` … `{3}`, which @stf fills, and a
 //! diagnostic's own (`{w}`, `{ta}`, …; see @st_hole and @diag_hole). They are
-//! bytes 1 to 30 (not 9 or 10); byte 31 parts a diagnostic's templates. A
-//! character past ASCII is a byte from 128, which the header maps to its
-//! code unit.
+//! characters 1 to 30 (not 9 or 10); character 31 parts a diagnostic's templates.
 
-/// The decoded length (3 bytes); the count of tables (1) and each one's
-/// count of strings (2 bytes); the count of characters past ASCII (1)
-/// and their code units (2 bytes each); the count of pairs (1) and each
-/// pair's two bytes, the pairs numbered from the bytes past ASCII; then the
-/// codes, Huffman-coded (see @st_huffman): a byte below @st_copy (a pair or
-/// a character), or a copy of 3 + k bytes for byte @st_copy + k (k = 15: 18
-/// + the next byte), from the distance that follows (7 bits a byte, low
-/// first).
-const vec strtab: U8 = @comptime/\ st_pack() \/
-
-/// The first copy code.
-let st_copy: I32 = 240
-
-/// Decoded: every string, each ended by a 0, and by string, where it starts.
+/// Every string, each ended by a 0, and by string, where it starts.
 struct StTable:
     | text: Str
     | at: Array[I32]
@@ -74,64 +54,20 @@ fn st_has_word(id: I32, w: Str) Bool {
     return false
 }
 
-/// Decode @strtab, once; by string, where it starts.
+/// Make the tables, once; by string, where it starts.
 fn st_ready() Array[I32] {
     if st_table.at.len() > 0 { return st_table.at }
-    let n = strtab[0] | (strtab[1] << 8) | (strtab[2] << 16)
-    let tables = strtab[3]
-    let h = 4 + 2 * tables
-    let high = 128 + strtab[h]
-    let pairs = h + 2 - 256
-    let tokens = st_huffman(2 * high + pairs + 2 * strtab[h + 1 + 2 * strtab[h]])
-    let at = 0
+    st_tables()
+    let n = st_build.len()
     let codes = Array[I32].new(n, 0)
-    let stack = Array[I32].new(256, 0)
-    let out = 0
-    while (out < n) {
-        let c = tokens[at]
-        at += 1
-        if c >= st_copy {
-            let size = c - st_copy + 3
-            if c == 255 {
-                size += tokens[at]
-                at += 1
-            }
-            let d = 0
-            let shift = 0
-            let b = 128
-            while (b >= 128) {
-                b = tokens[at]
-                at += 1
-                d = d | ((b & 127) << shift)
-                shift += 7
-            }
-            for (0 ..< size) |k| {
-                codes[out] = codes[out - d]
-                out += 1
-            }
-        } else {
-            stack[0] = c
-            let sp = 1
-            while (sp > 0) {
-                sp -= 1
-                let s = stack[sp]
-                if s >= high {
-                    stack[sp] = strtab[pairs + 2 * s + 1]
-                    stack[sp + 1] = strtab[pairs + 2 * s]
-                    sp += 2
-                } else {
-                    codes[out] = if s < 128 { s } else { (strtab[h + 2 * s - 255] << 8) | strtab[h + 2 * s - 254] }
-                    out += 1
-                }
-            }
-        }
-    }
+    for (0 ..< n) |i| { codes[i] = st_build[i] }
     // Table k's string j starts at `starts[1024 * k + j]`; one more slot
     // past its last ends it.
+    let tables = st_counts.len()
     let starts = Array[I32].new(1024 * tables, 0)
     let slot = 0
     let table = 0
-    let left = strtab[4] | (strtab[5] << 8)
+    let left = st_counts[0]
     for (0 ..< n) |i| {
         if codes[i] == 0 {
             slot += 1
@@ -141,7 +77,7 @@ fn st_ready() Array[I32] {
                 table += 1
                 slot = 1024 * table
                 starts[slot] = i + 1
-                left = strtab[4 + 2 * table] | (strtab[5 + 2 * table] << 8)
+                left = st_counts[table]
             }
         }
     }
@@ -150,336 +86,9 @@ fn st_ready() Array[I32] {
     return starts
 }
 
-/// The codes, Huffman-coded from `at`: their count (3 bytes), each byte's
-/// code length (4 bits, low first; 0 for none), then the canonical codes,
-/// high bit first.
-fn st_huffman(at: I32) Array[I32] {
-    let count = Array[I32].new(16, 0)
-    let symbols = Array[I32].new(256, 0)
-    let place = Array[I32].new(16, 0)
-    for (0 ..< 2) |pass| {
-        for (0 ..< 256) |c| {
-            let l = (strtab[at + 3 + (c >> 1)] >> (4 * (c & 1))) & 15
-            if pass == 0 { count[l] += 1 } else if l > 0 {
-                symbols[place[l]] = c
-                place[l] += 1
-            }
-        }
-        count[0] = 0
-        for (1 ..< 16) |l| { place[l] = place[l - 1] + count[l - 1] }
-    }
-    let tokens = Array[I32].new(strtab[at] | (strtab[at + 1] << 8) | (strtab[at + 2] << 16), 0)
-    let bit = (at + 131) * 8
-    for (0 ..< tokens.len()) |t| {
-        let code = 0
-        let first = 0
-        let index = 0
-        let l = 1
-        while (l > 0) {
-            code = code | ((strtab[bit >> 3] >> (7 - (bit & 7))) & 1)
-            bit += 1
-            if code - first < count[l] {
-                tokens[t] = symbols[index + code - first]
-                l = 0
-            } else {
-                index += count[l]
-                first = (first + count[l]) << 1
-                code = code << 1
-                l += 1
-            }
-        }
-    }
-    return tokens
-}
-
-//! == Packing (when the compiler is built)
-
-/// The tables' bytes, the code units past ASCII in the order their bytes
-/// number them, and each table's count of strings.
+/// The tables' characters, and each table's count of strings.
 vec st_build: I32
-vec st_high: I32
 vec st_counts: I32
-
-fn st_pack() Array[I32] {
-    st_tables()
-    let n = st_build.len()
-    let high = 128 + st_high.len()
-    let out = Array[I32].new(n + 1024, 0)
-    out[0] = n & 255
-    out[1] = (n >> 8) & 255
-    out[2] = n >> 16
-    out[3] = st_counts.len()
-    let at = 4
-    for (0 ..< st_counts.len()) |k| {
-        out[at] = st_counts[k] & 255
-        out[at + 1] = st_counts[k] >> 8
-        at += 2
-    }
-    out[at] = st_high.len()
-    at += 1
-    for (0 ..< st_high.len()) |k| {
-        out[at] = st_high[k] >> 8
-        out[at + 1] = st_high[k] & 255
-        at += 2
-    }
-    // Pairs: each round, the most frequent pairs of codes (more than 3
-    // times), up to 8 and no two sharing a code, each get the next byte.
-    let text = Array[I32].new(n, 0)
-    let seq = Array[I32].new(n, 0)
-    for (0 ..< n) |i| {
-        text[i] = st_build[i]
-        seq[i] = st_build[i]
-    }
-    let size = Array[I32].new(256, 1)
-    let counts = Array[I32].new(65536, 0)
-    // A pair's byte this round (or 0), the round's 16 most frequent pairs
-    // (most first), and by code, the last round a pair took it.
-    let pick = Array[I32].new(65536, 0)
-    let top = Array[I32].new(16, -1)
-    let taken_in = Array[I32].new(256, 0)
-    let round = 0
-    let len = n
-    let code = high
-    let pairs_at = at
-    at += 1
-    while (code < st_copy) {
-        round += 1
-        for (1 ..< len) |i| { counts[seq[i - 1] * 256 + seq[i]] += 1 }
-        for (0 ..< 16) |t| { top[t] = -1 }
-        for (0 ..< 65536) |k| {
-            if counts[k] > 3 and (top[15] < 0 or counts[k] > counts[top[15]]) {
-                let t = 15
-                while (t > 0 and (top[t - 1] < 0 or counts[k] > counts[top[t - 1]])) {
-                    top[t] = top[t - 1]
-                    t -= 1
-                }
-                top[t] = k
-            }
-        }
-        if top[0] < 0 { break }
-        let taken = 0
-        for (0 ..< 16) |t| {
-            let k = top[t]
-            if k >= 0 and taken < 8 and code < st_copy and taken_in[k >> 8] != round and taken_in[k & 255] != round {
-                taken_in[k >> 8] = round
-                taken_in[k & 255] = round
-                pick[k] = code
-                out[at] = k >> 8
-                out[at + 1] = k & 255
-                at += 2
-                size[code] = size[k >> 8] + size[k & 255]
-                code += 1
-                taken += 1
-            }
-        }
-        let j = 0
-        let i = 0
-        while (i < len) {
-            let c = if i + 1 < len { pick[seq[i] * 256 + seq[i + 1]] } else { 0 }
-            if c > 0 {
-                seq[j] = c
-                i += 2
-            } else {
-                seq[j] = seq[i]
-                i += 1
-            }
-            j += 1
-        }
-        len = j
-        for (0 ..< 16) |t| { if top[t] >= 0 { pick[top[t]] = 0 } }
-        for (0 ..< 65536) |k| { counts[k] = 0 }
-    }
-    out[pairs_at] = code - high
-    // Copies: the cheapest path through the codes, each step a code or a
-    // copy of earlier bytes that ends where a code does.
-    let pos = Array[I32].new(len + 1, 0)
-    for (0 ..< len) |s| { pos[s + 1] = pos[s] + size[seq[s]] }
-    let cost = Array[I32].new(len + 1, 1073741824)
-    let from = Array[I32].new(len + 1, 0)
-    let copy_size = Array[I32].new(len + 1, 0)
-    let copy_from = Array[I32].new(len + 1, 0)
-    let head = Array[I32].new(65536, -1)
-    let prev = Array[I32].new(n, -1)
-    cost[0] = 0
-    let put = 0
-    for (0 ..< len) |s| {
-        let i = pos[s]
-        while (put < i) {
-            if put + 2 < n {
-                let h = st_hash(text, put)
-                prev[put] = head[h]
-                head[h] = put
-            }
-            put += 1
-        }
-        if cost[s] + 1 < cost[s + 1] {
-            cost[s + 1] = cost[s] + 1
-            from[s + 1] = s
-            copy_size[s + 1] = 0
-        }
-        if i + 3 <= n {
-            let j = head[st_hash(text, i)]
-            // Nearer copies first: a farther one only for its longer lengths.
-            let tries = 0
-            let e = s + 1
-            while (j >= 0 and tries < 16) {
-                let l = 0
-                while (l < 273 and i + l < n and text[j + l] == text[i + l]) { l += 1 }
-                let d = i - j
-                while (e <= len and pos[e] - i <= l) {
-                    let m = pos[e] - i
-                    let c = cost[s] + 2 + (if m >= 18 { 1 } else { 0 }) + (if d < 128 { 0 } else if d < 16384 { 1 } else { 2 })
-                    if m >= 3 and c < cost[e] {
-                        cost[e] = c
-                        from[e] = s
-                        copy_size[e] = m
-                        copy_from[e] = d
-                    }
-                    e += 1
-                }
-                j = prev[j]
-                tries += 1
-            }
-        }
-    }
-    // The path, back to front, then its codes.
-    let codes_at = at
-    let steps = Array[I32].new(len + 1, 0)
-    let count = 0
-    let e = len
-    while (e > 0) {
-        steps[count] = e
-        count += 1
-        e = from[e]
-    }
-    if at + cost[len] + 8 > out.len() { out = st_grow(out, at + cost[len] + 8) }
-    while (count > 0) {
-        count -= 1
-        let step = steps[count]
-        let m = copy_size[step]
-        if m == 0 {
-            out[at] = seq[from[step]]
-            at += 1
-        } else {
-            let k = if m >= 18 { 15 } else { m - 3 }
-            out[at] = st_copy + k
-            at += 1
-            if k == 15 {
-                out[at] = m - 18
-                at += 1
-            }
-            let d = copy_from[step]
-            while (d >= 128) {
-                out[at] = 128 | (d & 127)
-                at += 1
-                d = d >> 7
-            }
-            out[at] = d
-            at += 1
-        }
-    }
-    return st_pack_huffman(out, codes_at, at)
-}
-
-/// `out` with its codes from `from` Huffman-coded (see @st_huffman).
-fn st_pack_huffman(out: Array[I32], from: I32, end_: I32) Array[I32] {
-    let n = end_ - from
-    let freq = Array[I32].new(256, 0)
-    for (from ..< end_) |i| { freq[out[i]] += 1 }
-    let size = st_code_sizes(freq)
-    // Canonical codes: by size, then byte.
-    let code = Array[I32].new(256, 0)
-    let next = 0
-    for (1 ..< 16) |l| {
-        for (0 ..< 256) |c| {
-            if size[c] == l {
-                code[c] = next
-                next += 1
-            }
-        }
-        next = next << 1
-    }
-    let packed = Array[I32].new(from + 131 + n + 8, 0)
-    for (0 ..< from) |i| { packed[i] = out[i] }
-    packed[from] = n & 255
-    packed[from + 1] = (n >> 8) & 255
-    packed[from + 2] = n >> 16
-    for (0 ..< 256) |c| { packed[from + 3 + (c >> 1)] = packed[from + 3 + (c >> 1)] | (size[c] << (4 * (c & 1))) }
-    let bit = (from + 131) * 8
-    for (from ..< end_) |i| {
-        let c = out[i]
-        for (0 ..< size[c]) |k| {
-            let b = (code[c] >> (size[c] - 1 - k)) & 1
-            packed[bit >> 3] = packed[bit >> 3] | (b << (7 - (bit & 7)))
-            bit += 1
-        }
-    }
-    return packed.slice(0, (bit + 7) >> 3)
-}
-
-/// Huffman code sizes for these byte counts, at most 15 bits (rare bytes
-/// counted as more common until they fit).
-fn st_code_sizes(freq: Array[I32]) Array[I32] {
-    let floor = 0
-    while (true) {
-        // Nodes: the bytes, then the merged; each one's weight and parent.
-        let weight = Array[I32].new(512, 0)
-        let parent = Array[I32].new(512, -1)
-        let live = Array[I32].new(512, 0)
-        let nodes = 256
-        for (0 ..< 256) |c| {
-            if freq[c] > 0 {
-                weight[c] = if freq[c] < floor { floor } else { freq[c] }
-                live[c] = 1
-            }
-        }
-        let left = 0
-        for (0 ..< 256) |c| { left += live[c] }
-        while (left > 1) {
-            let a = -1
-            let b = -1
-            for (0 ..< nodes) |x| {
-                if live[x] == 1 {
-                    if a < 0 or weight[x] < weight[a] {
-                        b = a
-                        a = x
-                    } else if b < 0 or weight[x] < weight[b] { b = x }
-                }
-            }
-            weight[nodes] = weight[a] + weight[b]
-            live[nodes] = 1
-            live[a] = 0
-            live[b] = 0
-            parent[a] = nodes
-            parent[b] = nodes
-            nodes += 1
-            left -= 1
-        }
-        let size = Array[I32].new(256, 0)
-        let most = 0
-        for (0 ..< 256) |c| {
-            if freq[c] > 0 {
-                let x = c
-                while (parent[x] >= 0) {
-                    size[c] += 1
-                    x = parent[x]
-                }
-                if size[c] > most { most = size[c] }
-            }
-        }
-        if most <= 15 { return size }
-        floor = floor * 2 + 1
-    }
-    return freq
-}
-
-fn st_hash(text: Array[I32], i: I32) I32 => ((text[i] * 251 + text[i + 1]) * 251 + text[i + 2]) & 65535
-
-fn st_grow(a: Array[I32], size: I32) Array[I32] {
-    let b = Array[I32].new(size, 0)
-    b.copy_from(0, a, 0, a.len())
-    return b
-}
 
 /// Add a string (its holes made bytes) to the tables.
 fn st_put(text: Str) Void {
@@ -492,12 +101,7 @@ fn st_put(text: Str) Void {
             st_build.push(hole)
             i = close + 1
         } else {
-            if c >= 128 {
-                let k = 0
-                while (k < st_high.len() and st_high[k] != c) { k += 1 }
-                if k == st_high.len() { st_high.push(c) }
-                c = 128 + k
-            } else if c < 32 and c != 9 and c != 10 {
+            if c < 32 and c != 9 and c != 10 {
                 // (No control characters: they are holes.)
                 fatal
             }

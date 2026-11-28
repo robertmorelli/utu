@@ -38,12 +38,11 @@ of these files, so a stale build is refused).
 `src/selfhost/` drives it from JavaScript; `cli/utu.mjs` is its command
 line.
 
-Its text (messages, word lists, code templates, enum names) is not string
-constants but tables (`strtab.utu`): each file's strings are an enum and a
-`*_src` function that runs only while the compiler is built, when a
-`@comptime` packs all of them (byte pairs, then LZ77 copies, then Huffman
-codes) into one const vec; a compiler decodes it once, the first time it
-needs a string. A template's `{0}` … `{3}` are filled where it is used.
+Its text (messages, word lists, code templates, enum names) is tables
+(`strtab.utu`): each file's strings are an enum and a `*_src` function,
+laid end to end in one string the first time the compiler needs one (the
+module is served with brotli, which compresses them as well as packing
+them did). A template's `{0}` … `{3}` are filled where it is used.
 
 ## Lexer
 
