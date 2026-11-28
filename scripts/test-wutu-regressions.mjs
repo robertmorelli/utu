@@ -59,6 +59,10 @@ try {
     o.submitted = $('#n').textContent;
     $('#numbers').click(); await sleep(20);
     o.numbers = [$('#number').value, $('#capped').value];
+    // An I32 binds too: its value, and an entry read back as an I32.
+    o.count = $('#count').value;
+    $('#count').value = '12'; $('#count').dispatchEvent(new Event('input')); await sleep(20);
+    o.counted = [$('#n').textContent, $('#count').value];
     $('#more').click(); await sleep(20);
     o.pickAfter = $('#pick').value;
     // A multiple select with only the empty value chosen is one pick, not none.
@@ -93,7 +97,7 @@ try {
     nested: 'figure:header,span:Title0 figure:header,span:Titlea figure:header,span:Titlea|b',
     nestedAfter: 'figure:header,span:Title1 figure:header,span:Titlea figure:header,span:Titlea|b', nestedKept: true, inputs: ['2.5', 'c'],
     rowsAfter: [1, 1], methodAfter: 'm1', clockChanged: true, submitted: '2',
-    numbers: ['7', '20'], pickAfter: 'd',
+    numbers: ['7', '20'], count: '2', counted: ['12', '12'], pickAfter: 'd',
     template: 'ab;', multiStart: [[true, false], '1'], multiNone: [[false, false], '0'], multiEmpty: [[true, false], '1'], beatsStill: true, chartAfter: 'drawn;',
     clicks: 'AB', checks: [true, true, 'true b 2'], mounts: '1;',
   });

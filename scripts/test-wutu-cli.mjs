@@ -92,6 +92,16 @@ try {
   assert.equal(await fs.readFile(path.join(htmlOut, sheet), 'utf8'), '@layer wutu.document{body{color:red;}}');
   assert.match(pageHtml, new RegExp(`<head><link rel="stylesheet" href="\\./${sheet.replaceAll('.', '\\.')}"`));
   assert.ok(!(await fs.readFile(path.join(htmlOut, 'app.js'), 'utf8')).includes('color:red'));
+  // A value goes on to a line indented past its declaration's, in a @document
+  // rule and on an element (a value starting on the next line, `!important`).
+  const continued = path.join(dir, 'continued.utu');
+  await fs.writeFile(continued, 'wn a() {\n    div {\n        grid-template-columns:\n            1fr\n            2fr\n        &:hover {\n            color: red\n                !important\n        }\n        "x"\n    }\n}\nhtml {\n    @document {\n        p {\n            margin: 0\n                auto\n            grid-template-areas: "a b"\n                "c d"\n            padding: 0\n        }\n    }\n    body { |> a() }\n}\n');
+  const continuedOut = path.join(dir, 'continued-out');
+  const continuedBuilt = run('build', continued, '-o', continuedOut);
+  assert.equal(continuedBuilt.status, 0, continuedBuilt.stderr);
+  const continuedCss = await fs.readFile(path.join(continuedOut, (await fs.readdir(continuedOut)).find(name => name.endsWith('.css'))), 'utf8');
+  assert.match(continuedCss, /\{grid-template-columns:1fr 2fr;&:hover\{color:red !important;\}\}/);
+  assert.match(continuedCss, /p\{margin:0 auto;grid-template-areas:"a b" "c d";padding:0;\}/);
   const broken = path.join(dir, 'broken.utu');
   await fs.writeFile(broken, app('Broken').replace('"Broken";', '"Broken" "x"'));
   const failed = run('build', broken, '--out', path.join(dir, 'broken-out'), '--no-prerender');

@@ -235,7 +235,7 @@ main {
 ## Host interop
 
 - `@es/\ js \/` binds JS: `let host_log: fun(Str) Void = @es/\ (s) => console.log(s) \/` (std/console.utu).
-- Typed browser/JS APIs: `using Browser from std:Browser`, `using JS from std:JS` (docs/language/typescript-abi.md).
+- Typed browser/JS APIs: `using Browser from std:Browser`, `using JS from std:JS` (docs/language/typescript-abi.md). A file with Wutu (`wn`, `html { }`, `@wutu`) has `Browser` without the `using`.
 - `Promise[T]` is a real JS promise: `await p` in any `fn` or closure (needs JSPI: Bun, Node 23+, Chrome 126+); a closure the host calls that awaits is an async JS function. `.then(cl(v) { … })` everywhere. No `async` keyword.
 - Data crossing to JS as structure: `@json/\ encode T v \/`, `@json/\ decode T text \/` (gives `?T`) (docs/language/json.md). A native `Array[T]` is opaque to JS.
 

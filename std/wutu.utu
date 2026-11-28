@@ -1057,6 +1057,11 @@ mod wutu {
     fn key_text(value: Externref) Str {
         return "";
     }
+    /// `bind:number`'s number `x` as `like`'s type (`x.i32()`, …). The
+    /// compiler converts; this body is never what runs.
+    fn number_as(x: Externref, like: Externref) Externref {
+        return like;
+    }
     /// A text hole's reuse key (`= f(a, b);`): the compiler makes it, from
     /// the call and its arguments; this body is never what runs.
     fn memo_key(call: Externref, key: Str) Str {

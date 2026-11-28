@@ -182,4 +182,13 @@ html {
   assert.equal(await formatUtuSource(tools, text), text);
 }
 
+// A CSS value on lines indented past its declaration's stays one value (a
+// line at the declaration's indent would start another).
+{
+  const source = 'html {\n    @document {\n        p {\n            margin: 0\n                auto\n            padding: 0\n        }\n    }\n    body { "x" }\n}\n';
+  const text = await formatUtuSource(tools, source);
+  assert.match(text, /\n {12}margin: 0 auto\n {12}padding: 0\n/);
+  assert.equal(await formatUtuSource(tools, text), text);
+}
+
 console.log(`formatter: ${files.length} programs (${formatted} reformatted) keep their tree and are stable; targeted layout, CLI, and compilation checks passed`);

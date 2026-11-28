@@ -1117,6 +1117,33 @@ fn check_wutu_key(node: I32, args: I32, cx: Cx) I32 {
     return error_value()
 }
 
+/// `wutu.number_as(x, like)`, what `bind:number` writes and reads back:
+/// number `x` as `like`'s type, by x's conversion (`x.i32()`, …), or
+/// itself when they are one. `like` is not evaluated.
+fn check_wutu_number(node: I32, args: I32, cx: Cx) I32 {
+    let a = if args >= 0 { first_child(args) } else { -1 }
+    let b = if a >= 0 { next_sibling(a) } else { -1 }
+    if b < 0 or next_sibling(b) >= 0 {
+        report2(Diag.WrongArity, node, -1, 2, if args >= 0 { child_count(args) } else { 0 })
+        return error_value()
+    }
+    let m = w_mark()
+    let want = check_expr(b, -1, cx)
+    w_resize_stack(m)
+    if ty_is(want, Ty.Error) { return want }
+    let rt = check_expr(a, -1, cx)
+    if ty_is(rt, Ty.Error) { return rt }
+    let to = type_text(want)
+    let decl = if to != type_text(rt) and to != "Bool" and in_words(cks(Ckt.I32U32I64U64F32F64), to) { member(ty_decl(rt), intern_text(lower_text(to)), Space.Method) } else { -1 }
+    if decl < 0 {
+        coerce(rt, want, a)
+        return want
+    }
+    let fi = fn_instance(decl, ty_inst(rt))
+    coerce(rt, vl_item(fi_params[fi], 0), a)
+    return call_with(fi, -1, 1, m, a, cx)
+}
+
 /// Whether `callee` is `wutu.show` (std:wutu's).
 fn is_wutu_show(callee: I32) Bool => is_wutu_fn(callee, cks(Ckt.Show))
 
@@ -2350,6 +2377,7 @@ fn check_call(node: I32, expect: I32, cx: Cx) I32 {
     if is_wutu_show(callee) { return check_wutu_show(node, args, cx) }
     if is_wutu_fn(callee, cks(Ckt.MemoKey)) { return check_memo_key(node, args, cx) }
     if is_wutu_fn(callee, cks(Ckt.KeyText)) { return check_wutu_key(node, args, cx) }
+    if is_wutu_fn(callee, cks(Ckt.NumberAs)) { return check_wutu_number(node, args, cx) }
     if is_kind(callee, Node.Identifier) {
         let cd = node_decl[callee]
         if cd >= 0 and is_kind(decl_node[cd], Node.Gp_decl) {
@@ -4824,6 +4852,7 @@ enum(U8) Ckt:
     | ACaptureIsACopyWrite
     | MemoKey
     | KeyText
+    | NumberAs
     | FromI32
     | FromU32
     | FromI64
@@ -4893,6 +4922,7 @@ fn cks_src(t: Ckt) Str {
         Ckt.ACaptureIsACopyWrite => "a capture is a copy: write to the array (xs[i]) or a let",
         Ckt.MemoKey => "memo_key",
         Ckt.KeyText => "key_text",
+        Ckt.NumberAs => "number_as",
         Ckt.FromI32 => "from_i32",
         Ckt.FromU32 => "from_u32",
         Ckt.FromI64 => "from_i64",

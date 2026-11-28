@@ -74,6 +74,16 @@ await Promise.all(Array.from({ length: jobs }, async () => {
 }));
 const now = results.join('\n');
 
+// Every diagnostic says where: the line under its headline is `code · file:line:col`
+// (no-main is about the whole file, which it names; a trap in an unsafe
+// build, which keeps no source map, names only its file).
+const placed = (head, under) => / · .+:\d+:\d+$/.test(under) || under.trim() === 'no-main' || head.startsWith(' TRAP ') && / · \S/.test(under);
+const unplaced = now.split('\n').flatMap((line, i, lines) => /^ (ERROR|TRAP) /.test(line) && !placed(line, lines[i + 1]) ? [`${line.trim()} (${lines[i + 1].trim()})`] : []);
+if (unplaced.length) {
+  console.log(`error messages: ${unplaced.length} without a place:\n${unplaced.join('\n')}`);
+  process.exit(1);
+}
+
 if (record) {
   fs.writeFileSync(RECORD, now);
   console.log(`error messages: recorded ${files.length} programs`);

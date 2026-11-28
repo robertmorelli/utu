@@ -47,6 +47,7 @@ function severalResults(bytes) {
 
 async function selfhost(file) {
   const built = await compileFile(utu, file, { optimize: 'size' });
+  if (!built.wasm) for (const d of built.diagnostics) assert.ok(d.file && d.line > 0, `${file}: no place for "${d.message}"`);
   return built.wasm ? { exports: (await instantiateNode(built.wasm, built.spec)).exports } : { errors: built.diagnostics.map(d => d.message) };
 }
 
@@ -167,11 +168,11 @@ lib { fn run() I32 {
     checked++;
   }
 
-  // A wn's bind: is reported at the binding: without std:Browser, and (with
-  // it) a field of the wrong type, once (both had no place: a wn's template
-  // is generated code in generated code).
+  // A wn's bind: of a field of the wrong type is reported at the binding,
+  // once, with std:Browser imported by the file's Wutu or by a `using` (it
+  // had no place: a wn's template is generated code in generated code).
   for (const [source, message, line, column] of [
-    ['struct S:\n    | t: Str\nwn field(s: S) {\n    input { bind:value = s.t }\n}\nhtml {\n    body {\n        |> field(S { t: "" })\n    }\n}\n', 'bind:value needs using Browser from std:Browser', 4, 13],
+    ['struct S:\n    | n: I32\nwn field(s: S) {\n    input { bind:value = s.n }\n}\nhtml {\n    body {\n        |> field(S { n: 1 })\n    }\n}\n', 'Field n is I32, got Str', 4, 13],
     ['using Browser from std:Browser\nstruct S:\n    | n: I32\nwn field(s: S) {\n    input { bind:value = s.n }\n}\nhtml {\n    body {\n        |> field(S { n: 1 })\n    }\n}\n', 'Field n is I32, got Str', 5, 13],
   ]) {
     const file = await write(source);

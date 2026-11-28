@@ -246,6 +246,50 @@ fn list_imports(file: I32, root: I32) Void {
     }
 }
 
+/// A file of the program, parsed: one with Wutu (`wn`, `html { }`,
+/// `@wutu`) that does not import std:Browser imports it as Browser.
+fn parse_program_file(file: I32) I32 {
+    let root = parse_file(file)
+    if root >= 0 and file_std[file] == 0 and has_wutu(file) and not imports_browser(root) { import_browser(file, root) }
+    return root
+}
+
+fn has_wutu(file: I32) Bool {
+    let wutu = sms(Sml.Wutu)
+    for (file_tok[file] ..< file_tok_end[file]) |t| {
+        if tok_kind[t] == Tok.WutuBody.i32() { return true }
+        if tok_kind[t] == Tok.DslBody.i32() and bytes_text(tok_start[t - 1], tok_end[t - 1]) == wutu { return true }
+    }
+    return false
+}
+
+/// `using Browser from std:Browser`, generated, as the file's last item.
+fn import_browser(file: I32, root: I32) Void {
+    let imports = import_file.len()
+    let site = dsl_current_site
+    dsl_current_site = -1
+    let made = parse_generated_file(rss(Rst.UsingBrowserFromStdBrowser))
+    dsl_current_site = site
+    // (Its import is the file's, not the generated file's.)
+    import_file.resize(imports)
+    import_node.resize(imports)
+    import_path.resize(imports)
+    import_target.resize(imports)
+    if made < 0 { return }
+    let item = node_child[made]
+    node_child[made] = -1
+    let last = node_child[root]
+    if last < 0 { node_child[root] = item } else {
+        while (node_next[last] >= 0) { last = node_next[last] }
+        node_next[last] = item
+    }
+    set_parent(item, root)
+    import_file.push(file)
+    import_node.push(item)
+    import_path.push(last_child(item))
+    import_target.push(-1)
+}
+
 /// The file a token is in: the one whose bytes it is (a DSL's expansion
 /// re-reads utu written in a file, after other files' tokens).
 fn file_of_token(t: I32) I32 {

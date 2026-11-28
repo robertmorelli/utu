@@ -121,6 +121,7 @@ main {
         |> byClock("t")
         input#number { type = "number"; bind:number = state.number }
         input#capped { type = "number"; max = "10"; bind:number = state.capped }
+        input#count { type = "number"; bind:number = state.n }
         button#numbers { "numbers"; on click { state.number = 7.0; state.capped = 20.0 } }
         select#pick {
             bind:value = state.pick

@@ -76,7 +76,7 @@ lib {
     fn file_offset(file: I32) I32 => file_start[file]
 
     /// Lex and parse a file. Returns its source file node, or -1.
-    fn file_parse(file: I32) I32 => parse_file(file)
+    fn file_parse(file: I32) I32 => parse_program_file(file)
 
     fn file_first_token(file: I32) I32 => file_tok[file]
 

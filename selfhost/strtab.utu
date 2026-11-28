@@ -861,6 +861,7 @@ enum(U8) Sml:
     | FnExpansionVoid
     | Splice
     | Css
+    | Wutu
     | Stored
     | Json
     | Splice2
@@ -1059,6 +1060,7 @@ fn sms_src(t: Sml) Str {
         Sml.FnExpansionVoid => "fn __expansion() Void { {0}; }",
         Sml.Splice => "__splice_{0}",
         Sml.Css => "css",
+        Sml.Wutu => "wutu",
         Sml.Stored => "stored",
         Sml.Json => "json",
         Sml.Splice2 => "__splice_",

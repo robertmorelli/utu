@@ -651,10 +651,13 @@ fn fb_block(text: Str, at_depth: I32, code: Bool) Void {
     let nb = 0
     let n = text.len()
     let i = 0
+    // In CSS, where the statement starts: a line indented past its line goes on with it.
+    let first = 0
     while (i < n) {
         let c = text.get(i)
         // Where the next character is.
         let next = i + 1
+        if not code and not is_js_space(c) and current.trim().len() == 0 { first = i }
         if quote != 0 {
             current = current + text.slice(i, i + 1)
             if c == 92 and i + 1 < n {
@@ -722,7 +725,8 @@ fn fb_block(text: Str, at_depth: I32, code: Bool) Void {
                 } else if c == 59 and parens == 0 {
                     fb_flush(depth, current)
                     current = ""
-                } else if c == 10 and parens == 0 and current.trim().len() > 0 and ends_line(current, text, i + 1, code) {
+                } else if c == 10 and parens == 0 and current.trim().len() > 0 and ends_line(current, text, i + 1, code)
+                        and (code or indent_at(text, next_token(text, i + 1)) <= indent_at(text, first)) {
                     fb_flush(depth, current)
                     current = ""
                 } else if c == 44 and code and nb > 0 and braces[nb - 1] == parens and not in_captures(current) and not between_patterns(current, text, i + 1) {
@@ -869,10 +873,10 @@ fn is_declaration(i: I32) Bool => not has_code(":@&", word_text(ti_b[i]).get(0))
 fn declaration_text(start: I32) Str {
     let text = fb_source
     wp_at = start
-    let head = wp_css_until(text, wps(Wpt.ColonBraceBraceEndSemi), false)
+    let head = wp_css_until(text, wps(Wpt.ColonBraceBraceEndSemi), false, -1)
     wp_at += 1
     wp_trivia(text)
-    let _ = wp_css_until(text, if text_at(head, 0, "--") { ";}" } else { wps(Wpt.SemiBraceBraceEnd) }, true)
+    let _ = wp_css_until(text, if text_at(head, 0, "--") { ";}" } else { wps(Wpt.SemiBraceBraceEnd) }, true, indent_at(text, start))
     wp_end(text)
     return text.slice(start, wp_at)
 }

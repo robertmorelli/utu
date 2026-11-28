@@ -149,7 +149,7 @@ CSS property has those prefixes), set in its namespace.
 
 ## Components
 
-`wn` declares a function whose brace body is Wutu text. Every `wn` returns `Externref` (matching `Component.render() Externref`), so adding or removing sibling elements or switching between HTML, SVG, fragments, and `Component` never changes its return type, and `using Browser from std:Browser` is only needed when your code explicitly references `Browser.*` APIs or typed DOM events (`on click |e|`). For example, `wn card(title: Str) { article { | title } }` is the same as
+`wn` declares a function whose brace body is Wutu text. Every `wn` returns `Externref` (matching `Component.render() Externref`), so adding or removing sibling elements or switching between HTML, SVG, fragments, and `Component` never changes its return type, and a file with Wutu (`wn`, `html { }`, `@wutu`) imports `std:Browser` as `Browser` by itself, so `Browser.*` APIs and typed DOM events (`on click |e|`) need no `using`. For example, `wn card(title: Str) { article { | title } }` is the same as
 `fn card(title: Str) Externref => @wutu/\ article { | title } \/`.
 Use `wn` at top level, in a module, as a method, or as a protocol method.
 
@@ -588,7 +588,8 @@ and closure parameters take precedence over aliases.
   select's value is set again once its options are in place, so an option
   added in the same render can be chosen).
 - `bind:checked = state.enabled;` binds a checkbox boolean.
-- `bind:number = state.amount;` binds an F64 through `valueAsNumber`. Invalid
+- `bind:number = state.amount;` binds a number through `valueAsNumber` (an F64;
+  any other number type converts, an I32 as `.i32()` does). Invalid
   numeric edits do not overwrite the state with NaN, and an entry the input
   cannot parse is not overwritten; a value outside `min`, `max` or `step`
   still shows.

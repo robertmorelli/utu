@@ -961,9 +961,6 @@ fn wd_element(n: I32, outer_svg: Bool, o: WOps) Str {
             let handler = wutu_island(word_text(ti_b[i]), ti_from[i], ti_to[i], n)
             let name = word_text(ti_a[i])
             let shorthand = (ti_flags[i] & 1) != 0
-            if shorthand and ti_c[i] >= 0 and wu_has_browser == 0 and event_type(name).len() > 0 {
-                wutu_fail(wus3(Wut.TypedEventNeedsBrowser, name, word_text(ti_c[i]), event_type(name)), ti_at[i])
-            }
             let listener = if shorthand { event_listener(name, handler, ti_c[i]) } else { handler }
             let quiet = (ti_flags[i] & 4) != 0 or (shorthand and quiet_handler(word_text(ti_b[i]), ti_c[i]))
             wx_events.push(intern_text(wus2(Wut.AOpenOpenBCloseCloseSemiNl, wutu_helper("on"), listener)))
@@ -976,7 +973,6 @@ fn wd_element(n: I32, outer_svg: Bool, o: WOps) Str {
 
 /// A binding's code: the property written on render, read back on input.
 fn wd_binding(n: I32, i: I32) Str {
-    if wu_has_browser == 0 { wutu_fail(wus1(Wut.BindNeedsBrowser, word_text(ti_a[i])), ti_at[i]) }
     let id = node_uid(n)
     let target = wutu_island(word_text(ti_b[i]), ti_from[i], ti_to[i], n)
     let kind = word_text(ti_a[i])
@@ -1008,7 +1004,10 @@ fn values_separator() Str => wus(Wut.U001fQuoteBackslashQu)
 ///   files             a file input's ?Browser.FileList (read-only: none)
 fn binding_sync(kind: Str, id: Str, target: Str) Str {
     // (Only an entry the input cannot parse is kept: a value out of range or step still shows.)
-    if kind == "number" { return wus4(Wut.IfNotValidityBadInputAndValueAsNumber, id, id, target, id) + wus1(Wut.ACloseSemiSpaceBraceEnd, target) }
+    if kind == "number" {
+        let number = wus2(Wut.WutuNumberAs, target, id + wus(Wut.ValueAsNumber))
+        return wus4(Wut.IfNotValidityBadInputAndValueAsNumber, id, id, number, id) + wus1(Wut.ACloseSemiSpaceBraceEnd, number)
+    }
     if kind == wus(Wut.Group) { return wus4(Wut.IfCheckedValueChecked, id, id, target, id) + wus2(Wut.Value, id, target) }
     if kind == "values" { return wus4(Wut.IfLen0Else, wutu_helper(wus(Wut.SelectSet)), id, target, values_separator()) + wus2(Wut.Join, values_separator(), target) }
     if kind == wus(Wut.FilesLc) { return "" }
@@ -1018,7 +1017,7 @@ fn binding_sync(kind: Str, id: Str, target: Str) Str {
 /// What reads a binding back into the state, when its event fires.
 fn binding_update(kind: Str, id: Str, target: Str) Str {
     // NaN != NaN: an unparsable number leaves the state as it is.
-    if kind == "number" { return wus4(Wut.IfValueAsNumberValueAsNumberValueAsNumbe, id, id, target, id) }
+    if kind == "number" { return wus4(Wut.IfValueAsNumberValueAsNumberValueAsNumbe, id, id, target, wus2(Wut.WutuNumberAs, id + wus(Wut.ValueAsNumber), target)) }
     if kind == wus(Wut.Group) { return wus3(Wut.IfCheckedValue, id, target, id) }
     // (One expression: the update is spliced in as one.)
     if kind == "values" {
@@ -1215,8 +1214,6 @@ enum(U16) Wut:
     | LayerWutuDocumentAtDotBraceBraceE
     | Node
     | AmbiguousElementAliasReferenceItInside
-    | TypedEventNeedsBrowser
-    | BindNeedsBrowser
     | InvalidUtuInterpolationAtOffset
     | InternalNoWutuHelper
     | LetFunEs
@@ -1296,6 +1293,8 @@ enum(U16) Wut:
     | Index
     | ACommaSpaceB
     | WutuKeyText
+    | WutuNumberAs
+    | ValueAsNumber
     | AOpenBCloseSemi
     | F
     | Each
@@ -1487,8 +1486,6 @@ fn wus_src(t: Wut) Str {
         Wut.LayerWutuDocumentAtDotBraceBraceE => "@layer wutu.document{{0}}",
         Wut.Node => "{0}node{1}",
         Wut.AmbiguousElementAliasReferenceItInside => "Ambiguous element alias '{0}'; reference it inside its own subtree",
-        Wut.TypedEventNeedsBrowser => "on {0} |{1}| makes {1} a Browser.{2}, which needs using Browser from std:Browser",
-        Wut.BindNeedsBrowser => "bind:{0} needs using Browser from std:Browser",
         Wut.InvalidUtuInterpolationAtOffset => "Invalid Utu interpolation at offset {0}: {1}{2}",
         Wut.InternalNoWutuHelper => "internal: no Wutu helper {0}",
         Wut.LetFunEs => "let {0}: fun({1}) {2} = @es/\\ {3} \\/;",
@@ -1543,7 +1540,9 @@ fn wus_src(t: Wut) Str {
         Wut.Join => "{0}.join({1}); })",
         Wut.IfDotBangEqOpenClo => "if {0}.{1} != ({2}) { {3}.",
         Wut.ASpaceEqSpaceOpenBCloseSemiSpaceBraceEnd => "{0} = ({1}); }",
-        Wut.IfValueAsNumberValueAsNumberValueAsNumbe => "if {0}.valueAsNumber == {1}.valueAsNumber { {2} = {3}.valueAsNumber; }",
+        Wut.IfValueAsNumberValueAsNumberValueAsNumbe => "if {0}.valueAsNumber == {1}.valueAsNumber { {2} = {3}; }",
+        Wut.WutuNumberAs => "wutu.number_as({0}, {1})",
+        Wut.ValueAsNumber => ".valueAsNumber",
         Wut.IfCheckedValue => "if {0}.checked { {1} = {2}.value; }",
         Wut.AOpenBClose => "{0}({1})",
         Wut.IfLen0ArrayStrNew => "{0} = if {1}.len() == 0 { Array[Str].new(0, \"\"); } else { {2}.slice(1, {3}.len()).split(",
