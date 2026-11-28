@@ -640,5 +640,9 @@ fn wasm_type_text(vt: I32) Str {
         return if vt_nullable(vt) == vt { sms1(Sml.RefNullType, vt_heap(vt).str()) }
             else { sms1(Sml.RefType, vt_heap(vt).str()) }
     }
-    return sms1(Sml.Value, vt.str())
+    // A tuple: its values, each in its own local.
+    let list = vt - vt_tuple
+    let out = "("
+    for (0 ..< vl_len[list]) |i| { out = out + (if i > 0 { ", " } else { "" }) + wasm_type_text(vl_item(list, i)) }
+    return out + ")"
 }

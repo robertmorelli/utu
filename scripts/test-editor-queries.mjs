@@ -67,4 +67,19 @@ const traps = await compileFile(utu, 'examples/ci/codegen_traps.utu', { root: pr
 assert.ok(traps.wasm);
 assert.ok(Array.from({ length: utu.decl_count() }, (_, d) => utu.decl_effects(d)).some(flags => flags & 8));
 assert.equal(utu.compile_program(4), 0);
+// A tuple's Wasm type is its values (once a raw internal number).
+{
+  const fs = await import('node:fs');
+  const os = await import('node:os');
+  const path = await import('node:path');
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'utu-tuple-hover-'));
+  const file = path.join(dir, 'tuple.utu');
+  fs.writeFileSync(file, 'fn divmod(a: I32, b: I32) .{I32, F64} => .{a / b, 0.5}\nlib { fn run() I32 { let .{q, r} = divmod(17, 5); return q } }\n');
+  const tuple = await compileFile(utu, file, { root: dir, target: 'analysis' });
+  assert.equal(tuple.diagnostics.length, 0);
+  const own = tuple.files.find(f => f.key === file);
+  const at = own.text.indexOf('divmod(17');
+  assert.match(programIndex(utu, tuple.files).explainHover(own.key, at), /Wasm: `\(i32, f64\)`/);
+  fs.rmSync(dir, { recursive: true, force: true });
+}
 console.log('editor query exports pass');
